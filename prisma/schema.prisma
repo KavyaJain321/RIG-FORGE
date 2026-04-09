@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum UserStatus {
+  WORKING
+  NOT_WORKING
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketStatus {
+  OPEN
+  ACCEPTED
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  TICKET_RAISED
+  TICKET_ACCEPTED
+  TICKET_COMPLETED
+  TICKET_CANCELLED
+  TASK_ASSIGNED
+  TASK_DONE
+  TASK_OVERDUE
+  PROJECT_UPDATE
+  PROJECT_ANNOUNCEMENT
+  PROJECT_MEMBER_ADDED
+  PROJECT_LEAD_ASSIGNED
+  ONBOARDING_APPROVED
+  ONBOARDING_PENDING
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
+  passwordHash  String
+  role          Role
+  avatarUrl     String?
+  currentStatus UserStatus @default(NOT_WORKING)
+  isActive      Boolean    @default(true)
+  isOnboarding  Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  projects        ProjectMember[]
+  projectsLed     Project[]       @relation("ProjectLead")
+  tasks           Task[]
+  threads         ThreadMessage[]
+  notifications   Notification[]
+  ticketsRaised   Ticket[]        @relation("TicketsRaised")
+  ticketsHelped   Ticket[]        @relation("TicketsHelped")
+  dailyLogs       DailyLog[]
+  dailyActivities DailyActivity[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus
+  priority    Priority
+  deadline    DateTime?
+  leadId      String?
+  links       Json?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  lead    User?           @relation("ProjectLead", fields: [leadId], references: [id])
+  members ProjectMember[]
+  tasks   Task[]
+  thread  ProjectThread?
+  tickets Ticket[]
+
+  @@index([leadId])
+}
+
+model ProjectMember {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String
+  contribution Float    @default(0)
+  joinedAt     DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([userId, projectId])
+  @@index([projectId])
+}
+
+model Task {
+  id             String     @id @default(cuid())
+  title          String
+  description    String?
+  expectedOutput String?
+  status         TaskStatus
+  priority       Priority
+  assigneeId     String?
+  projectId      String
+  dueDate        DateTime?
+  completedAt    DateTime?
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  assignee User?      @relation(fields: [assigneeId], references: [id])
+  project  Project    @relation(fields: [projectId], references: [id])
+  thread   TaskThread?
+
+  @@index([projectId])
+  @@index([assigneeId])
+}
+
+model Ticket {
+  id          String       @id @default(cuid())
+  title       String
+  description String
+  projectId   String
+  raisedById  String
+  helperId    String?
+  status      TicketStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+  acceptedAt  DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  project  Project @relation(fields: [projectId], references: [id])
+  raisedBy User    @relation("TicketsRaised", fields: [raisedById], references: [id])
+  helper   User?   @relation("TicketsHelped", fields: [helperId], references: [id])
+
+  @@index([projectId])
+  @@index([raisedById])
+  @@index([status])
+}
+
+model DailyLog {
+  id          String   @id @default(cuid())
+  userId      String
+  date        DateTime @db.Date
+  workSummary String
+  notes       String?
+  isLocked    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model DailyActivity {
+  id         String    @id @default(cuid())
+  userId     String
+  date       DateTime  @db.Date
+  wasActive  Boolean   @default(false)
+  lastSeenAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model WeeklyReport {
+  id          String   @id @default(cuid())
+  weekStart   DateTime @db.Date
+  weekEnd     DateTime @db.Date
+  generatedAt DateTime @default(now())
+  snapshot    Json
+
+  @@index([weekStart])
+}
+
+model TaskThread {
+  id        String   @id @default(cuid())
+  taskId    String   @unique
+  createdAt DateTime @default(now())
+
+  task     Task            @relation(fields: [taskId], references: [id])
+  messages ThreadMessage[]
+}
+
+model ProjectThread {
+  id        String   @id @default(cuid())
+  projectId String   @unique
+  createdAt DateTime @default(now())
+
+  project  Project         @relation(fields: [projectId], references: [id])
+  messages ThreadMessage[]
+}
+
+model ThreadMessage {
+  id              String   @id @default(cuid())
+  content         String
+  authorId        String
+  taskThreadId    String?
+  projectThreadId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  author        User           @relation(fields: [authorId], references: [id])
+  taskThread    TaskThread?    @relation(fields: [taskThreadId], references: [id])
+  projectThread ProjectThread? @relation(fields: [projectThreadId], references: [id])
+
+  @@index([taskThreadId])
+  @@index([projectThreadId])
+  @@index([authorId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  read      Boolean          @default(false)
+  linkTo    String?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([read])
+}

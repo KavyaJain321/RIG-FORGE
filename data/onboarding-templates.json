@@ -1,0 +1,47 @@
+{
+  "templates": [
+    {
+      "id": "default",
+      "name": "Standard Onboarding",
+      "description": "Default 30-day onboarding",
+      "tasks": [
+        {
+          "title": "Complete profile setup",
+          "description": "Add your timezone, working hours, and avatar",
+          "dueDay": 1,
+          "category": "SETUP"
+        },
+        {
+          "title": "Read the team handbook",
+          "description": "Located in the Projects section",
+          "dueDay": 2,
+          "category": "LEARN"
+        },
+        {
+          "title": "Meet your team lead",
+          "description": "Schedule a 30-min intro call",
+          "dueDay": 3,
+          "category": "MEET"
+        },
+        {
+          "title": "Submit your first standup",
+          "description": "Go to the Standup section and submit your first update",
+          "dueDay": 5,
+          "category": "SHIP"
+        },
+        {
+          "title": "Complete your first task",
+          "description": "Pick up a TODO task from your assigned project",
+          "dueDay": 14,
+          "category": "SHIP"
+        },
+        {
+          "title": "30-day check-in",
+          "description": "Review progress with your team lead",
+          "dueDay": 30,
+          "category": "MEET"
+        }
+      ]
+    }
+  ]
+}

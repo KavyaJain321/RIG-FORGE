@@ -1,0 +1,154 @@
+import { prisma } from '@/lib/db'
+import type { ProjectDetail, ProjectSummary, ProjectLink } from '@/lib/types'
+
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+
+export async function isMemberOfProject(
+  userId: string,
+  projectId: string,
+): Promise<boolean> {
+  const membership = await prisma.projectMember.findUnique({
+    where: { userId_projectId: { userId, projectId } },
+    select: { id: true },
+  })
+  return membership !== null
+}
+
+// ─── Query helpers ────────────────────────────────────────────────────────────
+
+export async function fetchProjectDetail(
+  projectId: string,
+): Promise<ProjectDetail | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId, isActive: true },
+    include: {
+      lead: { select: { name: true } },
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatarUrl: true,
+              role: true,
+              currentStatus: true,
+            },
+          },
+        },
+      },
+      tasks: {
+        where: { isActive: true },
+        include: {
+          assignee: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+  })
+
+  if (!project) return null
+
+  const totalTasks = project.tasks.length
+  const doneTasks = project.tasks.filter((t) => t.status === 'DONE').length
+  const rawLinks = project.links
+  const links: ProjectLink[] = Array.isArray(rawLinks)
+    ? (rawLinks as unknown as ProjectLink[])
+    : []
+
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description,
+    status: project.status,
+    priority: project.priority,
+    deadline: project.deadline,
+    leadId: project.leadId,
+    leadName: project.lead?.name ?? null,
+    links,
+    totalTasks,
+    doneTasks,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    members: project.members.map((m) => ({
+      userId: m.user.id,
+      name: m.user.name,
+      email: m.user.email,
+      avatarUrl: m.user.avatarUrl,
+      role: m.user.role,
+      currentStatus: m.user.currentStatus,
+      joinedAt: m.joinedAt,
+      isLead: project.leadId === m.user.id,
+    })),
+    tasks: project.tasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      expectedOutput: t.expectedOutput,
+      status: t.status,
+      priority: t.priority,
+      assigneeId: t.assigneeId,
+      assigneeName: t.assignee?.name ?? null,
+      dueDate: t.dueDate,
+      completedAt: t.completedAt,
+      createdAt: t.createdAt,
+    })),
+  }
+}
+
+export async function fetchProjectSummary(
+  projectId: string,
+): Promise<ProjectSummary | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId, isActive: true },
+    include: {
+      lead: { select: { name: true } },
+      tasks: {
+        where: { isActive: true },
+        select: { status: true },
+      },
+      members: {
+        take: 5,
+        orderBy: { joinedAt: 'asc' },
+        select: {
+          user: {
+            select: { id: true, name: true, avatarUrl: true, role: true },
+          },
+        },
+      },
+      _count: { select: { members: true } },
+    },
+  })
+
+  if (!project) return null
+
+  const totalTasks = project.tasks.length
+  const doneTasks = project.tasks.filter((t) => t.status === 'DONE').length
+  const rawLinks = project.links
+  const links: ProjectLink[] = Array.isArray(rawLinks)
+    ? (rawLinks as unknown as ProjectLink[])
+    : []
+
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description,
+    status: project.status,
+    priority: project.priority,
+    deadline: project.deadline,
+    leadId: project.leadId,
+    leadName: project.lead?.name ?? null,
+    links,
+    totalTasks,
+    doneTasks,
+    memberCount: project._count.members,
+    members: project.members.map((m) => ({
+      id: m.user.id,
+      name: m.user.name,
+      avatarUrl: m.user.avatarUrl,
+      role: m.user.role,
+    })),
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+  }
+}

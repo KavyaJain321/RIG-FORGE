@@ -1,0 +1,154 @@
+import { type NextRequest } from 'next/server'
+
+import { prisma } from '@/lib/db'
+import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { successResponse, errorResponse } from '@/lib/api-helpers'
+import type { AuthUser } from '@/lib/types'
+
+// ─── Types ─────────────────────────────────────────────────────────────────
+
+interface ProjectEntry {
+  id: string
+  name: string
+  status: string
+  isLead: boolean
+  joinedAt: Date
+}
+
+interface ActivityEntry {
+  date: string
+  wasActive: boolean
+}
+
+interface DailyLogEntry {
+  date: string
+  workSummary: string
+  notes: string | null
+}
+
+export interface ProfileResponse {
+  user: AuthUser
+  projects: ProjectEntry[]
+  activityThisWeek: ActivityEntry[]
+  dailyLogsThisWeek: DailyLogEntry[]
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+function getSevenDaysAgo(): Date {
+  const d = new Date()
+  d.setUTCHours(0, 0, 0, 0)
+  d.setUTCDate(d.getUTCDate() - 6)
+  return d
+}
+
+function buildWeekDates(): string[] {
+  const dates: string[] = []
+  const start = getSevenDaysAgo()
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start)
+    d.setUTCDate(d.getUTCDate() + i)
+    dates.push(d.toISOString().slice(0, 10))
+  }
+  return dates
+}
+
+// ─── GET /api/users/me/profile ─────────────────────────────────────────────
+
+export async function GET(request: NextRequest) {
+  try {
+    const token = getTokenFromCookies(request)
+    if (!token) return errorResponse('Authentication required', 401)
+
+    const claims = verifyToken(token)
+    if (!claims) return errorResponse('Invalid or expired token', 401)
+
+    const userId = claims.userId
+    const sevenDaysAgo = getSevenDaysAgo()
+
+    const [userRecord, memberRows, activityRows, logRows] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          avatarUrl: true,
+          currentStatus: true,
+          isOnboarding: true,
+          createdAt: true,
+        },
+      }),
+      prisma.projectMember.findMany({
+        where: { userId },
+        include: {
+          project: {
+            select: { id: true, name: true, status: true, leadId: true },
+          },
+        },
+        orderBy: { joinedAt: 'desc' },
+      }),
+      prisma.dailyActivity.findMany({
+        where: { userId, date: { gte: sevenDaysAgo } },
+        orderBy: { date: 'asc' },
+      }),
+      prisma.dailyLog.findMany({
+        where: { userId, date: { gte: sevenDaysAgo } },
+        orderBy: { date: 'desc' },
+      }),
+    ])
+
+    if (!userRecord) return errorResponse('User not found', 404)
+
+    const user: AuthUser = {
+      id: userRecord.id,
+      name: userRecord.name,
+      email: userRecord.email,
+      role: userRecord.role,
+      avatarUrl: userRecord.avatarUrl ?? null,
+      currentStatus: userRecord.currentStatus,
+      isOnboarding: userRecord.isOnboarding,
+      createdAt: userRecord.createdAt,
+    }
+
+    const projects: ProjectEntry[] = memberRows.map((m) => ({
+      id: m.project.id,
+      name: m.project.name,
+      status: m.project.status,
+      isLead: m.project.leadId === userId,
+      joinedAt: m.joinedAt,
+    }))
+
+    // Build a map of date → wasActive from DB rows
+    const activityMap = new Map<string, boolean>(
+      activityRows.map((a) => [
+        new Date(a.date).toISOString().slice(0, 10),
+        a.wasActive,
+      ])
+    )
+
+    const activityThisWeek: ActivityEntry[] = buildWeekDates().map((date) => ({
+      date,
+      wasActive: activityMap.get(date) ?? false,
+    }))
+
+    const dailyLogsThisWeek: DailyLogEntry[] = logRows.map((l) => ({
+      date: new Date(l.date).toISOString().slice(0, 10),
+      workSummary: l.workSummary,
+      notes: l.notes ?? null,
+    }))
+
+    const response: ProfileResponse = {
+      user,
+      projects,
+      activityThisWeek,
+      dailyLogsThisWeek,
+    }
+
+    return successResponse(response)
+  } catch (error) {
+    console.error('[GET /api/users/me/profile] Unexpected error:', error)
+    return errorResponse('Internal server error', 500)
+  }
+}

@@ -1,0 +1,34 @@
+import { type NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db'
+import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { successResponse, errorResponse } from '@/lib/api-helpers'
+import type { AuthUser, ApiResponse } from '@/lib/types'
+
+export async function GET(request: NextRequest): Promise<NextResponse<ApiResponse<AuthUser> | ApiResponse<never>>> {
+  try {
+    const token = getTokenFromCookies(request)
+    if (!token) return errorResponse('Not authenticated', 401)
+
+    const payload = verifyToken(token)
+    if (!payload) return errorResponse('Invalid or expired token', 401)
+
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } })
+    if (!user) return errorResponse('User not found', 404)
+
+    const authUser: AuthUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role as 'ADMIN' | 'EMPLOYEE',
+      avatarUrl: user.avatarUrl,
+      currentStatus: user.currentStatus as 'WORKING' | 'NOT_WORKING',
+      isOnboarding: user.isOnboarding,
+      createdAt: user.createdAt,
+    }
+
+    return successResponse(authUser)
+  } catch (error) {
+    console.error('[GET /api/auth/me]', error)
+    return errorResponse('An unexpected error occurred', 500)
+  }
+}

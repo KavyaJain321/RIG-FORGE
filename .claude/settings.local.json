@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm tsc:*)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Dell\\\\Desktop\\\\FORGE\\\\app\\\\api\\\\onboarding\\\\me\\\\tasks\\\\[taskId]\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Dell\\\\Desktop\\\\FORGE\\\\app\\\\api\\\\onboarding\\\\[userId]\\\\tasks\\\\[taskId]\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Dell\\\\Desktop\\\\FORGE\\\\app\\\\api\\\\onboarding\\\\[userId]\\\\reset\")",
+      "Bash(wmic logicaldisk:*)",
+      "Bash(ls \"C:\\\\Users\\\\Dell\\\\Desktop\\\\FORGE\\\\components\\\\thread\"\" 2>/dev/null || echo \"dir empty or not found \")",
+      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+      "mcp__plugin_context-mode_context-mode__ctx_execute_file",
+      "Bash(grep -v \"^$\")",
+      "Bash(pnpm add:*)",
+      "mcp__plugin_context-mode_context-mode__ctx_search",
+      "Bash(ls -la /c/Users/Dell/Desktop/FORGE/*.md)",
+      "Bash(curl -s http://localhost:3000 -o /dev/null -w \"%{http_code}\")",
+      "Bash(node:*)",
+      "Bash(find C:/Users/Dell/Desktop/FORGE -name seed* -o -name setup* -o -name *.seed*)",
+      "Bash(grep -r \"admin@forge\\\\|password\\\\|Admin123\\\\|forge123\\\\|default.*pass\" C:/Users/Dell/Desktop/FORGE --include=*.md --include=*.txt --include=*.env* -l)",
+      "Bash(npx playwright:*)",
+      "Bash(npm install:*)",
+      "Bash(cat C:/Users/Dell/Desktop/FORGE/app/dashboard/projects/[id]/page.tsx)",
+      "Bash(cd:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
