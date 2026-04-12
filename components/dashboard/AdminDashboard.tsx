@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import type { AdminDashboardData, AuthUser, ApiResponse } from '@/lib/types'
+import MemberSlideOver from '@/components/people/MemberSlideOver'
 
 interface AdminDashboardProps {
   user: AuthUser
@@ -70,6 +71,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const [data, setData] = useState<AdminDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchData = useCallback(async (): Promise<void> => {
@@ -123,22 +125,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-neutral-400 mb-1">
-              Admin Overview
-            </p>
-            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">
-              Dashboard
-            </h1>
-          </div>
-          <button
-            onClick={() => { void fetchData() }}
-            className="w-8 h-8 rounded-full bg-black/[0.06] hover:bg-black/[0.1] text-neutral-500 hover:text-neutral-800 transition-all flex items-center justify-center text-base"
-            title="Refresh"
-          >
-            ↻
-          </button>
+        <div>
+          <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-neutral-400 mb-1">
+            Admin Overview
+          </p>
+          <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">
+            Dashboard
+          </h1>
         </div>
 
         {/* Error banner */}
@@ -175,29 +168,36 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                     No one is working right now
                   </p>
                 ) : (
-                  <ul className="space-y-3">
+                  <ul className="space-y-1">
                     {data.workingMembers.map(member => (
-                      <li key={member.id} className="flex items-center gap-3">
-                        <div className="relative shrink-0">
-                          {member.avatarUrl ? (
-                            <img
-                              src={member.avatarUrl}
-                              alt={member.name}
-                              className="w-9 h-9 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-semibold text-neutral-600">
-                              {getInitials(member.name)}
-                            </div>
-                          )}
-                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-neutral-800 truncate">{member.name}</p>
-                          <p className="text-xs text-neutral-400 truncate">
-                            {member.primaryProject ?? 'No project'}
-                          </p>
-                        </div>
+                      <li key={member.id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMemberId(member.id)}
+                          className="w-full flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-neutral-50 transition-colors text-left group"
+                        >
+                          <div className="relative shrink-0">
+                            {member.avatarUrl ? (
+                              <img
+                                src={member.avatarUrl}
+                                alt={member.name}
+                                className="w-9 h-9 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-semibold text-neutral-600">
+                                {getInitials(member.name)}
+                              </div>
+                            )}
+                            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-neutral-800 truncate group-hover:text-neutral-900">{member.name}</p>
+                            <p className="text-xs text-neutral-400 truncate">
+                              {member.primaryProject ?? 'No project'}
+                            </p>
+                          </div>
+                          <span className="text-neutral-300 group-hover:text-neutral-500 text-xs transition-colors">›</span>
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -339,6 +339,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           </>
         )}
       </div>
+
+      {/* Member slide-over panel */}
+      <MemberSlideOver
+        memberId={selectedMemberId}
+        isAdmin
+        onClose={() => setSelectedMemberId(null)}
+      />
     </div>
   )
 }

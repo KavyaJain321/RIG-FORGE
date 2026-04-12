@@ -193,10 +193,16 @@ body {
 .shimmer { @apply forge-shimmer rounded-2xl; background: rgba(0,0,0,0.06); }
 
 @keyframes bell-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.7; transform: scale(1.15); }
 }
-.bell-pulse { animation: bell-pulse 2s ease-in-out infinite; }
+.bell-pulse { animation: bell-pulse 1.4s ease-in-out infinite; }
+
+@keyframes notif-ping {
+  0%   { transform: scale(1);   opacity: 1; }
+  60%  { transform: scale(1.9); opacity: 0; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    TOPBAR

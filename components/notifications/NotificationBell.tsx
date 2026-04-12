@@ -15,8 +15,8 @@ interface NotificationBellProps {
 const NotificationBell = forwardRef<HTMLDivElement, NotificationBellProps>(
   function NotificationBell({ onClick, isOpen }, ref) {
     const { unreadCount, connected } = useNotificationStore()
-    const hasUnread = unreadCount > 0
-    const badgeLabel = unreadCount > 9 ? '9+' : String(unreadCount)
+    const hasUnread  = unreadCount > 0
+    const badgeLabel = unreadCount > 99 ? '99+' : String(unreadCount)
 
     return (
       <div ref={ref}>
@@ -30,34 +30,44 @@ const NotificationBell = forwardRef<HTMLDivElement, NotificationBellProps>(
               ? 'border-accent bg-background-tertiary'
               : 'border-transparent hover:bg-background-tertiary',
           ].join(' ')}
-          aria-label="Notifications"
+          aria-label={`Notifications${hasUnread ? ` (${unreadCount} unread)` : ''}`}
           aria-expanded={isOpen}
         >
-          {/* Bell symbol */}
-          <span
-            className={[
-              'font-mono text-xs shrink-0',
-              hasUnread ? 'text-accent' : 'text-text-muted',
-            ].join(' ')}
-          >
-            ◉
+          {/* Bell icon with pulsing red dot overlay when there are unreads */}
+          <span className="relative shrink-0 flex items-center justify-center">
+            <span
+              className={[
+                'font-mono text-xs',
+                hasUnread ? 'text-accent' : 'text-text-muted',
+              ].join(' ')}
+            >
+              ◉
+            </span>
+
+            {/* Pulsing red dot — visible immediately when unread > 0 */}
+            {hasUnread && (
+              <span
+                className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500"
+                style={{ animation: 'notif-ping 1.2s ease-in-out infinite' }}
+              />
+            )}
           </span>
 
           {/* Label */}
           <span
             className={[
               'flex-1 text-left',
-              hasUnread ? 'text-text-primary' : 'text-text-secondary',
+              hasUnread ? 'text-text-primary font-semibold' : 'text-text-secondary',
             ].join(' ')}
           >
             NOTIFICATIONS
           </span>
 
-          {/* Right side: badge + connection dot */}
+          {/* Right side: count badge + connection dot */}
           <span className="flex items-center gap-2 shrink-0">
             {hasUnread && (
               <span
-                className="rounded-full min-w-[18px] h-[18px] bg-accent text-background-primary font-mono text-[10px] font-bold flex items-center justify-center px-1 bell-pulse"
+                className="rounded-full min-w-[20px] h-5 bg-red-500 text-white font-mono text-[10px] font-bold flex items-center justify-center px-1.5 bell-pulse"
                 style={{ lineHeight: 1 }}
               >
                 {badgeLabel}
@@ -71,7 +81,7 @@ const NotificationBell = forwardRef<HTMLDivElement, NotificationBellProps>(
                 'w-[6px] h-[6px]',
                 connected ? 'bg-status-success' : 'bg-status-offline',
               ].join(' ')}
-              title={connected ? 'Live' : 'Disconnected'}
+              title={connected ? 'Live' : 'Polling'}
             />
           </span>
         </button>

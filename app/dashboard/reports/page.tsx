@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 import { useAuth } from '@/hooks/useAuth'
-import type { WeeklyReportSummary } from '@/lib/types'
+import type { WeeklyReportSummary, DailyLogEntry, ApiResponse } from '@/lib/types'
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 
 function formatDate(date: Date | string): string {
   return new Date(date).toLocaleDateString('en-US', {
@@ -23,6 +25,8 @@ function formatDateShort(date: Date | string): string {
   })
 }
 
+// ─── Admin helpers ────────────────────────────────────────────────────────────
+
 function isCurrentWeekAlreadyGenerated(reports: WeeklyReportSummary[]): boolean {
   if (reports.length === 0) return false
   const latest = reports[0]
@@ -38,49 +42,182 @@ function isCurrentWeekAlreadyGenerated(reports: WeeklyReportSummary[]): boolean 
   return reportWeekStart >= lastMonday && reportWeekStart < currentMonday
 }
 
-export default function ReportsPage() {
-  const router = useRouter()
-  const { user, loading } = useAuth()
+// ─── Employee: Weekly note section ────────────────────────────────────────────
 
-  const [reports, setReports] = useState<WeeklyReportSummary[]>([])
-  const [fetchError, setFetchError] = useState<string | null>(null)
-  const [generating, setGenerating] = useState(false)
+const MAX_NOTE_LENGTH = 2000
+
+function WeeklyNoteSection() {
+  const [entry, setEntry]     = useState<DailyLogEntry | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [draft, setDraft]     = useState('')
+  const [saving, setSaving]   = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [error, setError]     = useState<string | null>(null)
+
+  // What Friday this note belongs to — just for display
+  const thisWeekFriday = (() => {
+    const now = new Date()
+    const day = now.getUTCDay()
+    const daysSinceMon = day === 0 ? 6 : day - 1
+    const friday = new Date(now)
+    friday.setUTCDate(now.getUTCDate() - daysSinceMon + 4)
+    return friday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  })()
+
+  const fetchNote = useCallback(async () => {
+    try {
+      const res  = await fetch('/api/weekly-note', { credentials: 'include' })
+      const json = await res.json() as ApiResponse<DailyLogEntry | null>
+      if (res.ok && json.data) {
+        setEntry(json.data)
+        setDraft(json.data.workSummary)
+      }
+    } catch {
+      // Network issue — leave form blank, user can still try to submit
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void fetchNote() }, [fetchNote])
+
+  async function handleSave() {
+    const trimmed = draft.trim()
+    if (!trimmed || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res  = await fetch('/api/weekly-note', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: trimmed }),
+      })
+      const json = await res.json() as ApiResponse<DailyLogEntry>
+      if (!res.ok || json.error) {
+        setError(json.error ?? 'Could not save note')
+        return
+      }
+      setEntry(json.data)
+      setEditing(false)
+    } catch {
+      setError('Network error — could not save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleCancel() {
+    setDraft(entry?.workSummary ?? '')
+    setEditing(false)
+    setError(null)
+  }
+
+  const showForm = entry === null || editing
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-10">
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-neutral-800">Weekly Note</h1>
+        <p className="text-sm text-neutral-500 mt-1">
+          Week ending {thisWeekFriday} — anything to flag? (optional)
+        </p>
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-neutral-100">
+        {loading ? (
+          <div className="space-y-3">
+            <div className="shimmer h-4 w-40 rounded" />
+            <div className="shimmer h-24 rounded-xl" />
+          </div>
+        ) : showForm ? (
+          <div className="space-y-4">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              maxLength={MAX_NOTE_LENGTH}
+              rows={5}
+              placeholder="Anything to flag this week? (optional)"
+              className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300 resize-none"
+            />
+            {draft.length > MAX_NOTE_LENGTH - 200 && (
+              <p className="text-xs text-neutral-400 text-right">
+                {draft.length} / {MAX_NOTE_LENGTH}
+              </p>
+            )}
+            {error && (
+              <p className="text-xs text-red-600">{error}</p>
+            )}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => void handleSave()}
+                disabled={saving || !draft.trim()}
+                className="px-4 py-2 bg-neutral-900 text-white text-xs font-semibold rounded-xl hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {saving ? 'Saving…' : 'Save note'}
+              </button>
+              {editing && (
+                <button
+                  onClick={handleCancel}
+                  className="px-4 py-2 text-neutral-500 hover:text-neutral-700 text-xs font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Saved state — read-only with edit link */
+          <div className="space-y-3">
+            <div className="bg-neutral-50 rounded-xl px-4 py-3">
+              <p className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed">
+                {entry.workSummary}
+              </p>
+            </div>
+            <button
+              onClick={() => setEditing(true)}
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Edit note
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Admin: Reports list ──────────────────────────────────────────────────────
+
+function AdminReportsSection() {
+  const [reports, setReports]           = useState<WeeklyReportSummary[]>([])
+  const [fetchError, setFetchError]     = useState<string | null>(null)
+  const [generating, setGenerating]     = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!loading && user && user.role !== 'ADMIN') {
-      router.replace('/dashboard')
-    }
-  }, [user, loading, router])
-
-  useEffect(() => {
-    if (!loading && user?.role === 'ADMIN') {
-      fetchReports()
-    }
-  }, [loading, user])
-
-  async function fetchReports() {
+  const fetchReports = useCallback(async () => {
     setFetchError(null)
     try {
-      const res = await fetch('/api/reports')
+      const res  = await fetch('/api/reports')
+      const body = await res.json() as { data: WeeklyReportSummary[]; error?: string }
       if (!res.ok) {
-        const body = await res.json()
         setFetchError(body.error ?? 'Failed to load reports')
         return
       }
-      const body = await res.json()
-      setReports(body.data as WeeklyReportSummary[])
+      setReports(body.data)
     } catch {
       setFetchError('Network error loading reports')
     }
-  }
+  }, [])
+
+  useEffect(() => { void fetchReports() }, [fetchReports])
 
   async function handleGenerate() {
     setGenerating(true)
     setGenerateError(null)
     try {
-      const res = await fetch('/api/reports/generate', { method: 'POST' })
-      const body = await res.json()
+      const res  = await fetch('/api/reports/generate', { method: 'POST' })
+      const body = await res.json() as { error?: string }
       if (!res.ok) {
         setGenerateError(body.error ?? 'Failed to generate report')
         return
@@ -93,16 +230,6 @@ export default function ReportsPage() {
     }
   }
 
-  if (loading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-      </div>
-    )
-  }
-
-  if (user.role !== 'ADMIN') return null
-
   const alreadyGenerated = isCurrentWeekAlreadyGenerated(reports)
 
   return (
@@ -112,7 +239,7 @@ export default function ReportsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Weekly Reports</h1>
         <div className="flex flex-col items-end gap-1">
           <button
-            onClick={handleGenerate}
+            onClick={() => void handleGenerate()}
             disabled={generating || alreadyGenerated}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -130,7 +257,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Error */}
+      {/* Fetch error */}
       {fetchError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           {fetchError}
@@ -173,4 +300,26 @@ export default function ReportsPage() {
       )}
     </div>
   )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function ReportsPage() {
+  const router = useRouter()
+  const { user, loading } = useAuth()
+
+  useEffect(() => {
+    if (!loading && !user) router.replace('/login')
+  }, [user, loading, router])
+
+  if (loading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    )
+  }
+
+  if (user.role === 'ADMIN') return <AdminReportsSection />
+  return <WeeklyNoteSection />
 }

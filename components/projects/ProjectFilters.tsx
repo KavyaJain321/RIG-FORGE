@@ -64,7 +64,7 @@ export default function ProjectFilters({
             { value: 'ACTIVE', label: 'ACTIVE' },
             { value: 'ON_HOLD', label: 'ON HOLD' },
             { value: 'COMPLETED', label: 'COMPLETED' },
-            { value: 'ARCHIVED', label: 'ARCHIVED' },
+            ...(isAdmin ? [{ value: 'ARCHIVED', label: 'ARCHIVED' }] : []),
           ]}
           className="text-xs"
         />

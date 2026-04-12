@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 
 import MemberRow from '@/components/projects/detail/MemberRow'
+import MemberSlideOver from '@/components/people/MemberSlideOver'
 import type { ProjectDetail, ProjectLink } from '@/lib/types'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -11,6 +13,7 @@ interface OverviewTabProps {
   project: ProjectDetail
   isAdmin: boolean
   isLead: boolean
+  currentUserId?: string
   onProjectChange: (next: ProjectDetail) => void
 }
 
@@ -103,11 +106,38 @@ function BlockerStatusBadge({ status }: { status: string }) {
 interface DescriptionSectionProps {
   projectId: string
   description: string | null
+  isAdmin: boolean
   canEdit: boolean
   onSaved: (description: string | null) => void
 }
 
-function DescriptionSection({ projectId, description, canEdit, onSaved }: DescriptionSectionProps) {
+/** Custom ReactMarkdown renderers that match the RIG-FORGE design system */
+const markdownComponents: React.ComponentProps<typeof ReactMarkdown>['components'] = {
+  // Summary paragraph — slightly more prominent
+  p: ({ children }) => (
+    <p className="font-mono text-sm text-secondary leading-relaxed mb-3 last:mb-0">
+      {children}
+    </p>
+  ),
+  // Bullet list with comfortable spacing
+  ul: ({ children }) => (
+    <ul className="flex flex-col gap-1.5 mt-1">
+      {children}
+    </ul>
+  ),
+  li: ({ children }) => (
+    <li className="flex gap-2 font-mono text-xs text-secondary leading-relaxed">
+      <span className="text-accent shrink-0 mt-0.5">—</span>
+      <span>{children}</span>
+    </li>
+  ),
+  // Bold key terms
+  strong: ({ children }) => (
+    <strong className="font-semibold text-primary">{children}</strong>
+  ),
+}
+
+function DescriptionSection({ projectId, description, isAdmin, canEdit, onSaved }: DescriptionSectionProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(description ?? '')
   const [saving, setSaving] = useState(false)
@@ -143,10 +173,15 @@ function DescriptionSection({ projectId, description, canEdit, onSaved }: Descri
     setError(null)
   }
 
+  const isEmpty = !description || description.trim() === ''
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="font-mono text-xs text-muted tracking-widest uppercase">Description</h3>
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-mono text-[10px] text-muted tracking-widest uppercase">
+          About This Project
+        </h3>
         {canEdit && !editing && (
           <button
             type="button"
@@ -159,15 +194,16 @@ function DescriptionSection({ projectId, description, canEdit, onSaved }: Descri
         )}
       </div>
 
+      {/* Edit mode */}
       {editing ? (
         <div className="flex flex-col gap-2">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            rows={4}
+            rows={7}
             maxLength={1000}
             className="w-full bg-background-primary border border-border-default px-4 py-3 font-mono text-sm text-primary placeholder:text-muted focus:border-accent focus:outline-none resize-none transition-colors duration-150"
-            placeholder="Add a project description..."
+            placeholder="Add a project description... Markdown supported: **bold**, - bullet"
           />
           {error && <p className="font-mono text-xs text-status-danger">{error}</p>}
           <div className="flex gap-3">
@@ -188,10 +224,37 @@ function DescriptionSection({ projectId, description, canEdit, onSaved }: Descri
             </button>
           </div>
         </div>
-      ) : description ? (
-        <p className="font-mono text-sm text-secondary leading-relaxed whitespace-pre-wrap">{description}</p>
+      ) : isEmpty ? (
+        /* Empty state — differs by role */
+        isAdmin ? (
+          <div className="flex items-start gap-3 bg-surface-mid border border-border-default rounded-card px-5 py-4">
+            <span className="text-muted text-base shrink-0 mt-0.5">✏️</span>
+            <p className="font-mono text-xs text-muted leading-relaxed">
+              No description yet.{' '}
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => { setDraft(''); setEditing(true) }}
+                  className="text-accent hover:text-accent-hover underline transition-colors duration-150"
+                >
+                  Click here to add one.
+                </button>
+              )}
+              {!canEdit && 'Ask a project lead or admin to add one.'}
+            </p>
+          </div>
+        ) : (
+          <p className="font-mono text-xs text-muted italic">
+            No description available for this project.
+          </p>
+        )
       ) : (
-        <p className="font-mono text-sm text-muted italic">No description provided</p>
+        /* Description card with left accent border */
+        <div className="bg-surface-mid border border-border-default border-l-[3px] border-l-accent rounded-card px-5 py-4">
+          <ReactMarkdown components={markdownComponents}>
+            {description}
+          </ReactMarkdown>
+        </div>
       )}
     </div>
   )
@@ -596,8 +659,15 @@ function DetailsPanel({ project, isAdmin, onProjectChange }: DetailsPanelProps) 
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function OverviewTab({ project, isAdmin, isLead, onProjectChange }: OverviewTabProps) {
+export default function OverviewTab({ project, isAdmin, isLead, currentUserId, onProjectChange }: OverviewTabProps) {
   const canEdit = isAdmin || isLead
+  const [slideOverMemberId, setSlideOverMemberId] = useState<string | null>(null)
+
+  function handleMemberClick(userId: string) {
+    // Employees can only open their own profile
+    if (!isAdmin && userId !== currentUserId) return
+    setSlideOverMemberId(userId)
+  }
 
   function handleRemoveMember(userId: string) {
     onProjectChange({
@@ -623,6 +693,7 @@ export default function OverviewTab({ project, isAdmin, isLead, onProjectChange 
           <DescriptionSection
             projectId={project.id}
             description={project.description}
+            isAdmin={isAdmin}
             canEdit={canEdit}
             onSaved={handleDescriptionSaved}
           />
@@ -656,6 +727,8 @@ export default function OverviewTab({ project, isAdmin, isLead, onProjectChange 
                 projectId={project.id}
                 member={m}
                 isAdmin={isAdmin}
+                currentUserId={currentUserId}
+                onMemberClick={handleMemberClick}
                 onRemoveMember={handleRemoveMember}
               />
             ))
@@ -671,6 +744,14 @@ export default function OverviewTab({ project, isAdmin, isLead, onProjectChange 
           />
         </div>
       </div>
+
+      {/* Member slide-over: admin sees all, employee only own profile */}
+      <MemberSlideOver
+        memberId={slideOverMemberId}
+        isAdmin={isAdmin}
+        currentUserId={currentUserId}
+        onClose={() => setSlideOverMemberId(null)}
+      />
     </div>
   )
 }

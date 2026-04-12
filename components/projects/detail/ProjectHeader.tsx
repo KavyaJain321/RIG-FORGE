@@ -124,11 +124,6 @@ export default function ProjectHeader({
         </div>
       </div>
 
-      {/* Row 3 — description */}
-      {project.description ? (
-        <p className="text-secondary text-sm max-w-2xl mb-4">{project.description}</p>
-      ) : null}
-
       {/* Tabs */}
       <ProjectTabs />
     </header>

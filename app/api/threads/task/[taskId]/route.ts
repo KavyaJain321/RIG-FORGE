@@ -10,6 +10,7 @@ interface RouteContext {
 }
 
 // ─── GET /api/threads/task/[taskId] ──────────────────────────────────────────
+// Task threads are always TEAM visibility — no LEAD_ADMIN filtering needed.
 
 export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
@@ -21,7 +22,6 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
     const { taskId } = params
 
-    // Verify task exists and user has access
     const task = await prisma.task.findFirst({
       where: {
         id: taskId,
@@ -32,10 +32,8 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       },
       select: { id: true },
     })
-
     if (!task) return errorResponse('Task not found', 404)
 
-    // Get or create thread
     const thread = await prisma.taskThread.upsert({
       where: { taskId },
       create: { taskId },
@@ -56,11 +54,13 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         id: true,
         content: true,
         authorId: true,
+        visibility: true,
+        fileUrl: true,
+        fileName: true,
+        fileType: true,
         createdAt: true,
         updatedAt: true,
-        author: {
-          select: { name: true, avatarUrl: true, role: true },
-        },
+        author: { select: { name: true, avatarUrl: true, role: true } },
       },
     })
 
@@ -80,6 +80,10 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       createdAt: m.createdAt,
       updatedAt: m.updatedAt,
       edited: m.createdAt.getTime() !== m.updatedAt.getTime(),
+      visibility: m.visibility as 'TEAM' | 'LEAD_ADMIN',
+      fileUrl: m.fileUrl,
+      fileName: m.fileName,
+      fileType: m.fileType,
     }))
 
     return successResponse({ items, nextCursor })
@@ -90,6 +94,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 }
 
 // ─── POST /api/threads/task/[taskId] ─────────────────────────────────────────
+// Task thread messages are always TEAM visibility.
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
@@ -101,7 +106,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
 
     const { taskId } = params
 
-    // Verify task exists and user has access
     const task = await prisma.task.findFirst({
       where: {
         id: taskId,
@@ -112,7 +116,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       },
       select: { id: true },
     })
-
     if (!task) return errorResponse('Task not found', 404)
 
     let body: unknown
@@ -122,7 +125,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return errorResponse('Request body must be valid JSON', 400)
     }
 
-    const { content } = body as Record<string, unknown>
+    const { content, fileUrl, fileName, fileType } = body as Record<string, unknown>
     if (!content || typeof content !== 'string' || content.trim().length === 0) {
       return errorResponse('content is required', 400)
     }
@@ -130,7 +133,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return errorResponse('content must not exceed 4000 characters', 400)
     }
 
-    // Get or create thread
+    const safeFileUrl = typeof fileUrl === 'string' && fileUrl.trim() ? fileUrl.trim() : null
+    const safeFileName = typeof fileName === 'string' && fileName.trim() ? fileName.trim() : null
+    const safeFileType = safeFileUrl ? (typeof fileType === 'string' ? fileType.trim() : 'link') : null
+
     const thread = await prisma.taskThread.upsert({
       where: { taskId },
       create: { taskId },
@@ -143,16 +149,22 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         content: content.trim(),
         authorId: payload.userId,
         taskThreadId: thread.id,
+        visibility: 'TEAM', // task threads are always team-visible
+        fileUrl: safeFileUrl,
+        fileName: safeFileName,
+        fileType: safeFileType,
       },
       select: {
         id: true,
         content: true,
         authorId: true,
+        visibility: true,
+        fileUrl: true,
+        fileName: true,
+        fileType: true,
         createdAt: true,
         updatedAt: true,
-        author: {
-          select: { name: true, avatarUrl: true, role: true },
-        },
+        author: { select: { name: true, avatarUrl: true, role: true } },
       },
     })
 
@@ -168,6 +180,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       createdAt: message.createdAt,
       updatedAt: message.updatedAt,
       edited: message.createdAt.getTime() !== message.updatedAt.getTime(),
+      visibility: 'TEAM',
+      fileUrl: message.fileUrl,
+      fileName: message.fileName,
+      fileType: message.fileType,
     }
 
     return successResponse(response, 201)

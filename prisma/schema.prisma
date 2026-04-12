@@ -47,6 +47,11 @@ enum TicketStatus {
   CANCELLED
 }
 
+enum MessageVisibility {
+  TEAM       // all project members
+  LEAD_ADMIN // only project lead + admins
+}
+
 enum NotificationType {
   TICKET_RAISED
   TICKET_ACCEPTED
@@ -61,6 +66,7 @@ enum NotificationType {
   PROJECT_LEAD_ASSIGNED
   ONBOARDING_APPROVED
   ONBOARDING_PENDING
+  ADMIN_MESSAGE
 }
 
 // ─── Models ───────────────────────────────────────────────────────────────────
@@ -228,13 +234,17 @@ model ProjectThread {
 }
 
 model ThreadMessage {
-  id              String   @id @default(cuid())
+  id              String            @id @default(cuid())
   content         String
   authorId        String
   taskThreadId    String?
   projectThreadId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  visibility      MessageVisibility @default(TEAM)
+  fileUrl         String?
+  fileName        String?
+  fileType        String?           // "link" | "file"
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   author        User           @relation(fields: [authorId], references: [id])
   taskThread    TaskThread?    @relation(fields: [taskThreadId], references: [id])

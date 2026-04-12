@@ -152,7 +152,7 @@ export default function ThreadPanel({
 
       {/* ── Input ──────────────────────────────────────────────────── */}
       <div className="border-t border-border-default pt-3 mt-3">
-        <MessageInput onSend={sendMessage} />
+        <MessageInput onSend={(content, opts) => sendMessage(content, opts)} />
       </div>
     </div>
   )

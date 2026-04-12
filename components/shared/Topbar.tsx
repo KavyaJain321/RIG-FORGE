@@ -29,6 +29,7 @@ const EMPLOYEE_NAV = [
   { href: '/dashboard/projects', label: 'MY PROJECTS' },
   { href: '/dashboard/people', label: 'PEOPLE' },
   { href: '/dashboard/tickets', label: 'TICKETS' },
+  { href: '/dashboard/reports', label: 'REPORTS' },
   { href: '/dashboard/profile', label: 'MY PROFILE' },
 ] as const
 
@@ -261,6 +262,7 @@ export default function Topbar() {
           isOpen={bellOpen}
           onClose={() => setBellOpen(false)}
           bellRef={bellRef}
+          isAdmin={user?.role === 'ADMIN'}
         />,
         document.body
       )}

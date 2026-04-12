@@ -128,15 +128,16 @@ export interface ProjectDetail {
 export interface MemberSummary {
   id: string
   name: string
-  email: string
+  email: string           // empty string '' when viewer is EMPLOYEE and this is a teammate
   role: 'ADMIN' | 'EMPLOYEE'
   avatarUrl: string | null
   currentStatus: 'WORKING' | 'NOT_WORKING'
-  lastSeenAt: Date | null
+  lastSeenAt: Date | null // null when viewer is EMPLOYEE and this is a teammate
   isOnboarding: boolean
-  projectCount: number
-  primaryProject: string | null
+  projectCount: number    // 0 when viewer is EMPLOYEE and this is a teammate
+  primaryProject: string | null  // null when viewer is EMPLOYEE and this is a teammate
   createdAt: Date
+  isOwnProfile: boolean   // true when this is the currently-logged-in user's own card
 }
 
 /** Full member detail for admin view. */
@@ -156,6 +157,8 @@ export interface MemberDetail {
     status: string
     isLead: boolean
     joinedAt: Date
+    myTaskCount: number
+    myDoneTaskCount: number
   }[]
   activityThisWeek: {
     date: string
@@ -171,6 +174,7 @@ export interface MemberDetail {
   inProgressTasks: {
     id: string
     title: string
+    priority: string
     projectId: string
     projectName: string
     dueDate: Date | null
@@ -326,6 +330,10 @@ export interface MessageResponse {
   createdAt: Date
   updatedAt: Date
   edited: boolean
+  visibility: 'TEAM' | 'LEAD_ADMIN'
+  fileUrl?: string | null
+  fileName?: string | null
+  fileType?: string | null
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────

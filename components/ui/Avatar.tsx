@@ -4,7 +4,7 @@
 interface AvatarProps {
   name: string
   avatarUrl: string | null
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   active?: boolean
 }
 
@@ -14,9 +14,10 @@ interface SizeConfig {
 }
 
 const SIZE_CONFIG: Record<NonNullable<AvatarProps['size']>, SizeConfig> = {
-  sm: { container: 'w-6 h-6', text: 'text-[10px]' }, // 24px
-  md: { container: 'w-8 h-8', text: 'text-xs' },      // 32px
-  lg: { container: 'w-10 h-10', text: 'text-sm' },    // 40px
+  sm: { container: 'w-6 h-6',   text: 'text-[10px]' }, // 24px
+  md: { container: 'w-8 h-8',   text: 'text-xs' },     // 32px
+  lg: { container: 'w-10 h-10', text: 'text-sm' },     // 40px
+  xl: { container: 'w-14 h-14', text: 'text-base' },   // 56px
 }
 
 function getInitials(name: string): string {

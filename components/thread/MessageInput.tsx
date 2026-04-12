@@ -9,21 +9,42 @@ import { useAuthStore } from '@/store/authStore'
 
 const MAX_CHARS = 2000
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface SendOpts {
+  visibility?: 'TEAM' | 'LEAD_ADMIN'
+  fileUrl?: string
+  fileName?: string
+  fileType?: string
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface MessageInputProps {
-  onSend:    (content: string) => Promise<void>
-  disabled?: boolean
+  onSend:                (content: string, opts?: SendOpts) => Promise<void>
+  disabled?:             boolean
+  /** When true shows TEAM / Lead & Admins visibility segmented control */
+  showVisibilityToggle?: boolean
+  /** When true shows the link attachment row */
+  showLinkAttachment?:   boolean
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function MessageInput({ onSend, disabled }: MessageInputProps) {
+export default function MessageInput({
+  onSend,
+  disabled,
+  showVisibilityToggle,
+  showLinkAttachment,
+}: MessageInputProps) {
   const { user } = useAuthStore()
 
-  const [content,  setContent]  = useState('')
-  const [sending,  setSending]  = useState(false)
-  const [inputErr, setInputErr] = useState<string | null>(null)
+  const [content,    setContent]    = useState('')
+  const [sending,    setSending]    = useState(false)
+  const [inputErr,   setInputErr]   = useState<string | null>(null)
+  const [visibility, setVisibility] = useState<'TEAM' | 'LEAD_ADMIN'>('TEAM')
+  const [linkUrl,    setLinkUrl]    = useState('')
+  const [linkLabel,  setLinkLabel]  = useState('')
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -47,13 +68,20 @@ export default function MessageInput({ onSend, disabled }: MessageInputProps) {
       setInputErr(`Message exceeds ${MAX_CHARS} characters`)
       return
     }
+    const opts: SendOpts = {}
+    if (showVisibilityToggle) opts.visibility = visibility
+    if (showLinkAttachment && linkUrl.trim()) {
+      opts.fileUrl  = linkUrl.trim()
+      opts.fileName = linkLabel.trim() || linkUrl.trim()
+      opts.fileType = 'link'
+    }
     setSending(true)
     setContent('')
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '36px'
-    }
+    setLinkUrl('')
+    setLinkLabel('')
+    if (textareaRef.current) textareaRef.current.style.height = '36px'
     try {
-      await onSend(trimmed)
+      await onSend(trimmed, opts)
     } finally {
       setSending(false)
     }
@@ -64,9 +92,7 @@ export default function MessageInput({ onSend, disabled }: MessageInputProps) {
       e.preventDefault()
       void handleSubmit()
     }
-    if (e.key === 'Escape') {
-      textareaRef.current?.blur()
-    }
+    if (e.key === 'Escape') textareaRef.current?.blur()
   }
 
   const showCharCount  = content.length > 1500
@@ -86,7 +112,57 @@ export default function MessageInput({ onSend, disabled }: MessageInputProps) {
         <Avatar name={user?.name ?? '?'} avatarUrl={user?.avatarUrl ?? null} size="sm" />
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 space-y-2">
+        {/* Visibility toggle */}
+        {showVisibilityToggle && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setVisibility('TEAM')}
+              className={`font-mono text-[10px] tracking-widest px-2 py-1 border transition-colors ${
+                visibility === 'TEAM'
+                  ? 'border-accent text-accent bg-accent/10'
+                  : 'border-border-default text-muted hover:text-secondary'
+              }`}
+            >
+              🌐 TEAM
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisibility('LEAD_ADMIN')}
+              className={`font-mono text-[10px] tracking-widest px-2 py-1 border transition-colors ${
+                visibility === 'LEAD_ADMIN'
+                  ? 'border-amber-500 text-amber-400 bg-amber-500/10'
+                  : 'border-border-default text-muted hover:text-secondary'
+              }`}
+            >
+              🔒 LEAD & ADMINS ONLY
+            </button>
+          </div>
+        )}
+
+        {/* Link attachment row */}
+        {showLinkAttachment && (
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={linkLabel}
+              onChange={(e) => setLinkLabel(e.target.value)}
+              placeholder="Label (optional)"
+              disabled={isDisabled}
+              className="w-28 shrink-0 bg-background-primary border border-border-default px-2 py-1 font-mono text-[10px] text-primary placeholder:text-muted focus:border-accent focus:outline-none disabled:opacity-50"
+            />
+            <input
+              type="url"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://... (optional link)"
+              disabled={isDisabled}
+              className="flex-1 min-w-0 bg-background-primary border border-border-default px-2 py-1 font-mono text-[10px] text-primary placeholder:text-muted focus:border-accent focus:outline-none disabled:opacity-50"
+            />
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           value={content}

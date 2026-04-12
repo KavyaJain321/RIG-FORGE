@@ -56,46 +56,49 @@ export function useSocket(): UseSocketReturn {
     }
   }, [])
 
+  // ─── Shared poll logic (used both immediately + on interval) ────────
+
+  const pollNow = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications/count', { credentials: 'include' })
+      if (!res.ok) return
+
+      // API returns { data: { count } } — NOT unreadCount
+      const json = (await res.json()) as { data: { count: number } }
+      const newCount = json.data?.count ?? 0
+
+      setUnreadCountRef.current(newCount)
+
+      // If count grew since last poll, fetch latest items to populate dropdown
+      if (newCount > lastPolledCount.current) {
+        const itemsRes = await fetch('/api/notifications?limit=10', { credentials: 'include' })
+        if (itemsRes.ok) {
+          const itemsJson = (await itemsRes.json()) as { data: { items: NotificationItem[] } }
+          const items = itemsJson.data?.items ?? []
+          items.forEach((n) => addNotificationRef.current(n))
+        }
+      }
+
+      lastPolledCount.current = newCount
+    } catch {
+      // Network error during poll — silently skip
+    }
+  }, [])
+
   // ─── Polling fallback ────────────────────────────────────────────────
 
   const startPollingFallback = useCallback(() => {
     if (pollingIntervalRef.current !== null) return
 
-    console.log('[useSocket] WebSocket failed — starting polling fallback (30s)')
+    console.log('[useSocket] WebSocket failed — starting polling fallback (10s)')
+
+    // Fetch immediately so the badge appears right away
+    void pollNow()
 
     pollingIntervalRef.current = setInterval(() => {
-      void (async () => {
-        try {
-          const res = await fetch('/api/notifications/count', {
-            credentials: 'include',
-          })
-          if (!res.ok) return
-
-          const json = (await res.json()) as { data: { unreadCount: number } }
-          const newCount = json.data?.unreadCount ?? 0
-
-          setUnreadCountRef.current(newCount)
-
-          if (newCount > lastPolledCount.current) {
-            const itemsRes = await fetch('/api/notifications?limit=5', {
-              credentials: 'include',
-            })
-            if (itemsRes.ok) {
-              const itemsJson = (await itemsRes.json()) as {
-                data: { items: NotificationItem[] }
-              }
-              const items = itemsJson.data?.items ?? []
-              items.forEach((n) => addNotificationRef.current(n))
-            }
-          }
-
-          lastPolledCount.current = newCount
-        } catch {
-          // Network error during poll — silently skip
-        }
-      })()
-    }, 30_000)
-  }, []) // refs never change identity — no deps needed
+      void pollNow()
+    }, 10_000)
+  }, [pollNow])
 
   // ─── Reconnect handler ───────────────────────────────────────────────
 
@@ -212,6 +215,8 @@ export function useSocket(): UseSocketReturn {
     isMounted.current = true
 
     if (user) {
+      // Immediately fetch unread count so badge shows without waiting for socket
+      void pollNow()
       void initSocket()
     }
 

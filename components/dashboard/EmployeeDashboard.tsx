@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import type { EmployeeDashboardData, AuthUser, ApiResponse, DailyLogEntry } from '@/lib/types'
+import type { EmployeeDashboardData, AuthUser, ApiResponse } from '@/lib/types'
 
 interface EmployeeDashboardProps {
   user: AuthUser
@@ -63,153 +63,6 @@ function StatCard({ label, value }: { label: string; value: number }) {
   )
 }
 
-interface DailyLogSectionProps {
-  userId: string
-}
-
-function DailyLogSection({ userId: _userId }: DailyLogSectionProps) {
-  const [logEntry, setLogEntry] = useState<DailyLogEntry | null>(null)
-  const [logText, setLogText] = useState('')
-  const [logNotes, setLogNotes] = useState('')
-  const [logLoading, setLogLoading] = useState(true)
-  const [logSaving, setLogSaving] = useState(false)
-  const [logError, setLogError] = useState<string | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
-
-  useEffect(() => {
-    async function fetchLog(): Promise<void> {
-      try {
-        const res = await fetch('/api/daily-log', { credentials: 'include' })
-        const json = (await res.json()) as ApiResponse<DailyLogEntry | null>
-        if (res.ok && json.data) {
-          setLogEntry(json.data)
-          setLogText(json.data.workSummary)
-          setLogNotes(json.data.notes ?? '')
-        }
-      } catch {
-        // No log yet is fine — just keep empty state
-      } finally {
-        setLogLoading(false)
-      }
-    }
-    void fetchLog()
-  }, [])
-
-  async function handleSaveLog(): Promise<void> {
-    if (!logText.trim()) return
-    setLogSaving(true)
-    setLogError(null)
-    try {
-      const method = logEntry ? 'PATCH' : 'POST'
-      const res = await fetch('/api/daily-log', {
-        method,
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workSummary: logText, notes: logNotes || null }),
-      })
-      const json = (await res.json()) as ApiResponse<DailyLogEntry>
-      if (!res.ok || json.error) {
-        setLogError(json.error ?? 'Failed to save log')
-        return
-      }
-      setLogEntry(json.data)
-      setIsEditing(false)
-    } catch {
-      setLogError('Network error — could not save log')
-    } finally {
-      setLogSaving(false)
-    }
-  }
-
-  const showForm = logEntry === null || isEditing
-
-  return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider">
-          Today&apos;s Log
-        </h2>
-        {logEntry !== null && !isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Edit
-          </button>
-        )}
-      </div>
-
-      {logLoading ? (
-        <div className="shimmer h-24 rounded-xl" />
-      ) : showForm ? (
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-neutral-500 mb-1">
-              What did you work on today?
-            </label>
-            <textarea
-              value={logText}
-              onChange={e => setLogText(e.target.value)}
-              rows={3}
-              placeholder="Describe your work for today..."
-              className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300 resize-none"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-neutral-500 mb-1">
-              Notes (optional)
-            </label>
-            <textarea
-              value={logNotes}
-              onChange={e => setLogNotes(e.target.value)}
-              rows={2}
-              placeholder="Any blockers, notes, or comments..."
-              className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300 resize-none"
-            />
-          </div>
-          {logError !== null && (
-            <p className="text-xs text-red-600">{logError}</p>
-          )}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => { void handleSaveLog() }}
-              disabled={logSaving || !logText.trim()}
-              className="px-4 py-2 bg-neutral-900 text-white text-xs font-semibold rounded-xl hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {logSaving ? 'Saving...' : 'Save Log'}
-            </button>
-            {isEditing && (
-              <button
-                onClick={() => {
-                  setIsEditing(false)
-                  setLogText(logEntry?.workSummary ?? '')
-                  setLogNotes(logEntry?.notes ?? '')
-                  setLogError(null)
-                }}
-                className="px-4 py-2 text-neutral-500 hover:text-neutral-700 text-xs font-medium transition-colors"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="bg-neutral-50 rounded-xl px-4 py-3">
-            <p className="text-sm text-neutral-800 whitespace-pre-wrap">{logEntry.workSummary}</p>
-          </div>
-          {logEntry.notes && (
-            <div className="bg-neutral-50 rounded-xl px-4 py-3">
-              <p className="text-xs font-medium text-neutral-400 mb-1">Notes</p>
-              <p className="text-sm text-neutral-600 whitespace-pre-wrap">{logEntry.notes}</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
   const [data, setData] = useState<EmployeeDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -249,7 +102,6 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
             <div className="shimmer h-56 rounded-2xl" />
           </div>
           <div className="shimmer h-40 rounded-2xl" />
-          <div className="shimmer h-48 rounded-2xl" />
         </div>
       </div>
     )
@@ -408,9 +260,6 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
                 </div>
               )}
             </div>
-
-            {/* Row 4: Today's Log */}
-            <DailyLogSection userId={user.id} />
           </>
         )}
       </div>

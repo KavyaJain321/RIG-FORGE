@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/components/ui/Toast'
 import type { LocalMessage, MessageResponse, ThreadType } from '@/components/thread/types'
+import type { SendOpts } from '@/components/thread/MessageInput'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -22,7 +23,7 @@ export interface UseThreadReturn {
   nextCursor: string | null
   sending: boolean
   fetchEarlier: () => Promise<void>
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string, opts?: SendOpts) => Promise<void>
   editMessage: (id: string, content: string) => Promise<void>
   deleteMessage: (id: string) => Promise<void>
   scrollRef: React.RefObject<HTMLDivElement>
@@ -40,6 +41,8 @@ export function useThread(
   threadType: ThreadType,
   entityId: string,
   _projectId: string,
+  isAdmin = false,
+  isLead = false,
 ): UseThreadReturn {
   const { user } = useAuthStore()
   const { addToast } = useToast()
@@ -112,7 +115,7 @@ export function useThread(
   // ─── Send (optimistic) ───────────────────────────────────────────────
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, opts?: SendOpts) => {
       if (!user) return
       const optimisticId  = `optimistic-${Date.now()}`
       const optimisticMsg: LocalMessage = {
@@ -127,6 +130,10 @@ export function useThread(
         updatedAt:    new Date(),
         edited:       false,
         optimistic:   true,
+        visibility:   opts?.visibility ?? 'TEAM',
+        fileUrl:      opts?.fileUrl,
+        fileName:     opts?.fileName,
+        fileType:     opts?.fileType,
       }
 
       setSending(true)
@@ -138,7 +145,13 @@ export function useThread(
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({
+            content,
+            visibility: opts?.visibility,
+            fileUrl:    opts?.fileUrl,
+            fileName:   opts?.fileName,
+            fileType:   opts?.fileType,
+          }),
         })
         const json = (await res.json()) as { data: MessageResponse }
         if (res.ok && json.data) {
@@ -224,6 +237,8 @@ export function useThread(
       const msg = (e as CustomEvent<MessageResponse>).detail
       // Only accept messages for this thread
       if (threadIdRef.current && msg.threadId !== threadIdRef.current) return
+      // CHANGE 9: filter out LEAD_ADMIN messages for unauthorized viewers
+      if (msg.visibility === 'LEAD_ADMIN' && !isAdmin && !isLead) return
       const nearBottom = isNearBottom()
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev

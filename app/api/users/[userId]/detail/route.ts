@@ -6,7 +6,9 @@ import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { MemberDetail } from '@/lib/types'
 
 // ─── GET /api/users/[userId]/detail ─────────────────────────────────────────
-// Admin-only. Returns full MemberDetail for a given user.
+// ADMIN: returns full MemberDetail for any user.
+// EMPLOYEE: can ONLY fetch their own profile — 403 for anyone else.
+// This is the hard privacy wall. The frontend also guards, but the API is authoritative.
 
 export async function GET(
   request: NextRequest,
@@ -18,25 +20,24 @@ export async function GET(
 
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid or expired token', 401)
-    if (payload.role !== 'ADMIN') return errorResponse('Admin access required', 403)
 
     const { userId } = params
+    const isAdmin = payload.role === 'ADMIN'
+    const isOwnProfile = payload.userId === userId
+
+    // EMPLOYEE attempting to view another user's profile → hard deny
+    if (!isAdmin && !isOwnProfile) {
+      return errorResponse('Forbidden', 403)
+    }
+
+    // Both ADMIN and own-profile always get full data
 
     const now = new Date()
     const sevenDaysAgo = new Date(now)
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    // Run all queries in parallel
-    const [
-      userRecord,
-      projectMembers,
-      dailyActivities,
-      dailyLogs,
-      completedTasks,
-      activeTasks,
-      ticketsRaisedCount,
-      ticketsHelpedCount,
-    ] = await Promise.all([
+    // Base queries always needed
+    const baseQueries = [
       prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -67,43 +68,63 @@ export async function GET(
         select: { date: true, wasActive: true, lastSeenAt: true },
         orderBy: { date: 'desc' },
       }),
-      prisma.dailyLog.findMany({
-        where: {
-          userId,
-          date: { gte: sevenDaysAgo, lte: now },
-        },
-        select: { date: true, workSummary: true, notes: true },
-        orderBy: { date: 'asc' },
-      }),
-      prisma.task.findMany({
-        where: {
-          assigneeId: userId,
-          status: 'DONE',
-          completedAt: { gte: sevenDaysAgo },
-        },
-        select: {
-          id: true,
-          title: true,
-          projectId: true,
-          completedAt: true,
-          project: { select: { name: true } },
-        },
-      }),
-      prisma.task.findMany({
-        where: {
-          assigneeId: userId,
-          status: { in: ['TODO', 'IN_PROGRESS'] },
-        },
-        select: {
-          id: true,
-          title: true,
-          projectId: true,
-          dueDate: true,
-          project: { select: { name: true } },
-        },
-      }),
-      prisma.ticket.count({ where: { raisedById: userId } }),
-      prisma.ticket.count({ where: { helperId: userId } }),
+    ] as const
+
+    // Full queries — only for admin or own profile
+    const needsFull = isAdmin || isOwnProfile
+
+    const [
+      userRecord,
+      projectMembers,
+      dailyActivities,
+      dailyLogs,
+      completedTasks,
+      activeTasks,
+      ticketsRaisedCount,
+      ticketsHelpedCount,
+    ] = await Promise.all([
+      ...baseQueries,
+      needsFull
+        ? prisma.dailyLog.findMany({
+            where: { userId, date: { gte: sevenDaysAgo, lte: now } },
+            select: { date: true, workSummary: true, notes: true },
+            orderBy: { date: 'asc' },
+          })
+        : Promise.resolve([]),
+      needsFull
+        ? prisma.task.findMany({
+            where: {
+              assigneeId: userId,
+              status: 'DONE',
+              completedAt: { gte: sevenDaysAgo },
+            },
+            select: {
+              id: true,
+              title: true,
+              projectId: true,
+              completedAt: true,
+              project: { select: { name: true } },
+            },
+          })
+        : Promise.resolve([]),
+      needsFull
+        ? prisma.task.findMany({
+            where: {
+              assigneeId: userId,
+              status: { in: ['TODO', 'IN_PROGRESS'] },
+            },
+            select: {
+              id: true,
+              title: true,
+              priority: true,
+              projectId: true,
+              dueDate: true,
+              project: { select: { name: true } },
+            },
+          })
+        : Promise.resolve([]),
+      needsFull ? prisma.ticket.count({ where: { raisedById: userId } }) : Promise.resolve(0),
+      needsFull ? prisma.ticket.count({ where: { helperId: userId } }) : Promise.resolve(0),
     ])
 
     if (!userRecord) return errorResponse('User not found', 404)
@@ -125,15 +146,44 @@ export async function GET(
       return { date: key, wasActive: activityMap.get(key) ?? false }
     })
 
+    // Task counts per project for this user
+    const projectIds = projectMembers.map((pm) => pm.project.id)
+    const [taskCountsRaw, doneTaskCountsRaw] = await Promise.all([
+      projectIds.length > 0
+        ? prisma.task.groupBy({
+            by: ['projectId'],
+            where: { assigneeId: userId, projectId: { in: projectIds } },
+            _count: { id: true },
+          })
+        : Promise.resolve([]),
+      projectIds.length > 0
+        ? prisma.task.groupBy({
+            by: ['projectId'],
+            where: { assigneeId: userId, projectId: { in: projectIds }, status: 'DONE' },
+            _count: { id: true },
+          })
+        : Promise.resolve([]),
+    ])
+
+    const taskCountMap = new Map<string, number>()
+    for (const row of taskCountsRaw) taskCountMap.set(row.projectId, row._count.id)
+    const doneTaskCountMap = new Map<string, number>()
+    for (const row of doneTaskCountsRaw) doneTaskCountMap.set(row.projectId, row._count.id)
+
     const projects = projectMembers.map((pm) => ({
       id: pm.project.id,
       name: pm.project.name,
       status: pm.project.status as string,
       isLead: pm.project.leadId === userId,
       joinedAt: pm.joinedAt,
+      myTaskCount: taskCountMap.get(pm.project.id) ?? 0,
+      myDoneTaskCount: doneTaskCountMap.get(pm.project.id) ?? 0,
     }))
 
-    const completedTasksThisWeek = completedTasks.map((t) => ({
+    const completedTasksThisWeek = (completedTasks as {
+      id: string; title: string; projectId: string; completedAt: Date | null;
+      project: { name: string }
+    }[]).map((t) => ({
       id: t.id,
       title: t.title,
       projectId: t.projectId,
@@ -141,16 +191,22 @@ export async function GET(
       completedAt: t.completedAt as Date,
     }))
 
-    const inProgressTasks = activeTasks.map((t) => ({
+    const inProgressTasks = (activeTasks as {
+      id: string; title: string; priority: string; projectId: string;
+      dueDate: Date | null; project: { name: string }
+    }[]).map((t) => ({
       id: t.id,
       title: t.title,
+      priority: t.priority,
       projectId: t.projectId,
       projectName: t.project.name,
       dueDate: t.dueDate,
       isOverdue: t.dueDate !== null && t.dueDate < now,
     }))
 
-    const dailyLogsThisWeek = dailyLogs.map((log) => ({
+    const dailyLogsThisWeek = (dailyLogs as {
+      date: Date; workSummary: string; notes: string | null
+    }[]).map((log) => ({
       date: log.date.toISOString().slice(0, 10),
       workSummary: log.workSummary,
       notes: log.notes,

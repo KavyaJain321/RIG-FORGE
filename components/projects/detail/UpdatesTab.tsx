@@ -13,6 +13,7 @@ export interface UpdatesTabProps {
     role: string
   }
   isLead: boolean
+  isAdmin?: boolean
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ function formatTime(date: Date | string): string {
   })
 }
 
-/** Replace bare URLs with anchor tags. Returns an array of text/element nodes. */
+/** Replace bare URLs with clickable links */
 function linkify(text: string): React.ReactNode[] {
   const urlRegex = /https?:\/\/\S+/g
   const parts: React.ReactNode[] = []
@@ -43,9 +44,7 @@ function linkify(text: string): React.ReactNode[] {
   let match: RegExpExecArray | null
 
   while ((match = urlRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index))
-    }
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
     const url = match[0]
     parts.push(
       <a
@@ -60,11 +59,7 @@ function linkify(text: string): React.ReactNode[] {
     )
     lastIndex = match.index + url.length
   }
-
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex))
-  }
-
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex))
   return parts
 }
 
@@ -73,22 +68,19 @@ function linkify(text: string): React.ReactNode[] {
 interface MessageBubbleProps {
   message: MessageResponse
   isOwn: boolean
-  isLead: boolean
+  isAuthorLead: boolean
 }
 
-function MessageBubble({ message, isOwn, isLead }: MessageBubbleProps) {
-  const initials = getInitials(message.authorName)
+function MessageBubble({ message, isOwn, isAuthorLead }: MessageBubbleProps) {
+  const initials  = getInitials(message.authorName)
+  const isPrivate = message.visibility === 'LEAD_ADMIN'
 
   return (
     <div className={`flex gap-3 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
       {/* Avatar */}
       <div className="shrink-0">
         {message.authorAvatar ? (
-          <img
-            src={message.authorAvatar}
-            alt={message.authorName}
-            className="w-8 h-8 rounded-full object-cover"
-          />
+          <img src={message.authorAvatar} alt={message.authorName} className="w-8 h-8 rounded-full object-cover" />
         ) : (
           <span className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold select-none">
             {initials}
@@ -96,36 +88,53 @@ function MessageBubble({ message, isOwn, isLead }: MessageBubbleProps) {
         )}
       </div>
 
-      {/* Bubble */}
-      <div className={`max-w-[70%] space-y-1 ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
-        {/* Author line */}
-        <div className={`flex items-center gap-1.5 text-xs ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+      {/* Content column */}
+      <div className={`max-w-[70%] space-y-1 flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+        {/* Author meta row */}
+        <div className={`flex items-center gap-1.5 text-xs flex-wrap ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
           <span className="font-medium text-foreground">{message.authorName}</span>
           {(message.authorRole ?? '') === 'ADMIN' && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-900/40 text-amber-400">
-              Admin
-            </span>
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-900/40 text-amber-400">Admin</span>
           )}
-          {isLead && (message.authorRole ?? '') !== 'ADMIN' && (
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-900/40 text-blue-400">
-              Lead
+          {isAuthorLead && (message.authorRole ?? '') !== 'ADMIN' && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-900/40 text-blue-400">Lead</span>
+          )}
+          {isPrivate && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-900/40 text-amber-400" title="Visible to Lead & Admins only">
+              🔒 private
             </span>
           )}
           <span className="text-muted">{formatTime(message.createdAt)}</span>
           {message.edited && <span className="text-muted italic">(edited)</span>}
         </div>
 
-        {/* Text */}
+        {/* Text bubble */}
         <div
           className={[
             'rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words',
-            isOwn
-              ? 'bg-blue-950 text-blue-100 rounded-tr-none'
-              : 'bg-gray-800 text-foreground rounded-tl-none',
+            isPrivate
+              ? isOwn
+                ? 'bg-amber-950/60 text-amber-100 rounded-tr-none border border-amber-700/40'
+                : 'bg-amber-950/40 text-amber-50 rounded-tl-none border border-amber-700/40'
+              : isOwn
+                ? 'bg-blue-950 text-blue-100 rounded-tr-none'
+                : 'bg-gray-800 text-foreground rounded-tl-none',
           ].join(' ')}
         >
           {linkify(message.content)}
         </div>
+
+        {/* Link chip */}
+        {message.fileUrl && (
+          <a
+            href={message.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 mt-1 font-mono text-[10px] text-accent border border-accent/40 px-2 py-1 hover:bg-accent/10 transition-colors rounded"
+          >
+            🔗 {message.fileName ?? message.fileUrl}
+          </a>
+        )}
       </div>
     </div>
   )
@@ -133,12 +142,19 @@ function MessageBubble({ message, isOwn, isLead }: MessageBubbleProps) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function UpdatesTab({ projectId, currentUser, isLead }: UpdatesTabProps) {
+export default function UpdatesTab({ projectId, currentUser, isLead, isAdmin = false }: UpdatesTabProps) {
   const [messages, setMessages] = useState<MessageResponse[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [draft, setDraft]       = useState('')
   const [sending, setSending]   = useState(false)
+
+  // Visibility: everyone can toggle
+  const [visibility, setVisibility] = useState<'TEAM' | 'LEAD_ADMIN'>('TEAM')
+
+  // Link attachment
+  const [linkUrl,   setLinkUrl]   = useState('')
+  const [linkLabel, setLinkLabel] = useState('')
 
   const bottomRef   = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -152,10 +168,7 @@ export default function UpdatesTab({ projectId, currentUser, isLead }: UpdatesTa
     if (!silent) setLoading(true)
     setError(null)
     try {
-      const res = await fetch(
-        `/api/threads/project/${projectId}?limit=100`,
-        { credentials: 'include' },
-      )
+      const res  = await fetch(`/api/threads/project/${projectId}?limit=100`, { credentials: 'include' })
       const json = await res.json() as ApiResponse<{ messages: MessageResponse[] }>
       if (!res.ok || json.error) {
         if (!silent) setError(json.error ?? 'Failed to load updates.')
@@ -169,20 +182,12 @@ export default function UpdatesTab({ projectId, currentUser, isLead }: UpdatesTa
     }
   }, [projectId])
 
-  // Initial load + polling
   useEffect(() => {
     void fetchMessages(false)
-
-    pollRef.current = setInterval(() => {
-      void fetchMessages(true)
-    }, 15_000)
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
+    pollRef.current = setInterval(() => void fetchMessages(true), 15_000)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [fetchMessages])
 
-  // Scroll to bottom when messages load
   useEffect(() => {
     if (!loading) scrollToBottom()
   }, [loading, messages.length])
@@ -194,21 +199,28 @@ export default function UpdatesTab({ projectId, currentUser, isLead }: UpdatesTa
     setSending(true)
     setError(null)
     try {
-      const res = await fetch(`/api/threads/project/${projectId}`, {
+      const body: Record<string, unknown> = { content, visibility }
+      if (linkUrl.trim()) {
+        body.fileUrl  = linkUrl.trim()
+        body.fileName = linkLabel.trim() || linkUrl.trim()
+        body.fileType = 'link'
+      }
+
+      const res  = await fetch(`/api/threads/project/${projectId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(body),
       })
       const json = await res.json() as ApiResponse<MessageResponse>
       if (!res.ok || json.error) {
         setError(json.error ?? 'Failed to send message.')
         return
       }
-      if (json.data) {
-        setMessages((prev) => [...prev, json.data!])
-      }
+      if (json.data) setMessages((prev) => [...prev, json.data!])
       setDraft('')
+      setLinkUrl('')
+      setLinkLabel('')
       setTimeout(scrollToBottom, 50)
     } catch {
       setError('Network error. Message not sent.')
@@ -224,7 +236,9 @@ export default function UpdatesTab({ projectId, currentUser, isLead }: UpdatesTa
     }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  const hasLink = linkUrl.trim().length > 0
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col h-full min-h-[500px]">
@@ -263,33 +277,105 @@ export default function UpdatesTab({ projectId, currentUser, isLead }: UpdatesTa
             key={msg.id}
             message={msg}
             isOwn={msg.authorId === currentUser.id}
-            isLead={isLead && msg.authorId === currentUser.id}
+            isAuthorLead={isLead && msg.authorId === currentUser.id}
           />
         ))}
 
         <div ref={bottomRef} />
       </div>
 
-      {/* Input area */}
-      <div className="shrink-0 border-t border-border-default px-4 py-3 flex gap-3 items-end">
-        <textarea
-          ref={textareaRef}
-          rows={2}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={sending}
-          placeholder="Write an update… (Enter to send, Shift+Enter for newline)"
-          className="flex-1 bg-surface-raised border border-border-default rounded px-3 py-2 text-sm focus:outline-none focus:border-accent resize-none disabled:opacity-50"
-        />
-        <button
-          type="button"
-          onClick={() => void handleSend()}
-          disabled={sending || !draft.trim()}
-          className="px-4 py-2 text-sm font-medium bg-accent text-white rounded hover:bg-accent/80 disabled:opacity-50 transition-colors self-end"
-        >
-          {sending ? 'Sending…' : 'Send'}
-        </button>
+      {/* ── Compose area ───────────────────────────────────────────────── */}
+      <div className="shrink-0 border-t border-border-default px-4 py-3 space-y-2">
+
+        {/* Row 1: Visibility toggle — available to ALL members */}
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-[10px] text-muted tracking-widest mr-1">VISIBLE TO:</span>
+          <button
+            type="button"
+            onClick={() => setVisibility('TEAM')}
+            disabled={sending}
+            className={`font-mono text-[10px] tracking-widest px-2 py-1 border transition-colors ${
+              visibility === 'TEAM'
+                ? 'border-accent text-accent bg-accent/10'
+                : 'border-border-default text-muted hover:text-secondary'
+            }`}
+          >
+            🌐 TEAM
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisibility('LEAD_ADMIN')}
+            disabled={sending}
+            className={`font-mono text-[10px] tracking-widest px-2 py-1 border transition-colors ${
+              visibility === 'LEAD_ADMIN'
+                ? 'border-amber-500 text-amber-400 bg-amber-500/10'
+                : 'border-border-default text-muted hover:text-secondary'
+            }`}
+          >
+            🔒 LEAD & ADMINS ONLY
+          </button>
+        </div>
+
+        {/* Row 2: Optional link attachment */}
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] text-muted tracking-widest shrink-0">🔗 LINK:</span>
+          <input
+            type="text"
+            value={linkLabel}
+            onChange={(e) => setLinkLabel(e.target.value)}
+            placeholder="Label (optional)"
+            disabled={sending}
+            className="w-28 shrink-0 bg-surface-raised border border-border-default rounded px-2 py-1 text-xs focus:outline-none focus:border-accent disabled:opacity-50"
+          />
+          <input
+            type="url"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            placeholder="https://..."
+            disabled={sending}
+            className="flex-1 min-w-0 bg-surface-raised border border-border-default rounded px-2 py-1 text-xs focus:outline-none focus:border-accent disabled:opacity-50"
+          />
+          {hasLink && (
+            <button
+              type="button"
+              onClick={() => { setLinkUrl(''); setLinkLabel('') }}
+              className="text-muted hover:text-status-danger transition-colors shrink-0 text-xs"
+              title="Clear link"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Row 3: Textarea + send */}
+        <div className="flex gap-3 items-end">
+          <textarea
+            ref={textareaRef}
+            rows={2}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={sending}
+            placeholder={
+              visibility === 'LEAD_ADMIN'
+                ? 'Private message to lead & admins… (Enter to send)'
+                : 'Write an update… (Enter to send, Shift+Enter for newline)'
+            }
+            className={`flex-1 border rounded px-3 py-2 text-sm focus:outline-none resize-none disabled:opacity-50 transition-colors ${
+              visibility === 'LEAD_ADMIN'
+                ? 'bg-amber-950/20 border-amber-700/50 focus:border-amber-500 text-amber-50 placeholder:text-amber-700'
+                : 'bg-surface-raised border-border-default focus:border-accent'
+            }`}
+          />
+          <button
+            type="button"
+            onClick={() => void handleSend()}
+            disabled={sending || !draft.trim()}
+            className="px-4 py-2 text-sm font-medium bg-accent text-white rounded hover:bg-accent/80 disabled:opacity-50 transition-colors self-end"
+          >
+            {sending ? 'Sending…' : 'Send'}
+          </button>
+        </div>
       </div>
     </div>
   )

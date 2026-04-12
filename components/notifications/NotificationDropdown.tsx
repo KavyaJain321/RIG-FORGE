@@ -28,6 +28,7 @@ interface NotificationDropdownProps {
   isOpen: boolean
   onClose: () => void
   bellRef: React.RefObject<HTMLDivElement>
+  isAdmin?: boolean
 }
 
 // ─── REST helpers ──────────────────────────────────────────────────────────
@@ -40,12 +41,149 @@ interface NotificationsApiResponse {
   }
 }
 
+// ─── Admin Broadcast Panel ─────────────────────────────────────────────────
+
+function AdminBroadcastPanel() {
+  const [expanded, setExpanded] = useState(false)
+  const [target, setTarget] = useState<'ALL' | 'ONE'>('ALL')
+  const [userId, setUserId] = useState('')
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
+  const [sending, setSending] = useState(false)
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  const send = async () => {
+    if (!title.trim() || !body.trim()) return
+    if (target === 'ONE' && !userId.trim()) return
+    setSending(true)
+    setFeedback(null)
+    try {
+      const res = await fetch('/api/notifications/admin-send', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUserId: target === 'ALL' ? 'ALL' : userId.trim(),
+          title: title.trim(),
+          body: body.trim(),
+        }),
+      })
+      const json = await res.json() as { data?: { sent: number }; error?: string }
+      if (res.ok && json.data) {
+        setFeedback({ ok: true, msg: `Sent to ${json.data.sent} user${json.data.sent !== 1 ? 's' : ''}` })
+        setTitle('')
+        setBody('')
+        setUserId('')
+      } else {
+        setFeedback({ ok: false, msg: json.error ?? 'Failed to send' })
+      }
+    } catch {
+      setFeedback({ ok: false, msg: 'Network error' })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="border-t border-border-default">
+      {/* Toggle button */}
+      <button
+        type="button"
+        onClick={() => { setExpanded(v => !v); setFeedback(null) }}
+        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-background-tertiary transition-colors"
+      >
+        <span className="font-mono text-[10px] tracking-widest text-accent uppercase">
+          ◉ BROADCAST NOTIFICATION
+        </span>
+        <span className="font-mono text-xs text-muted">{expanded ? '▲' : '▼'}</span>
+      </button>
+
+      {expanded && (
+        <div className="px-4 pb-4 space-y-2.5">
+          {/* Target selector */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setTarget('ALL')}
+              className={`flex-1 font-mono text-[10px] tracking-widest py-1.5 border transition-colors ${
+                target === 'ALL'
+                  ? 'border-accent text-accent bg-accent/5'
+                  : 'border-border-default text-muted hover:border-accent/50'
+              }`}
+            >
+              ALL MEMBERS
+            </button>
+            <button
+              type="button"
+              onClick={() => setTarget('ONE')}
+              className={`flex-1 font-mono text-[10px] tracking-widest py-1.5 border transition-colors ${
+                target === 'ONE'
+                  ? 'border-accent text-accent bg-accent/5'
+                  : 'border-border-default text-muted hover:border-accent/50'
+              }`}
+            >
+              ONE MEMBER
+            </button>
+          </div>
+
+          {/* User ID input (single mode) */}
+          {target === 'ONE' && (
+            <input
+              type="text"
+              placeholder="User ID or email..."
+              value={userId}
+              onChange={e => setUserId(e.target.value)}
+              className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder-text-muted focus:outline-none focus:border-accent transition-colors"
+            />
+          )}
+
+          {/* Title */}
+          <input
+            type="text"
+            placeholder="Notification title..."
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder-text-muted focus:outline-none focus:border-accent transition-colors"
+          />
+
+          {/* Body */}
+          <textarea
+            placeholder="Message..."
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            rows={3}
+            className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
+          />
+
+          {/* Feedback */}
+          {feedback && (
+            <p className={`font-mono text-[10px] tracking-wide ${feedback.ok ? 'text-status-success' : 'text-status-danger'}`}>
+              {feedback.ok ? '✓ ' : '✕ '}{feedback.msg}
+            </p>
+          )}
+
+          {/* Send button */}
+          <button
+            type="button"
+            onClick={() => void send()}
+            disabled={sending || !title.trim() || !body.trim() || (target === 'ONE' && !userId.trim())}
+            className="w-full border border-accent text-accent font-mono text-[10px] tracking-widest py-2 hover:bg-accent hover:text-background-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {sending ? 'SENDING...' : target === 'ALL' ? 'SEND TO ALL MEMBERS' : 'SEND TO MEMBER'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export default function NotificationDropdown({
   isOpen,
   onClose,
   bellRef,
+  isAdmin = false,
 }: NotificationDropdownProps) {
   const router = useRouter()
 
@@ -156,7 +294,6 @@ export default function NotificationDropdown({
       const json = (await res.json()) as NotificationsApiResponse
       const { items, nextCursor } = json.data
 
-      // Append older notifications (deduplicated via setNotifications merge)
       setNotifications([...notifications, ...items])
       setCursor(nextCursor)
       setHasMore(nextCursor !== null)
@@ -224,7 +361,7 @@ export default function NotificationDropdown({
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-default shrink-0">
         <span className="font-mono text-[10px] text-text-muted tracking-widest">
-          NOTIFICATIONS 
+          NOTIFICATIONS
         </span>
 
         <div className="flex items-center gap-3">
@@ -267,7 +404,7 @@ export default function NotificationDropdown({
           <div className="flex flex-col items-center justify-center py-12">
             <span className="text-text-muted text-2xl mb-2">◉</span>
             <span className="font-mono text-xs text-text-muted tracking-widest">
-              ALL CAUGHT UP 
+              ALL CAUGHT UP
             </span>
           </div>
         ) : (
@@ -296,6 +433,9 @@ export default function NotificationDropdown({
           </>
         )}
       </div>
+
+      {/* ── Admin Broadcast ─────────────────────────────────────────── */}
+      {isAdmin && <AdminBroadcastPanel />}
     </div>
   )
 }

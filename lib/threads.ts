@@ -6,7 +6,7 @@ import type { MessageResponse } from '@/lib/types'
 export type ThreadType = 'task' | 'project'
 
 type ThreadMessageWithAuthor = Prisma.ThreadMessageGetPayload<{
-  include: { author: { select: { name: true; avatarUrl: true } } }
+  include: { author: { select: { name: true; avatarUrl: true; role: true } } }
 }>
 
 export function buildMessageResponse(
@@ -23,11 +23,16 @@ export function buildMessageResponse(
     authorId: message.authorId,
     authorName: message.author.name,
     authorAvatar: message.author.avatarUrl,
+    authorRole: message.author.role,
     threadType,
     threadId,
     createdAt: message.createdAt,
     updatedAt: message.updatedAt,
     edited,
+    visibility: (message.visibility as 'TEAM' | 'LEAD_ADMIN') ?? 'TEAM',
+    fileUrl: message.fileUrl ?? null,
+    fileName: message.fileName ?? null,
+    fileType: message.fileType ?? null,
   }
 }
 

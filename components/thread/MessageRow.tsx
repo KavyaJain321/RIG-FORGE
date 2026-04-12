@@ -118,8 +118,10 @@ export default function MessageRow({
     }
   }
 
+  const isPrivate = message.visibility === 'LEAD_ADMIN'
+
   return (
-    <div className={`flex gap-3 py-2 group ${message.optimistic ? 'opacity-50' : ''}`}>
+    <div className={`flex gap-3 py-2 group rounded ${message.optimistic ? 'opacity-50' : ''} ${isPrivate ? 'bg-amber-950/20 border-l-2 border-amber-500/50 pl-2' : ''}`}>
       {/* Avatar */}
       <div className="shrink-0 mt-0.5">
         {message.optimistic ? (
@@ -142,6 +144,11 @@ export default function MessageRow({
           {message.edited && (
             <span className="font-mono text-[10px] text-muted italic shrink-0">
               (edited)
+            </span>
+          )}
+          {isPrivate && (
+            <span className="font-mono text-[10px] text-amber-400 shrink-0" title="Visible to Lead & Admins only">
+              🔒 private
             </span>
           )}
 
@@ -211,9 +218,21 @@ export default function MessageRow({
             </div>
           </div>
         ) : (
-          <p className="mt-0.5 font-mono text-xs text-secondary leading-relaxed whitespace-pre-wrap break-words">
-            {message.content}
-          </p>
+          <>
+            <p className="mt-0.5 font-mono text-xs text-secondary leading-relaxed whitespace-pre-wrap break-words">
+              {message.content}
+            </p>
+            {message.fileUrl && (
+              <a
+                href={message.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 mt-1 font-mono text-[10px] text-accent border border-accent/40 px-2 py-0.5 hover:bg-accent/10 transition-colors"
+              >
+                🔗 {message.fileName ?? message.fileUrl}
+              </a>
+            )}
+          </>
         )}
       </div>
     </div>

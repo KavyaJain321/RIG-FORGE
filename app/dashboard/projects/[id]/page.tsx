@@ -193,6 +193,7 @@ export default function ProjectDetailPage() {
             project={project}
             isAdmin={isAdmin}
             isLead={isLead}
+            currentUserId={userId ?? undefined}
             onProjectChange={setProject}
           />
         )}
@@ -209,6 +210,7 @@ export default function ProjectDetailPage() {
             projectId={project.id}
             currentUser={{ id: user?.id ?? '', name: user?.name ?? '', role: user?.role ?? '' }}
             isLead={isLead}
+            isAdmin={isAdmin}
           />
         )}
       </div>

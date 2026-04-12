@@ -53,6 +53,65 @@ function buildWeekDates(): string[] {
   return dates
 }
 
+// ─── PATCH /api/users/me/profile ──────────────────────────────────────────
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const token = getTokenFromCookies(request)
+    if (!token) return errorResponse('Authentication required', 401)
+
+    const claims = verifyToken(token)
+    if (!claims) return errorResponse('Invalid or expired token', 401)
+
+    const body = await request.json() as { name?: string; avatarUrl?: string }
+    const updateData: { name?: string; avatarUrl?: string } = {}
+
+    if (body.name !== undefined) {
+      const name = String(body.name).trim()
+      if (name.length === 0) return errorResponse('Name cannot be empty', 400)
+      updateData.name = name
+    }
+    if (body.avatarUrl !== undefined) {
+      updateData.avatarUrl = body.avatarUrl ?? undefined
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return errorResponse('No fields to update', 400)
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: claims.userId },
+      data: updateData,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatarUrl: true,
+        currentStatus: true,
+        isOnboarding: true,
+        createdAt: true,
+      },
+    })
+
+    const user: AuthUser = {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+      avatarUrl: updated.avatarUrl ?? null,
+      currentStatus: updated.currentStatus,
+      isOnboarding: updated.isOnboarding,
+      createdAt: updated.createdAt,
+    }
+
+    return successResponse(user)
+  } catch (error) {
+    console.error('[PATCH /api/users/me/profile] Unexpected error:', error)
+    return errorResponse('Internal server error', 500)
+  }
+}
+
 // ─── GET /api/users/me/profile ─────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
