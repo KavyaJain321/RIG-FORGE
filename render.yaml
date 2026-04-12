@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: rig-forge
+    env: node
+    plan: free
+    buildCommand: pnpm install && pnpm db:generate && pnpm build
+    startCommand: pnpm start
