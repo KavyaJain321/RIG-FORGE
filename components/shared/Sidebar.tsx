@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
+import { isAdminRole } from '@/lib/auth'
 import LogoutLogModal from '@/components/shared/LogoutLogModal'
 
 // ─── Nav definitions ──────────────────────────────────────────────────────────
@@ -101,7 +102,7 @@ function SidebarContent({ onNavClick, onLogoutClick }: SidebarContentProps) {
   const pathname = usePathname()
   useAuth() // populates authStore
   const { user } = useAuthStore()
-  const navItems = user?.role === 'ADMIN' ? ADMIN_NAV : EMPLOYEE_NAV
+  const navItems = user?.role && isAdminRole(user.role) ? ADMIN_NAV : EMPLOYEE_NAV
 
   return (
     <div className="flex flex-col h-full">
@@ -158,7 +159,7 @@ function SidebarContent({ onNavClick, onLogoutClick }: SidebarContentProps) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">{user.name}</p>
                 <p className="text-xs text-muted">
-                  {user.role === 'ADMIN' ? 'Admin' : 'Employee'}
+                  {user.role === 'SUPER_ADMIN' ? 'Super Admin' : isAdminRole(user.role) ? 'Admin' : 'Employee'}
                 </p>
               </div>
             </div>

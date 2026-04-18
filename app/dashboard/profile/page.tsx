@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 import { useAuth } from '@/hooks/useAuth'
+import { isAdminRole } from '@/lib/auth'
 import type { ApiResponse } from '@/lib/types'
 import type { ProfileResponse } from '@/app/api/users/me/profile/route'
 
@@ -96,7 +97,7 @@ export default function ProfilePage() {
   // ── Redirect admins ───────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!authLoading && user?.role === 'ADMIN') {
+    if (!authLoading && user?.role && isAdminRole(user.role)) {
       router.push('/dashboard')
     }
   }, [authLoading, user, router])

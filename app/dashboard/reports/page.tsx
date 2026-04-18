@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 import { useAuth } from '@/hooks/useAuth'
+import { isAdminRole } from '@/lib/auth'
 import type { WeeklyReportSummary, DailyLogEntry, ApiResponse } from '@/lib/types'
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -320,6 +321,6 @@ export default function ReportsPage() {
     )
   }
 
-  if (user.role === 'ADMIN') return <AdminReportsSection />
+  if (isAdminRole(user.role)) return <AdminReportsSection />
   return <WeeklyNoteSection />
 }

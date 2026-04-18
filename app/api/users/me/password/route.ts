@@ -69,7 +69,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     const user = await prisma.user.findUnique({
       where: { id: claims.userId },
       select: { id: true, name: true, email: true, role: true, avatarUrl: true,
-                currentStatus: true, isOnboarding: true, passwordHash: true },
+                currentStatus: true, isOnboarding: true, passwordHash: true, createdAt: true },
     })
 
     if (!user) return errorResponse('User not found', 404)
@@ -108,7 +108,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       currentStatus: user.currentStatus as AuthUser['currentStatus'],
       isOnboarding: user.isOnboarding,
       mustChangePassword: false,
-      createdAt: new Date(),
+      createdAt: user.createdAt,
     }
 
     const response = successResponse(authUser)

@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
 import { useThread } from '@/hooks/useThread'
 import { useAuthStore } from '@/store/authStore'
+import { isAdminRole } from '@/lib/auth'
 import type { LocalMessage, ThreadType } from '@/components/thread/types'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ export default function ThreadPanel({
   maxHeight = '400px',
 }: ThreadPanelProps) {
   const { user } = useAuthStore()
-  const isAdmin       = user?.role === 'ADMIN'
+  const isAdmin       = user?.role ? isAdminRole(user.role) : false
   const currentUserId = user?.id ?? ''
 
   const {

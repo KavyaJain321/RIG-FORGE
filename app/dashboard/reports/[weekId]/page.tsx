@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
 import { useAuth } from '@/hooks/useAuth'
+import { isAdminRole } from '@/lib/auth'
 import { WeeklyReportEmployeeCard } from '@/components/reports/WeeklyReportEmployeeCard'
 import type { WeeklyReportSnapshot, WeeklyReportSummary } from '@/lib/types'
 
@@ -42,13 +43,13 @@ export default function WeeklyReportDetailPage() {
   const [sortMode, setSortMode] = useState<SortMode>('activity')
 
   useEffect(() => {
-    if (!loading && user && user.role !== 'ADMIN') {
+    if (!loading && user && !isAdminRole(user.role)) {
       router.replace('/dashboard')
     }
   }, [user, loading, router])
 
   useEffect(() => {
-    if (!loading && user?.role === 'ADMIN' && weekId) {
+    if (!loading && user?.role && isAdminRole(user.role) && weekId) {
       fetchReport()
     }
   }, [loading, user, weekId])

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { isAdminRole } from '@/lib/auth'
 import AdminDashboard from '@/components/dashboard/AdminDashboard'
 import EmployeeDashboard from '@/components/dashboard/EmployeeDashboard'
 
@@ -43,7 +44,7 @@ export default function DashboardPage() {
   if (loading) return <LoadingSkeleton />
   if (user === null) return null
 
-  if (user.role === 'ADMIN') {
+  if (isAdminRole(user.role)) {
     return <AdminDashboard user={user} />
   }
 

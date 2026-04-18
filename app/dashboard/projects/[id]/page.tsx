@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
 import { useAuth } from '@/hooks/useAuth'
+import { isAdminRole } from '@/lib/auth'
 import ProjectHeader from '@/components/projects/detail/ProjectHeader'
 import { useProjectTab } from '@/components/projects/detail/ProjectTabs'
 import OverviewTab from '@/components/projects/detail/OverviewTab'
@@ -76,7 +77,7 @@ export default function ProjectDetailPage() {
   const [addMemberOpen, setAddMemberOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const isAdmin = user?.role === 'ADMIN'
+  const isAdmin = user?.role ? isAdminRole(user.role) : false
   const isLead = project?.leadId === user?.id
 
   useEffect(() => {

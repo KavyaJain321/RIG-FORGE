@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { useAuth } from '@/hooks/useAuth'
+import { isAdminRole } from '@/lib/auth'
 import ProjectFilters from '@/components/projects/ProjectFilters'
 import ProjectListRow from '@/components/projects/ProjectListRow'
 import ProjectRowSkeleton from '@/components/projects/ProjectRowSkeleton'
@@ -112,7 +113,7 @@ export default function ProjectsPage() {
   const [showModal, setShowModal] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const isAdmin = user?.role === 'ADMIN'
+  const isAdmin = user?.role ? isAdminRole(user.role) : false
 
   // ── Auth redirect ──────────────────────────────────────────────────────────
   useEffect(() => {

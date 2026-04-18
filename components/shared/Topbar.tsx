@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
+import { isAdminRole } from '@/lib/auth'
 import { useSocket } from '@/hooks/useSocket'
 import Avatar from '@/components/ui/Avatar'
 import StatusDot from '@/components/ui/StatusDot'
@@ -270,7 +271,7 @@ export default function Topbar() {
           isOpen={bellOpen}
           onClose={() => setBellOpen(false)}
           bellRef={bellRef}
-          isAdmin={user?.role === 'ADMIN'}
+          isAdmin={user?.role ? isAdminRole(user.role) : false}
         />,
         document.body
       )}

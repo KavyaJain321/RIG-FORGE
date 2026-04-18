@@ -1,12 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import type { AuthUser, ApiResponse } from '@/lib/types'
 
 export default function ChangePasswordPage() {
-  const router = useRouter()
   const { setUser } = useAuthStore()
 
   const [currentPassword, setCurrentPassword] = useState('')
@@ -47,7 +45,9 @@ export default function ChangePasswordPage() {
       // Update auth store with new user data (mustChangePassword = false)
       setUser(json.data)
       setSuccess(true)
-      setTimeout(() => router.replace('/dashboard'), 1200)
+      // Use hard navigation so the new cookie is picked up by middleware fresh
+      // (router.replace stays in the soft-nav cache and can re-trigger the redirect)
+      setTimeout(() => { window.location.replace('/dashboard') }, 1200)
     } catch {
       setError('Network error. Please try again.')
     } finally {
