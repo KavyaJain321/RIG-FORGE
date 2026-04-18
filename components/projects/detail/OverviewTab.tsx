@@ -493,6 +493,7 @@ function DetailsPanel({ project, isAdmin, onProjectChange }: DetailsPanelProps) 
   const [editingStatus, setEditingStatus] = useState(false)
   const [editingPriority, setEditingPriority] = useState(false)
   const [editingDeadline, setEditingDeadline] = useState(false)
+  const [editingLead, setEditingLead] = useState(false)
   const [savingField, setSavingField] = useState<string | null>(null)
   const [fieldError, setFieldError] = useState<string | null>(null)
 
@@ -516,6 +517,38 @@ function DetailsPanel({ project, isAdmin, onProjectChange }: DetailsPanelProps) 
       setEditingStatus(false)
       setEditingPriority(false)
       setEditingDeadline(false)
+    } catch {
+      setFieldError('Network error')
+    } finally {
+      setSavingField(null)
+    }
+  }
+
+  async function changeLead(newLeadId: string | null) {
+    setSavingField('leadId')
+    setFieldError(null)
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ leadId: newLeadId }),
+      })
+      const json = (await res.json()) as { data: unknown; error: string | null }
+      if (!res.ok) {
+        setFieldError(json.error ?? 'Failed to update lead')
+        return
+      }
+      const newLeadName = newLeadId
+        ? (project.members.find((m) => m.userId === newLeadId)?.name ?? null)
+        : null
+      onProjectChange({
+        ...project,
+        leadId: newLeadId,
+        leadName: newLeadName,
+        members: project.members.map((m) => ({ ...m, isLead: m.userId === newLeadId })),
+      })
+      setEditingLead(false)
     } catch {
       setFieldError('Network error')
     } finally {
@@ -649,9 +682,45 @@ function DetailsPanel({ project, isAdmin, onProjectChange }: DetailsPanelProps) 
       {/* Lead */}
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-xs text-muted tracking-widest uppercase shrink-0">Lead</span>
-        <span className="font-mono text-xs text-secondary">
-          {project.leadName ?? '—'}
-        </span>
+        {isAdmin && editingLead ? (
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <select
+                defaultValue={project.leadId ?? ''}
+                disabled={savingField === 'leadId'}
+                onChange={(e) => void changeLead(e.target.value || null)}
+                className="appearance-none bg-background-primary border border-border-default px-3 py-1 pr-6 font-mono text-xs text-primary focus:border-accent focus:outline-none cursor-pointer disabled:opacity-60"
+              >
+                <option value="">— No Lead —</option>
+                {project.members.map((m) => (
+                  <option key={m.userId} value={m.userId}>{m.name}</option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-muted text-[10px]">▾</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setEditingLead(false); setFieldError(null) }}
+              className="font-mono text-[10px] text-muted hover:text-primary transition-colors duration-150"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs text-secondary">{project.leadName ?? '—'}</span>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setEditingLead(true)}
+                className="font-mono text-[10px] text-muted hover:text-accent transition-colors duration-150"
+                title="Change project lead"
+              >
+                ✎
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
