@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server'
 import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { fetchProjectDetail, fetchProjectSummary } from '@/lib/projects'
 import type { ProjectSummary, PaginatedResponse, ApiResponse, ProjectDetail, ProjectLink } from '@/lib/types'
@@ -42,7 +42,7 @@ export async function GET(
       }),
       ...(status && { status: status as never }),
       ...(priority && { priority: priority as never }),
-      ...(payload.role !== 'ADMIN' && {
+      ...(!isAdminRole(payload.role) && {
         members: { some: { userId: payload.userId } },
       }),
     }
@@ -133,7 +133,7 @@ export async function POST(
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid or expired session', 401)
 
-    if (payload.role !== 'ADMIN') return errorResponse('Admin access required', 403)
+    if (!isAdminRole(payload.role)) return errorResponse('Admin access required', 403)
 
     // ── 2. Parse body ─────────────────────────────────────────────────────────
     let body: unknown

@@ -24,6 +24,10 @@ const ADMIN_NAV = [
   { href: '/dashboard/onboarding', label: 'ONBOARDING' },
 ] as const
 
+// Super Admin sees everything Admin sees + no additional nav items needed
+// (Super Admin powers are surfaced inside the People/Onboarding pages)
+const SUPER_ADMIN_NAV = ADMIN_NAV
+
 const EMPLOYEE_NAV = [
   { href: '/dashboard', label: 'DASHBOARD' },
   { href: '/dashboard/projects', label: 'MY PROJECTS' },
@@ -57,7 +61,11 @@ export default function Topbar() {
   const { user, clearUser } = useAuthStore()
   useSocket()
 
-  const navItems = user?.role === 'ADMIN' ? ADMIN_NAV : EMPLOYEE_NAV
+  const navItems = user?.role === 'SUPER_ADMIN'
+    ? SUPER_ADMIN_NAV
+    : user?.role === 'ADMIN'
+      ? ADMIN_NAV
+      : EMPLOYEE_NAV
 
   const [statusOpen, setStatusOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)

@@ -15,6 +15,7 @@ import type { MemberDetail, ApiResponse } from '@/lib/types'
 interface MemberSlideOverProps {
   memberId: string | null
   isAdmin: boolean
+  isSuperAdmin?: boolean
   currentUserId?: string   // required for employee guard
   onClose: () => void
 }
@@ -65,7 +66,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function MemberSlideOver({ memberId, isAdmin, currentUserId, onClose }: MemberSlideOverProps) {
+export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = false, currentUserId, onClose }: MemberSlideOverProps) {
   // CLIENT-SIDE GUARD: employee cannot view another user's profile
   // The API also enforces this (403), but we also never open the panel
   if (memberId && !isAdmin && currentUserId && memberId !== currentUserId) {
@@ -79,6 +80,12 @@ export default function MemberSlideOver({ memberId, isAdmin, currentUserId, onCl
   const [notifTitle, setNotifTitle] = useState('')
   const [notifBody, setNotifBody] = useState('')
   const [sending, setSending] = useState(false)
+
+  // Password reset state
+  const [resettingPassword, setResettingPassword] = useState(false)
+  const [resetResult, setResetResult] = useState<string | null>(null)
+  const [showTempPassword, setShowTempPassword] = useState(false)
+
   const { addToast } = useToast()
 
   // Focus trap ref
@@ -161,6 +168,32 @@ export default function MemberSlideOver({ memberId, isAdmin, currentUserId, onCl
       addToast('error', 'Network error')
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleResetPassword = async () => {
+    if (!member) return
+    setResettingPassword(true)
+    setResetResult(null)
+    try {
+      const res = await fetch(`/api/admin/users/${member.id}/reset-password`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const json = await res.json() as { data: { temporaryPassword: string } | null; error: string | null }
+      if (!res.ok || !json.data) {
+        addToast('error', json.error ?? 'Failed to reset password')
+        return
+      }
+      setResetResult(json.data.temporaryPassword)
+      setShowTempPassword(true)
+      // Refresh member data to clear tempPassword display
+      void fetchMember(member.id)
+      addToast('success', 'Password reset — share new credentials with user')
+    } catch {
+      addToast('error', 'Network error')
+    } finally {
+      setResettingPassword(false)
     }
   }
 
@@ -430,8 +463,81 @@ export default function MemberSlideOver({ memberId, isAdmin, currentUserId, onCl
 
               {/* ── Admin Actions ──────────────────────────────── */}
               {isAdmin && (
-                <div>
+                <div className="space-y-4">
                   <SectionHeading>Admin Actions</SectionHeading>
+
+                  {/* Password management (not shown for SUPER_ADMIN accounts) */}
+                  {member.role !== 'SUPER_ADMIN' &&
+                    (isSuperAdmin || member.role === 'EMPLOYEE') && (
+                    <div className="forge-card p-4 space-y-3">
+                      <p className="font-mono text-xs text-secondary font-semibold tracking-wide">
+                        Password Management
+                      </p>
+
+                      {/* Current temp password (if user hasn't changed yet) */}
+                      {member.mustChangePassword && member.tempPassword && !resetResult && (
+                        <div className="bg-amber-950/20 border border-amber-500/40 px-3 py-2">
+                          <p className="font-mono text-[10px] text-amber-400 tracking-widest uppercase mb-1">
+                            ⚠ Temp Password (user hasn't changed it yet)
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-primary flex-1">
+                              {showTempPassword ? member.tempPassword : '••••••••••••••••'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowTempPassword((v) => !v)}
+                              className="font-mono text-[10px] text-muted hover:text-accent tracking-widest transition-colors"
+                            >
+                              {showTempPassword ? 'HIDE' : 'SHOW'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Reset result (new temp password just generated) */}
+                      {resetResult && (
+                        <div className="bg-status-success/10 border border-status-success/40 px-3 py-2">
+                          <p className="font-mono text-[10px] text-status-success tracking-widest uppercase mb-1">
+                            ✓ New Temp Password — Share with user:
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-primary font-bold flex-1">
+                              {showTempPassword ? resetResult : '••••••••••••••••'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowTempPassword((v) => !v)}
+                              className="font-mono text-[10px] text-muted hover:text-accent tracking-widest"
+                            >
+                              {showTempPassword ? 'HIDE' : 'SHOW'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Password status when already changed */}
+                      {!member.mustChangePassword && !resetResult && (
+                        <p className="font-mono text-[10px] text-muted">
+                          ✓ User has set their own password
+                        </p>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => void handleResetPassword()}
+                        disabled={resettingPassword}
+                        className="w-full border border-status-danger text-status-danger font-mono text-xs tracking-widest py-2 hover:bg-status-danger hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {resettingPassword ? 'RESETTING...' : 'RESET PASSWORD'}
+                      </button>
+                      <p className="font-mono text-[10px] text-muted leading-relaxed">
+                        This will generate a new temp password and force the user to change it on next login.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Send Notification */}
                   <div className="forge-card p-4 space-y-3">
                     <p className="font-mono text-xs text-secondary font-semibold tracking-wide">
                       Send Notification

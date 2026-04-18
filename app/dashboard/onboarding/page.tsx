@@ -48,7 +48,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (!loading) {
       if (!user) { router.push('/login'); return }
-      if (user.role !== 'ADMIN') { router.push('/dashboard'); return }
+      if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') { router.push('/dashboard'); return }
       void fetchData()
     }
   }, [loading, user, router, fetchData])
@@ -122,6 +122,7 @@ export default function OnboardingPage() {
         <GenerateUserModal
           onClose={() => setShowGenerate(false)}
           onGenerated={() => void fetchData()}
+          isSuperAdmin={user.role === 'SUPER_ADMIN'}
         />
       )}
     </div>

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { verifyToken, getTokenFromCookies, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const token = getTokenFromCookies(request)
     if (!token) return errorResponse('Not authenticated', 401)
     const payload = verifyToken(token)
-    if (!payload || payload.role !== 'ADMIN') return errorResponse('Admin access required', 403)
+    if (!payload || !isAdminRole(payload.role)) return errorResponse('Admin access required', 403)
 
     const pendingUsers = await prisma.user.findMany({
       where: { isOnboarding: true },

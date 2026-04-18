@@ -17,10 +17,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } })
     if (!user) return errorResponse('Invalid email or password', 401)
+    if (!user.isActive) return errorResponse('Account is deactivated', 403)
     const valid = await comparePassword(password, user.passwordHash)
     if (!valid) return errorResponse('Invalid email or password', 401)
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role, isOnboarding: user.isOnboarding })
+    const token = signToken({ userId: user.id, email: user.email, role: user.role, isOnboarding: user.isOnboarding, mustChangePassword: user.mustChangePassword })
     if (!token) return errorResponse('Authentication service unavailable', 503)
 
     // If approved user: set WORKING + create daily activity
@@ -41,10 +42,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role as 'ADMIN' | 'EMPLOYEE',
+      role: user.role as AuthUser['role'],
       avatarUrl: user.avatarUrl,
       currentStatus: user.isOnboarding ? 'NOT_WORKING' : 'WORKING',
       isOnboarding: user.isOnboarding,
+      mustChangePassword: user.mustChangePassword,
       createdAt: user.createdAt,
     }
 

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies, hashPassword } from '@/lib/auth'
+import { verifyToken, getTokenFromCookies, hashPassword, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import crypto from 'crypto'
 
@@ -21,7 +21,7 @@ function generateSecurePassword(): string {
     password += all[bytes[i] % all.length]
   }
   // Shuffle
-  return password.split('').sort(() => crypto.randomBytes(1)[0] / 256 - 0.5).join('')
+  return password.split('').sort(() => (crypto.randomBytes(1)[0] ?? 128) / 256 - 0.5).join('')
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -29,15 +29,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const token = getTokenFromCookies(request)
     if (!token) return errorResponse('Not authenticated', 401)
     const payload = verifyToken(token)
-    if (!payload || payload.role !== 'ADMIN') return errorResponse('Admin access required', 403)
+    if (!payload || !isAdminRole(payload.role)) return errorResponse('Admin access required', 403)
 
     let body: unknown
     try { body = await request.json() } catch { return errorResponse('Invalid JSON', 400) }
     const { name, email, role } = body as Record<string, unknown>
 
-    if (!name || typeof name !== 'string' || name.trim().length < 2) return errorResponse('Name is required (min 2 chars)', 400)
-    if (!email || typeof email !== 'string' || !email.includes('@')) return errorResponse('Valid email is required', 400)
-    if (!role || (role !== 'ADMIN' && role !== 'EMPLOYEE')) return errorResponse('Role must be ADMIN or EMPLOYEE', 400)
+    if (!name || typeof name !== 'string' || name.trim().length < 2)
+      return errorResponse('Name is required (min 2 chars)', 400)
+    if (!email || typeof email !== 'string' || !email.includes('@'))
+      return errorResponse('Valid email is required', 400)
+    if (!role || !['ADMIN', 'EMPLOYEE'].includes(role as string))
+      return errorResponse('Role must be ADMIN or EMPLOYEE', 400)
+
+    // ── Role restriction: only SUPER_ADMIN can create ADMIN accounts ──────────
+    if (role === 'ADMIN' && payload.role !== 'SUPER_ADMIN') {
+      return errorResponse('Only Super Admin can create Admin accounts', 403)
+    }
+
+    // ── No one can create SUPER_ADMIN accounts via this route ─────────────────
+    if (role === 'SUPER_ADMIN') {
+      return errorResponse('Super Admin accounts cannot be created via this route', 403)
+    }
 
     const normalizedEmail = email.toLowerCase().trim()
     const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } })
@@ -52,24 +65,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         email: normalizedEmail,
         passwordHash,
         role: role as 'ADMIN' | 'EMPLOYEE',
-        isOnboarding: true,
+        isOnboarding: false,          // pre-approved — no approval step needed
         currentStatus: 'NOT_WORKING',
+        tempPassword: temporaryPassword,  // stored so admins can retrieve it
+        mustChangePassword: true,         // user must change on first login
       },
     })
-
-    // Notify all admins that a new user was created
-    const admins = await prisma.user.findMany({ where: { role: 'ADMIN', isOnboarding: false } })
-    if (admins.length > 0) {
-      await prisma.notification.createMany({
-        data: admins.map((admin) => ({
-          userId: admin.id,
-          type: 'ONBOARDING_PENDING' as const,
-          title: 'New user created',
-          body: `${name.trim()} (${normalizedEmail}) has been created and is awaiting approval.`,
-          linkTo: '/dashboard/onboarding',
-        })),
-      })
-    }
 
     return successResponse({ email: normalizedEmail, temporaryPassword }, 201)
   } catch (error) {

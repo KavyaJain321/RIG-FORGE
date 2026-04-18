@@ -11,6 +11,12 @@ export interface TokenPayload {
   email: string
   role: string
   isOnboarding: boolean
+  mustChangePassword: boolean
+}
+
+/** Returns true for ADMIN and SUPER_ADMIN roles. */
+export function isAdminRole(role: string): boolean {
+  return role === 'ADMIN' || role === 'SUPER_ADMIN'
 }
 
 function getJwtSecret(): string {

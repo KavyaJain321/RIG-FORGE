@@ -1,16 +1,25 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { verifyToken, getTokenFromCookies, signToken, COOKIE_NAME } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import type { AuthUser } from '@/lib/types'
 
 const MIN_PASSWORD_LENGTH = 8
 const BCRYPT_ROUNDS = 12
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 
 // ─── PATCH /api/users/me/password ──────────────────────────────────────────
+// Changes the current user's password.
+// If mustChangePassword is true on the token, currentPassword is still required
+// (it equals the temp password they were given). After success:
+//   • passwordHash is updated
+//   • tempPassword is cleared
+//   • mustChangePassword is set to false
+//   • A new JWT is issued so middleware stops redirecting to change-password
 
-export async function PATCH(request: NextRequest) {
+export async function PATCH(request: NextRequest): Promise<NextResponse> {
   try {
     const token = getTokenFromCookies(request)
     if (!token) return errorResponse('Authentication required', 401)
@@ -35,7 +44,6 @@ export async function PATCH(request: NextRequest) {
       return errorResponse('currentPassword and newPassword are required', 400)
     }
 
-    // ── confirmPassword must be present and match ───────────────────────────
     if (!('confirmPassword' in body)) {
       return errorResponse('confirmPassword is required', 400)
     }
@@ -60,7 +68,8 @@ export async function PATCH(request: NextRequest) {
     // ── Fetch user ──────────────────────────────────────────────────────
     const user = await prisma.user.findUnique({
       where: { id: claims.userId },
-      select: { id: true, passwordHash: true },
+      select: { id: true, name: true, email: true, role: true, avatarUrl: true,
+                currentStatus: true, isOnboarding: true, passwordHash: true },
     })
 
     if (!user) return errorResponse('User not found', 404)
@@ -74,10 +83,45 @@ export async function PATCH(request: NextRequest) {
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: hash },
+      data: {
+        passwordHash: hash,
+        tempPassword: null,         // clear the temp password
+        mustChangePassword: false,  // remove the forced-change flag
+      },
     })
 
-    return successResponse({ success: true })
+    // ── Issue a fresh JWT so mustChangePassword=false takes effect ──────
+    const newToken = signToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      isOnboarding: user.isOnboarding,
+      mustChangePassword: false,
+    })
+
+    const authUser: AuthUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role as AuthUser['role'],
+      avatarUrl: user.avatarUrl,
+      currentStatus: user.currentStatus as AuthUser['currentStatus'],
+      isOnboarding: user.isOnboarding,
+      mustChangePassword: false,
+      createdAt: new Date(),
+    }
+
+    const response = successResponse(authUser)
+    if (newToken) {
+      response.cookies.set(COOKIE_NAME, newToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: COOKIE_MAX_AGE,
+      })
+    }
+    return response
   } catch (error) {
     console.error('[PATCH /api/users/me/password] Unexpected error:', error)
     return errorResponse('Internal server error', 500)

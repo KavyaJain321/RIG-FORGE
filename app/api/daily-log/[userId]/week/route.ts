@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { DailyLogEntry } from '@/lib/types'
 
@@ -24,7 +24,7 @@ export async function GET(
       return errorResponse('userId parameter is required', 400)
     }
 
-    if (userId !== payload.userId && payload.role !== 'ADMIN') {
+    if (userId !== payload.userId && !isAdminRole(payload.role)) {
       return errorResponse('Forbidden: insufficient permissions', 403)
     }
 

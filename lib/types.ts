@@ -1,10 +1,13 @@
 // ─── JWT ─────────────────────────────────────────────────────────────────────
 
+export type AppRole = 'SUPER_ADMIN' | 'ADMIN' | 'EMPLOYEE'
+
 export interface JWTPayload {
   userId: string
   email: string
-  role: 'ADMIN' | 'EMPLOYEE'
+  role: AppRole
   isOnboarding: boolean
+  mustChangePassword: boolean
   iat?: number
   exp?: number
 }
@@ -19,10 +22,11 @@ export interface AuthUser {
   id: string
   name: string
   email: string
-  role: 'ADMIN' | 'EMPLOYEE'
+  role: AppRole
   avatarUrl: string | null
   currentStatus: 'WORKING' | 'NOT_WORKING'
   isOnboarding: boolean
+  mustChangePassword: boolean
   createdAt: Date
 }
 
@@ -129,7 +133,7 @@ export interface MemberSummary {
   id: string
   name: string
   email: string           // empty string '' when viewer is EMPLOYEE and this is a teammate
-  role: 'ADMIN' | 'EMPLOYEE'
+  role: AppRole
   avatarUrl: string | null
   currentStatus: 'WORKING' | 'NOT_WORKING'
   lastSeenAt: Date | null // null when viewer is EMPLOYEE and this is a teammate
@@ -145,7 +149,9 @@ export interface MemberDetail {
   id: string
   name: string
   email: string
-  role: 'ADMIN' | 'EMPLOYEE'
+  role: AppRole
+  tempPassword?: string | null        // only present for admin/superadmin viewers
+  mustChangePassword?: boolean        // only present for admin/superadmin viewers
   avatarUrl: string | null
   currentStatus: 'WORKING' | 'NOT_WORKING'
   lastSeenAt: Date | null
@@ -414,7 +420,7 @@ export interface PendingUser {
   id: string
   name: string
   email: string
-  role: 'ADMIN' | 'EMPLOYEE'
+  role: AppRole
   createdAt: Date
   hasLoggedIn: boolean
   lastSeenAt: Date | null

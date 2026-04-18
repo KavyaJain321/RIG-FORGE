@@ -5,6 +5,7 @@ import { useState } from 'react'
 interface GenerateUserModalProps {
   onClose: () => void
   onGenerated: () => void
+  isSuperAdmin?: boolean
 }
 
 interface GeneratedResult {
@@ -12,7 +13,7 @@ interface GeneratedResult {
   temporaryPassword: string
 }
 
-export default function GenerateUserModal({ onClose, onGenerated }: GenerateUserModalProps) {
+export default function GenerateUserModal({ onClose, onGenerated, isSuperAdmin = false }: GenerateUserModalProps) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'EMPLOYEE' | 'ADMIN'>('EMPLOYEE')
@@ -72,13 +73,21 @@ export default function GenerateUserModal({ onClose, onGenerated }: GenerateUser
             <div>
               <label className="font-mono text-xs text-text-muted uppercase tracking-widest block mb-2">Role *</label>
               <div className="flex gap-4">
-                {(['EMPLOYEE', 'ADMIN'] as const).map((r) => (
-                  <label key={r} className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="role" value={r} checked={role === r} onChange={() => setRole(r)} className="accent-accent" />
-                    <span className="font-mono text-xs text-text-secondary">{r}</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="role" value="EMPLOYEE" checked={role === 'EMPLOYEE'} onChange={() => setRole('EMPLOYEE')} className="accent-accent" />
+                  <span className="font-mono text-xs text-text-secondary">EMPLOYEE</span>
+                </label>
+                {/* Only Super Admin can create Admin accounts */}
+                {isSuperAdmin && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="role" value="ADMIN" checked={role === 'ADMIN'} onChange={() => setRole('ADMIN')} className="accent-accent" />
+                    <span className="font-mono text-xs text-text-secondary">ADMIN</span>
                   </label>
-                ))}
+                )}
               </div>
+              {!isSuperAdmin && (
+                <p className="font-mono text-[10px] text-muted mt-1">Only Super Admin can create Admin accounts.</p>
+              )}
             </div>
             {error && <p className="font-mono text-xs text-status-danger">{error}</p>}
             <button type="button" onClick={() => void handleGenerate()} disabled={loading} className="w-full h-10 bg-accent text-white font-mono text-xs rounded-card hover:opacity-90 transition-opacity disabled:opacity-50 mt-2">

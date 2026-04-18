@@ -90,6 +90,7 @@ export async function PATCH(request: NextRequest) {
         avatarUrl: true,
         currentStatus: true,
         isOnboarding: true,
+        mustChangePassword: true,
         createdAt: true,
       },
     })
@@ -98,10 +99,11 @@ export async function PATCH(request: NextRequest) {
       id: updated.id,
       name: updated.name,
       email: updated.email,
-      role: updated.role,
+      role: updated.role as AuthUser['role'],
       avatarUrl: updated.avatarUrl ?? null,
-      currentStatus: updated.currentStatus,
+      currentStatus: updated.currentStatus as AuthUser['currentStatus'],
       isOnboarding: updated.isOnboarding,
+      mustChangePassword: updated.mustChangePassword,
       createdAt: updated.createdAt,
     }
 
@@ -136,6 +138,7 @@ export async function GET(request: NextRequest) {
           avatarUrl: true,
           currentStatus: true,
           isOnboarding: true,
+          mustChangePassword: true,
           createdAt: true,
         },
       }),
@@ -164,10 +167,11 @@ export async function GET(request: NextRequest) {
       id: userRecord.id,
       name: userRecord.name,
       email: userRecord.email,
-      role: userRecord.role,
+      role: userRecord.role as AuthUser['role'],
       avatarUrl: userRecord.avatarUrl ?? null,
-      currentStatus: userRecord.currentStatus,
+      currentStatus: userRecord.currentStatus as AuthUser['currentStatus'],
       isOnboarding: userRecord.isOnboarding,
+      mustChangePassword: userRecord.mustChangePassword,
       createdAt: userRecord.createdAt,
     }
 

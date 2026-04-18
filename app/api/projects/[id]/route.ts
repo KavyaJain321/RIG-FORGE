@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { fetchProjectDetail, fetchProjectSummary, isMemberOfProject } from '@/lib/projects'
 import type { ProjectDetail, ProjectSummary, ProjectLink } from '@/lib/types'
@@ -25,7 +25,7 @@ export async function GET(
 
     const projectId = params.id
 
-    if (payload.role !== 'ADMIN') {
+    if (!isAdminRole(payload.role)) {
       // For employees: return 404 for both non-existent AND non-member projects
       // to avoid revealing that a project exists
       const membership = await prisma.projectMember.findUnique({
@@ -73,7 +73,7 @@ export async function PATCH(
     })
     if (!project) return errorResponse('Project not found', 404)
 
-    const isAdmin = payload.role === 'ADMIN'
+    const isAdmin = isAdminRole(payload.role)
     const isLead = project.leadId === payload.userId
 
     // Only admin or project lead can PATCH
@@ -222,7 +222,7 @@ export async function DELETE(
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid or expired session', 401)
 
-    if (payload.role !== 'ADMIN') return errorResponse('Admin access required', 403)
+    if (!isAdminRole(payload.role)) return errorResponse('Admin access required', 403)
 
     const projectId = params.id
     const project = await prisma.project.findUnique({

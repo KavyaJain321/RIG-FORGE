@@ -57,7 +57,8 @@ function PeoplePageInner() {
   // Slide-over: driven by ?member= URL param
   // Only open if user is ADMIN or viewing own profile
   const rawSelectedId = searchParams.get('member')
-  const isAdmin = user?.role === 'ADMIN'
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   // For employees, only allow slide-over for own profile
   const selectedId = isAdmin
     ? rawSelectedId
@@ -125,7 +126,7 @@ function PeoplePageInner() {
 
   // Open slide-over — employees can only open their own
   const openMember = useCallback((id: string) => {
-    if (!isAdmin && id !== user?.id) return  // client-side guard
+    if (!isAdmin && !isSuperAdmin && id !== user?.id) return  // client-side guard
     const params = new URLSearchParams(searchParams.toString())
     params.set('member', id)
     router.push(`?${params.toString()}`, { scroll: false })
@@ -293,6 +294,7 @@ function PeoplePageInner() {
       <MemberSlideOver
         memberId={selectedId}
         isAdmin={isAdmin}
+        isSuperAdmin={isSuperAdmin}
         currentUserId={user?.id}
         onClose={closeMember}
       />

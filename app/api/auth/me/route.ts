@@ -19,10 +19,11 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role as 'ADMIN' | 'EMPLOYEE',
+      role: user.role as AuthUser['role'],
       avatarUrl: user.avatarUrl,
       currentStatus: user.currentStatus as 'WORKING' | 'NOT_WORKING',
       isOnboarding: user.isOnboarding,
+      mustChangePassword: user.mustChangePassword,
       createdAt: user.createdAt,
     }
 

@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { MemberDetail } from '@/lib/types'
 
@@ -22,7 +22,8 @@ export async function GET(
     if (!payload) return errorResponse('Invalid or expired token', 401)
 
     const { userId } = params
-    const isAdmin = payload.role === 'ADMIN'
+    const isAdmin = isAdminRole(payload.role)
+    const isSuperAdmin = payload.role === 'SUPER_ADMIN'
     const isOwnProfile = payload.userId === userId
 
     // EMPLOYEE attempting to view another user's profile → hard deny
@@ -49,6 +50,8 @@ export async function GET(
           currentStatus: true,
           isOnboarding: true,
           createdAt: true,
+          // Only expose temp password fields to admin viewers
+          ...(isAdmin && { tempPassword: true, mustChangePassword: true }),
         },
       }),
       prisma.projectMember.findMany({
@@ -212,16 +215,25 @@ export async function GET(
       notes: log.notes,
     }))
 
+    const typedUserRecord = userRecord as typeof userRecord & {
+      tempPassword?: string | null
+      mustChangePassword?: boolean
+    }
+
+    // ADMIN cannot see SUPER_ADMIN's temp password (nobody can reset superadmin)
+    const canSeeTempPassword = isAdmin && typedUserRecord.role !== 'SUPER_ADMIN' &&
+      (isSuperAdmin || typedUserRecord.role === 'EMPLOYEE')
+
     const detail: MemberDetail = {
-      id: userRecord.id,
-      name: userRecord.name,
-      email: userRecord.email,
-      role: userRecord.role,
-      avatarUrl: userRecord.avatarUrl,
-      currentStatus: userRecord.currentStatus,
+      id: typedUserRecord.id,
+      name: typedUserRecord.name,
+      email: typedUserRecord.email,
+      role: typedUserRecord.role as MemberDetail['role'],
+      avatarUrl: typedUserRecord.avatarUrl,
+      currentStatus: typedUserRecord.currentStatus as MemberDetail['currentStatus'],
       lastSeenAt,
-      isOnboarding: userRecord.isOnboarding,
-      createdAt: userRecord.createdAt,
+      isOnboarding: typedUserRecord.isOnboarding,
+      createdAt: typedUserRecord.createdAt,
       projects,
       activityThisWeek,
       completedTasksThisWeek,
@@ -229,6 +241,10 @@ export async function GET(
       ticketsRaisedCount,
       ticketsHelpedCount,
       dailyLogsThisWeek,
+      ...(isAdmin && {
+        mustChangePassword: typedUserRecord.mustChangePassword ?? false,
+        tempPassword: canSeeTempPassword ? (typedUserRecord.tempPassword ?? null) : null,
+      }),
     }
 
     return successResponse(detail)

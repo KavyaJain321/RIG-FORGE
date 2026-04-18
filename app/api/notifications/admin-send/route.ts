@@ -2,7 +2,7 @@ import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
 import { NotificationType } from '@prisma/client'
-import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 // ─── POST /api/notifications/admin-send ──────────────────────────────────────
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid or expired token', 401)
-    if (payload.role !== 'ADMIN') return errorResponse('Admin access required', 403)
+    if (!isAdminRole(payload.role)) return errorResponse('Admin access required', 403)
 
     let body: unknown
     try {

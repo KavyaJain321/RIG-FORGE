@@ -12,10 +12,11 @@ export function extractAuthUser(user: User): AuthUser {
     id: user.id,
     name: user.name,
     email: user.email,
-    role: user.role,
+    role: user.role as AuthUser['role'],
     avatarUrl: user.avatarUrl,
-    currentStatus: user.currentStatus,
+    currentStatus: user.currentStatus as AuthUser['currentStatus'],
     isOnboarding: user.isOnboarding,
+    mustChangePassword: user.mustChangePassword,
     createdAt: user.createdAt,
   }
 }

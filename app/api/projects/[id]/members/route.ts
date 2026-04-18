@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { fetchProjectDetail } from '@/lib/projects'
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid or expired token', 401)
 
-    if (payload.role !== 'ADMIN') {
+    if (!isAdminRole(payload.role)) {
       return errorResponse('Only admins can add members to projects', 403)
     }
 

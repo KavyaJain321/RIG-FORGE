@@ -11,6 +11,7 @@ datasource db {
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Role {
+  SUPER_ADMIN
   ADMIN
   EMPLOYEE
 }
@@ -77,12 +78,14 @@ model User {
   email         String     @unique
   passwordHash  String
   role          Role
-  avatarUrl     String?
-  currentStatus UserStatus @default(NOT_WORKING)
-  isActive      Boolean    @default(true)
-  isOnboarding  Boolean    @default(false)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  avatarUrl          String?
+  currentStatus      UserStatus @default(NOT_WORKING)
+  isActive           Boolean    @default(true)
+  isOnboarding       Boolean    @default(false)
+  tempPassword       String?    // plaintext temp password shown to admins; cleared after first change
+  mustChangePassword Boolean    @default(false)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
   projects        ProjectMember[]
   projectsLed     Project[]       @relation("ProjectLead")

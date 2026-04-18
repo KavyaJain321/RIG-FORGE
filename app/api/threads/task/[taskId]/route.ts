@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { MessageResponse } from '@/lib/types'
 
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       where: {
         id: taskId,
         isActive: true,
-        ...(payload.role !== 'ADMIN' && {
+        ...(!isAdminRole(payload.role) && {
           project: { members: { some: { userId: payload.userId } } },
         }),
       },
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       where: {
         id: taskId,
         isActive: true,
-        ...(payload.role !== 'ADMIN' && {
+        ...(!isAdminRole(payload.role) && {
           project: { members: { some: { userId: payload.userId } } },
         }),
       },

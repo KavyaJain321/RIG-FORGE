@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { MessageResponse } from '@/lib/types'
 
@@ -71,7 +71,7 @@ export async function GET(
       where: {
         id: projectId,
         isActive: true,
-        ...(payload.role !== 'ADMIN'
+        ...(!isAdminRole(payload.role)
           ? { members: { some: { userId: payload.userId } } }
           : {}),
       },
@@ -82,7 +82,7 @@ export async function GET(
     // Determine if this viewer can see ALL LEAD_ADMIN messages
     // (admins and this project's lead only — not every lead)
     const canSeeAllPrivate =
-      payload.role === 'ADMIN' || project.leadId === payload.userId
+      isAdminRole(payload.role) || project.leadId === payload.userId
 
     const { searchParams } = request.nextUrl
     const limit = Math.min(
@@ -240,7 +240,7 @@ export async function POST(
       where: {
         id: projectId,
         isActive: true,
-        ...(payload.role !== 'ADMIN'
+        ...(!isAdminRole(payload.role)
           ? { members: { some: { userId: payload.userId } } }
           : {}),
       },

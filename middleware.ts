@@ -21,6 +21,7 @@ interface EdgeJWTClaims {
   email: string
   role: string
   isOnboarding: boolean
+  mustChangePassword: boolean
   iat?: number
   exp?: number
 }
@@ -122,6 +123,13 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // ── Approved user on /pending → send to dashboard ──────────────────────────
   if (!claims.isOnboarding && isPending) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // ── Must-change-password guard ─────────────────────────────────────────────
+  // Force the user to /dashboard/change-password until they set a new password.
+  const isChangePasswordPage = pathname === '/dashboard/change-password'
+  if (claims.mustChangePassword && isDashboard && !isChangePasswordPage) {
+    return NextResponse.redirect(new URL('/dashboard/change-password', request.url))
   }
 
   return NextResponse.next()
