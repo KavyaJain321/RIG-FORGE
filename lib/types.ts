@@ -290,6 +290,19 @@ export interface WeeklyReportEmployeeSnapshot {
   }[]
 }
 
+export interface WeeklyReportProjectSnapshot {
+  projectId: string
+  name: string
+  status: string
+  leadName: string | null
+  memberCount: number
+  tasksTotal: number
+  tasksCompleted: number
+  tasksInProgress: number
+  tasksOverdue: number
+  completedThisWeek: number
+}
+
 export interface WeeklyReportSnapshot {
   weekStart: string
   weekEnd: string
@@ -299,7 +312,9 @@ export interface WeeklyReportSnapshot {
     totalTasksCompleted: number
     totalTicketsRaised: number
     totalTicketsResolved: number
+    activeProjects: number
   }
+  projects: WeeklyReportProjectSnapshot[]
   employees: WeeklyReportEmployeeSnapshot[]
 }
 

@@ -3,7 +3,7 @@ import { type NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
-import type { WeeklyReportSnapshot, WeeklyReportEmployeeSnapshot } from '@/lib/types'
+import type { WeeklyReportSnapshot, WeeklyReportEmployeeSnapshot, WeeklyReportProjectSnapshot } from '@/lib/types'
 
 // ─── POST /api/reports/generate ───────────────────────────────────────────────
 
@@ -144,11 +144,57 @@ export async function POST(request: NextRequest) {
       }),
     )
 
-    // ── 5. Build company stats ────────────────────────────────────────────────
+    // ── 5. Build project snapshots ────────────────────────────────────────────
+    const allProjects = await prisma.project.findMany({
+      include: {
+        lead: { select: { name: true } },
+        _count: { select: { members: true } },
+        tasks: {
+          select: {
+            status: true,
+            dueDate: true,
+            completedAt: true,
+          },
+        },
+      },
+      orderBy: [{ status: 'asc' }, { name: 'asc' }],
+    })
+
+    const projectSnapshots: WeeklyReportProjectSnapshot[] = allProjects.map((p) => {
+      const tasksTotal      = p.tasks.length
+      const tasksCompleted  = p.tasks.filter((t) => t.status === 'DONE').length
+      const tasksInProgress = p.tasks.filter((t) => t.status === 'IN_PROGRESS').length
+      const tasksOverdue    = p.tasks.filter(
+        (t) => t.status !== 'DONE' && t.dueDate && new Date(t.dueDate) < nowDate,
+      ).length
+      const completedThisWeek = p.tasks.filter(
+        (t) =>
+          t.status === 'DONE' &&
+          t.completedAt &&
+          new Date(t.completedAt) >= weekStart &&
+          new Date(t.completedAt) <= weekEnd,
+      ).length
+
+      return {
+        projectId:        p.id,
+        name:             p.name,
+        status:           p.status,
+        leadName:         p.lead?.name ?? null,
+        memberCount:      p._count.members,
+        tasksTotal,
+        tasksCompleted,
+        tasksInProgress,
+        tasksOverdue,
+        completedThisWeek,
+      }
+    })
+
+    // ── 6. Build company stats ────────────────────────────────────────────────
     const totalDaysActive = employeeSnapshots.reduce((sum, e) => sum + e.daysActive, 0)
     const totalTasksCompleted = employeeSnapshots.reduce((sum, e) => sum + e.tasksCompleted.length, 0)
     const totalTicketsRaised = employeeSnapshots.reduce((sum, e) => sum + e.ticketsRaised, 0)
     const totalTicketsResolved = employeeSnapshots.reduce((sum, e) => sum + e.ticketsHelped, 0)
+    const activeProjects = projectSnapshots.filter((p) => p.status === 'ACTIVE').length
 
     const snapshot: WeeklyReportSnapshot = {
       weekStart: weekStart.toISOString().split('T')[0],
@@ -159,7 +205,9 @@ export async function POST(request: NextRequest) {
         totalTasksCompleted,
         totalTicketsRaised,
         totalTicketsResolved,
+        activeProjects,
       },
+      projects: projectSnapshots,
       employees: employeeSnapshots,
     }
 
