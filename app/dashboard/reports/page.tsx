@@ -141,7 +141,7 @@ function GeneratorForm({ onGenerated }: { onGenerated: () => void }) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden mb-8">
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm mb-8">
       {/* Header */}
       <div className="px-6 py-5 border-b border-gray-100">
         <h2 className="text-base font-semibold text-gray-900">Generate New Report</h2>
