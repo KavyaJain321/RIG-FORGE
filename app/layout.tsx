@@ -39,6 +39,11 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: 'Rig Forge',
   description: 'Internal employee monitoring and project tracking platform',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 }
 
 export default function RootLayout({
