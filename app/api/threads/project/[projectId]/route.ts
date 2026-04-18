@@ -198,7 +198,7 @@ async function dispatchUpdateNotifications(
 
     // All system admins who are active (excluding sender)
     const admins = await prisma.user.findMany({
-      where: { role: 'ADMIN', isActive: true, id: { not: senderId } },
+      where: { role: { in: ['ADMIN', 'SUPER_ADMIN'] }, isActive: true, id: { not: senderId } },
       select: { id: true },
     })
     for (const a of admins) recipientIds.add(a.id)

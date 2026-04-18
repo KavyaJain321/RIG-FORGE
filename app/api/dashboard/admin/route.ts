@@ -1,6 +1,6 @@
 import { type NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { verifyToken, getTokenFromCookies, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { AdminDashboardData } from '@/lib/types'
 
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   const currentUser = verifyToken(token)
   if (!currentUser) return errorResponse('Unauthorized', 401)
-  if (currentUser.role !== 'ADMIN') return errorResponse('Forbidden', 403)
+  if (!isAdminRole(currentUser.role)) return errorResponse('Forbidden', 403)
 
   try {
     const [

@@ -1,7 +1,7 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { WeeklyReportSnapshot, WeeklyReportEmployeeSnapshot } from '@/lib/types'
 
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
   const currentUser = verifyToken(token)
   if (!currentUser) return errorResponse('Unauthorized', 401)
-  if (currentUser.role !== 'ADMIN') return errorResponse('Forbidden', 403)
+  if (!isAdminRole(currentUser.role)) return errorResponse('Forbidden', 403)
 
   try {
     // ── 1. Calculate last full week (Mon–Sun) ─────────────────────────────────
