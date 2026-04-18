@@ -209,13 +209,18 @@ model DailyActivity {
 }
 
 model WeeklyReport {
-  id          String   @id @default(cuid())
-  weekStart   DateTime @db.Date
-  weekEnd     DateTime @db.Date
-  generatedAt DateTime @default(now())
-  snapshot    Json
+  id            String   @id @default(cuid())
+  reportType    String   @default("WEEKLY")   // WEEKLY | PROJECT | EMPLOYEE
+  label         String?
+  weekStart     DateTime @db.Date
+  weekEnd       DateTime @db.Date
+  generatedAt   DateTime @default(now())
+  generatedById String?
+  filterIds     String[] @default([])
+  snapshot      Json
 
   @@index([weekStart])
+  @@index([reportType])
 }
 
 model TaskThread {

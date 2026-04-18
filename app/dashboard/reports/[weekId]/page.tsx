@@ -1,140 +1,484 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
 import { useAuth } from '@/hooks/useAuth'
 import { isAdminRole } from '@/lib/auth'
 import { WeeklyReportEmployeeCard } from '@/components/reports/WeeklyReportEmployeeCard'
-import type { WeeklyReportSnapshot, WeeklyReportSummary, WeeklyReportProjectSnapshot } from '@/lib/types'
+import type {
+  WeeklyReportSnapshot,
+  WeeklyReportSummary,
+  WeeklyReportProjectSnapshot,
+  ProjectReportSnapshot,
+  ProjectReportProjectEntry,
+  EmployeeReportSnapshot,
+  EmployeeReportEntry,
+} from '@/lib/types'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type SortMode = 'activity' | 'tasks' | 'name'
 
-interface WeeklyReportFull extends WeeklyReportSummary {
-  snapshot: WeeklyReportSnapshot
+type AnySnapshot = WeeklyReportSnapshot | ProjectReportSnapshot | EmployeeReportSnapshot
+
+interface ReportFull extends WeeklyReportSummary {
+  snapshot: AnySnapshot
 }
 
-function formatDate(date: Date | string): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmt(date: Date | string) {
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+function fmtShort(date: Date | string) {
+  return new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-function formatDateFull(date: Date | string): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function WeeklyReportDetailPage() {
-  const router = useRouter()
-  const params = useParams()
-  const weekId = params.weekId as string
-
+export default function ReportDetailPage() {
+  const router    = useRouter()
+  const params    = useParams()
+  const weekId    = params.weekId as string
   const { user, loading } = useAuth()
 
-  const [report, setReport] = useState<WeeklyReportFull | null>(null)
+  const [report,     setReport]     = useState<ReportFull | null>(null)
   const [fetchError, setFetchError] = useState<string | null>(null)
-  const [sortMode, setSortMode] = useState<SortMode>('activity')
+  const [sortMode,   setSortMode]   = useState<SortMode>('activity')
+  const printRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!loading && user && !isAdminRole(user.role)) {
-      router.replace('/dashboard')
-    }
+    if (!loading && user && !isAdminRole(user.role)) router.replace('/dashboard')
   }, [user, loading, router])
 
   useEffect(() => {
-    if (!loading && user?.role && isAdminRole(user.role) && weekId) {
-      fetchReport()
+    if (!loading && user && isAdminRole(user.role) && weekId) {
+      fetch(`/api/reports/${weekId}`)
+        .then((r) => r.json())
+        .then((body) => {
+          if (body.error) setFetchError(body.error)
+          else setReport(body.data as ReportFull)
+        })
+        .catch(() => setFetchError('Network error loading report'))
     }
   }, [loading, user, weekId])
 
-  async function fetchReport() {
-    setFetchError(null)
-    try {
-      const res = await fetch(`/api/reports/${weekId}`)
-      if (!res.ok) {
-        const body = await res.json()
-        setFetchError(body.error ?? 'Failed to load report')
-        return
-      }
-      const body = await res.json()
-      setReport(body.data as WeeklyReportFull)
-    } catch {
-      setFetchError('Network error loading report')
-    }
+  function handlePrint() {
+    window.print()
   }
 
-  if (loading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-      </div>
-    )
-  }
-
+  // ── Loading / Error states ──────────────────────────────────────────────────
+  if (loading || !user) return <Spinner />
   if (!isAdminRole(user.role)) return null
+  if (fetchError) return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <BackLink /><div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{fetchError}</div>
+    </div>
+  )
+  if (!report) return <Spinner />
 
-  if (fetchError) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <Link href="/dashboard/reports" className="text-blue-600 hover:text-blue-800 text-sm mb-4 inline-block">
-          ← Back to Reports
-        </Link>
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {fetchError}
+  const type = report.reportType ?? 'WEEKLY'
+
+  return (
+    <>
+      {/* ── Print-only styles ───────────────────────────────────────────────── */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #report-printable, #report-printable * { visibility: visible !important; }
+          #report-printable { position: fixed; inset: 0; padding: 32px; background: white; }
+          .no-print { display: none !important; }
+          @page { margin: 20mm; }
+        }
+      `}</style>
+
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between mb-5 no-print">
+          <BackLink />
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Export as PDF
+          </button>
+        </div>
+
+        {/* ── Printable content ────────────────────────────────────────────── */}
+        <div id="report-printable" ref={printRef}>
+          {type === 'PROJECT'  && <ProjectReport  report={report} snapshot={report.snapshot as ProjectReportSnapshot}  />}
+          {type === 'EMPLOYEE' && <EmployeeReport report={report} snapshot={report.snapshot as EmployeeReportSnapshot} sortMode={sortMode} setSortMode={setSortMode} />}
+          {type === 'WEEKLY'   && <WeeklyReport   report={report} snapshot={report.snapshot as WeeklyReportSnapshot}   sortMode={sortMode} setSortMode={setSortMode} />}
         </div>
       </div>
-    )
-  }
+    </>
+  )
+}
 
-  if (!report) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+// ─── PROJECT REPORT ───────────────────────────────────────────────────────────
+
+function ProjectReport({ report, snapshot }: { report: ReportFull; snapshot: ProjectReportSnapshot }) {
+  const totalTasks     = snapshot.projects.reduce((s, p) => s + p.tasks.total,           0)
+  const totalDone      = snapshot.projects.reduce((s, p) => s + p.tasks.completed,        0)
+  const totalInRange   = snapshot.projects.reduce((s, p) => s + p.tasks.completedInRange, 0)
+  const totalOverdue   = snapshot.projects.reduce((s, p) => s + p.tasks.overdue,          0)
+  const totalTickets   = snapshot.projects.reduce((s, p) => s + p.ticketsInRange,         0)
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-6 border-b border-gray-200 pb-5">
+        <div className="flex items-center gap-3 mb-1">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 uppercase tracking-wide">Project Report</span>
+          {report.label && <span className="text-sm text-gray-500">{report.label}</span>}
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mt-2">
+          {fmt(snapshot.dateFrom)} – {fmt(snapshot.dateTo)}
+        </h1>
+        <p className="text-sm text-gray-400 mt-1">Generated {fmt(report.generatedAt)}</p>
       </div>
-    )
+
+      {/* Summary bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+        <StatCard label="Projects"         value={snapshot.projects.length} />
+        <StatCard label="Total Tasks"      value={totalTasks} />
+        <StatCard label="Completed"        value={totalDone} />
+        <StatCard label="Done in Range"    value={totalInRange} />
+        <StatCard label="Overdue"          value={totalOverdue} color={totalOverdue > 0 ? 'red' : undefined} />
+      </div>
+
+      {/* Project cards */}
+      <div className="flex flex-col gap-6">
+        {snapshot.projects.map((p) => (
+          <ProjectCard key={p.projectId} project={p} />
+        ))}
+      </div>
+
+      {totalTickets > 0 && (
+        <p className="mt-6 text-sm text-gray-500 text-right">Total tickets raised in range: <strong>{totalTickets}</strong></p>
+      )}
+    </div>
+  )
+}
+
+function ProjectCard({ project: p }: { project: ProjectReportProjectEntry }) {
+  const pct = p.tasks.total > 0 ? Math.round((p.tasks.completed / p.tasks.total) * 100) : 0
+  const statusColor: Record<string, string> = {
+    ACTIVE:    'bg-green-100 text-green-700',
+    COMPLETED: 'bg-blue-100 text-blue-700',
+    ON_HOLD:   'bg-yellow-100 text-yellow-700',
+    CANCELLED: 'bg-red-100 text-red-700',
   }
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5">
+      {/* Title row */}
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
+        <div>
+          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+            <h3 className="text-base font-bold text-gray-900">{p.name}</h3>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[p.status] ?? 'bg-gray-100 text-gray-600'}`}>
+              {p.status.replace('_', ' ')}
+            </span>
+            {p.tasks.overdue > 0 && (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                {p.tasks.overdue} overdue
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-gray-500">
+            Lead: {p.leadName ?? '—'} · {p.memberCount} member{p.memberCount !== 1 ? 's' : ''}
+          </p>
+        </div>
+        {p.tasks.completedInRange > 0 && (
+          <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
+            +{p.tasks.completedInRange} completed in range
+          </span>
+        )}
+      </div>
 
-  const { snapshot } = report
-  const { companyStats } = snapshot
+      {/* Progress bar */}
+      <div className="flex items-center gap-3 mb-3">
+        <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+          <div className="h-2 rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="text-xs font-medium text-gray-600 shrink-0">
+          {p.tasks.completed}/{p.tasks.total} tasks ({pct}%)
+        </span>
+      </div>
+      <div className="flex gap-4 text-xs text-gray-500 mb-4">
+        <span>{p.tasks.inProgress} in progress</span>
+        <span>{p.tasks.total - p.tasks.completed - p.tasks.inProgress} to-do</span>
+        {p.ticketsInRange > 0 && <span>{p.ticketsInRange} ticket{p.ticketsInRange !== 1 ? 's' : ''} raised</span>}
+      </div>
 
-  const sortedEmployees = [...snapshot.employees].sort((a, b) => {
+      {/* Member breakdown table */}
+      {p.members.length > 0 && (
+        <div className="border border-gray-100 rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Member</th>
+                <th className="text-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Done</th>
+                <th className="text-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">In Progress</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {p.members.map((m) => (
+                <tr key={m.userId} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-gray-800 font-medium">{m.name}</td>
+                  <td className="px-3 py-2 text-center text-gray-700">{m.tasksCompleted}</td>
+                  <td className="px-3 py-2 text-center text-gray-700">{m.tasksInProgress}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── EMPLOYEE REPORT ──────────────────────────────────────────────────────────
+
+function EmployeeReport({
+  report,
+  snapshot,
+  sortMode,
+  setSortMode,
+}: {
+  report: ReportFull
+  snapshot: EmployeeReportSnapshot
+  sortMode: SortMode
+  setSortMode: (m: SortMode) => void
+}) {
+  const sorted = [...snapshot.employees].sort((a, b) => {
     if (sortMode === 'activity') return b.daysActive - a.daysActive
-    if (sortMode === 'tasks') return b.tasksCompleted.length - a.tasksCompleted.length
+    if (sortMode === 'tasks')    return b.tasksCompleted.length - a.tasksCompleted.length
     return a.name.localeCompare(b.name)
   })
 
-  const projects: WeeklyReportProjectSnapshot[] = snapshot.projects ?? []
-  const activeProjects  = projects.filter((p) => p.status === 'ACTIVE')
-  const otherProjects   = projects.filter((p) => p.status !== 'ACTIVE')
+  const totalActive = snapshot.employees.reduce((s, e) => s + e.daysActive, 0)
+  const totalDone   = snapshot.employees.reduce((s, e) => s + e.tasksCompleted.length, 0)
+  const totalRaised = snapshot.employees.reduce((s, e) => s + e.ticketsRaised,  0)
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      {/* Back */}
-      <Link
-        href="/dashboard/reports"
-        className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-4 inline-block"
-      >
-        ← Back to Reports
-      </Link>
-
+    <div>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Weekly Report: {formatDate(report.weekStart)} – {formatDate(report.weekEnd)}
+      <div className="mb-6 border-b border-gray-200 pb-5">
+        <div className="flex items-center gap-3 mb-1">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 uppercase tracking-wide">Employee Report</span>
+          {report.label && <span className="text-sm text-gray-500">{report.label}</span>}
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mt-2">
+          {fmt(snapshot.dateFrom)} – {fmt(snapshot.dateTo)}
         </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Generated {formatDateFull(report.generatedAt)}
-        </p>
+        <p className="text-sm text-gray-400 mt-1">Generated {fmt(report.generatedAt)}</p>
       </div>
 
-      {/* Company Summary Cards */}
+      {/* Summary bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+        <StatCard label="Employees"     value={snapshot.employees.length} />
+        <StatCard label="Tasks Completed" value={totalDone} />
+        <StatCard label="Tickets Raised"  value={totalRaised} />
+      </div>
+
+      {/* Sort control */}
+      <div className="flex items-center justify-between mb-4 no-print">
+        <h2 className="text-lg font-bold text-gray-900">👥 Employee Activity</h2>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600">Sort by:</label>
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="activity">Activity</option>
+            <option value="tasks">Tasks Done</option>
+            <option value="name">Name</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {sorted.map((emp) => <EmployeeCard key={emp.userId} employee={emp} />)}
+      </div>
+    </div>
+  )
+}
+
+function EmployeeCard({ employee: e }: { employee: EmployeeReportEntry }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      {/* Top row */}
+      <div className="px-5 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <div>
+            <h3 className="text-base font-bold text-gray-900">{e.name}</h3>
+            <p className="text-xs text-gray-500">{e.email} · {e.role.replace('_', ' ')}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 font-medium">
+              {e.daysActive} day{e.daysActive !== 1 ? 's' : ''} active
+            </span>
+            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+              {e.tasksCompleted.length} done
+            </span>
+            {e.tasksInProgress.length > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-yellow-50 text-yellow-700 font-medium">
+                {e.tasksInProgress.length} in progress
+              </span>
+            )}
+            {e.overdueTasksCount > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-red-50 text-red-700 font-medium">
+                {e.overdueTasksCount} overdue
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Project contributions */}
+        {e.projects.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {e.projects.map((pr) => (
+              <span key={pr.id} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                {pr.name} ({pr.tasksCompleted} done)
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Ticket counts */}
+        {(e.ticketsRaised > 0 || e.ticketsHelped > 0) && (
+          <p className="text-xs text-gray-500">
+            Tickets raised: {e.ticketsRaised} · Tickets helped: {e.ticketsHelped}
+          </p>
+        )}
+      </div>
+
+      {/* Expand/collapse */}
+      {(e.tasksCompleted.length > 0 || e.dailyLogs.length > 0) && (
+        <>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="w-full text-left px-5 py-2.5 bg-gray-50 border-t border-gray-100 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors no-print flex items-center justify-between"
+          >
+            <span>{expanded ? 'Hide details' : 'Show details'}</span>
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {expanded && (
+            <div className="px-5 py-4 border-t border-gray-100 space-y-4">
+              {/* Completed tasks */}
+              {e.tasksCompleted.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">✅ Completed Tasks</p>
+                  <ul className="space-y-1">
+                    {e.tasksCompleted.map((t) => (
+                      <li key={t.id} className="text-sm text-gray-700 flex items-start gap-1.5">
+                        <span className="text-gray-400 mt-0.5">·</span>
+                        <span>
+                          <span className="font-medium">{t.title}</span>
+                          <span className="text-gray-400 text-xs ml-1">
+                            — {t.projectName} · {new Date(t.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* In progress tasks */}
+              {e.tasksInProgress.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🔄 In Progress</p>
+                  <ul className="space-y-1">
+                    {e.tasksInProgress.map((t) => (
+                      <li key={t.id} className="text-sm text-gray-700 flex items-start gap-1.5">
+                        <span className="text-gray-400 mt-0.5">·</span>
+                        <span>
+                          <span className="font-medium">{t.title}</span>
+                          <span className="text-gray-400 text-xs ml-1">— {t.projectName}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Daily logs */}
+              {e.dailyLogs.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📝 Daily Logs</p>
+                  <div className="space-y-2">
+                    {e.dailyLogs.map((log) => (
+                      <div key={log.date} className="text-sm border-l-2 border-gray-200 pl-3">
+                        <p className="text-xs font-semibold text-gray-500 mb-0.5">
+                          {new Date(log.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </p>
+                        <p className="text-gray-700">{log.workSummary}</p>
+                        {log.notes && <p className="text-gray-400 text-xs mt-0.5">{log.notes}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── WEEKLY REPORT (legacy) ───────────────────────────────────────────────────
+
+function WeeklyReport({
+  report,
+  snapshot,
+  sortMode,
+  setSortMode,
+}: {
+  report: ReportFull
+  snapshot: WeeklyReportSnapshot
+  sortMode: SortMode
+  setSortMode: (m: SortMode) => void
+}) {
+  const { companyStats } = snapshot
+  const projects = snapshot.projects ?? []
+  const activeProjects = projects.filter((p) => p.status === 'ACTIVE')
+  const otherProjects  = projects.filter((p) => p.status !== 'ACTIVE')
+
+  const sortedEmployees = [...snapshot.employees].sort((a, b) => {
+    if (sortMode === 'activity') return b.daysActive - a.daysActive
+    if (sortMode === 'tasks')    return b.tasksCompleted.length - a.tasksCompleted.length
+    return a.name.localeCompare(b.name)
+  })
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 uppercase tracking-wide">Weekly Report</span>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {fmtShort(report.weekStart)} – {fmtShort(report.weekEnd)}
+        </h1>
+        <p className="text-sm text-gray-400 mt-1">Generated {fmt(report.generatedAt)}</p>
+      </div>
+
+      {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-10">
         <StatCard label="Employees"        value={companyStats.totalEmployees} />
         <StatCard label="Active Projects"  value={companyStats.activeProjects ?? activeProjects.length} />
@@ -144,53 +488,36 @@ export default function WeeklyReportDetailPage() {
         <StatCard label="Tickets Resolved" value={companyStats.totalTicketsResolved} />
       </div>
 
-      {/* ── Projects Section ──────────────────────────────────────────────────── */}
+      {/* Projects */}
       {projects.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            📁 Project Progress
-          </h2>
-
-          {/* Active projects */}
+          <h2 className="text-lg font-bold text-gray-900 mb-4">📁 Project Progress</h2>
           {activeProjects.length > 0 && (
             <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-                Active ({activeProjects.length})
-              </p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Active ({activeProjects.length})</p>
               <div className="flex flex-col gap-3 mb-6">
-                {activeProjects.map((p) => (
-                  <ProjectRow key={p.projectId} project={p} />
-                ))}
+                {activeProjects.map((p) => <WeeklyProjectRow key={p.projectId} project={p} />)}
               </div>
             </>
           )}
-
-          {/* Other projects */}
           {otherProjects.length > 0 && (
             <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-                Other ({otherProjects.length})
-              </p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Other ({otherProjects.length})</p>
               <div className="flex flex-col gap-3">
-                {otherProjects.map((p) => (
-                  <ProjectRow key={p.projectId} project={p} />
-                ))}
+                {otherProjects.map((p) => <WeeklyProjectRow key={p.projectId} project={p} />)}
               </div>
             </>
           )}
         </section>
       )}
 
-      {/* ── Employees Section ─────────────────────────────────────────────────── */}
+      {/* Employees */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            👥 Employee Activity
-          </h2>
-          <div className="flex items-center gap-2">
-            <label htmlFor="sort-mode" className="text-sm text-gray-600">Sort by:</label>
+          <h2 className="text-lg font-bold text-gray-900">👥 Employee Activity</h2>
+          <div className="flex items-center gap-2 no-print">
+            <label className="text-sm text-gray-600">Sort by:</label>
             <select
-              id="sort-mode"
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as SortMode)}
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -201,10 +528,9 @@ export default function WeeklyReportDetailPage() {
             </select>
           </div>
         </div>
-
         <div className="flex flex-col gap-4">
-          {sortedEmployees.map((employee) => (
-            <WeeklyReportEmployeeCard key={employee.userId} employee={employee} />
+          {sortedEmployees.map((emp) => (
+            <WeeklyReportEmployeeCard key={emp.userId} employee={emp} />
           ))}
         </div>
       </section>
@@ -212,20 +538,7 @@ export default function WeeklyReportDetailPage() {
   )
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-interface StatCardProps { label: string; value: number | string }
-function StatCard({ label, value }: StatCardProps) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-xl font-bold text-gray-900">{value}</p>
-    </div>
-  )
-}
-
-interface ProjectRowProps { project: WeeklyReportProjectSnapshot }
-function ProjectRow({ project: p }: ProjectRowProps) {
+function WeeklyProjectRow({ project: p }: { project: WeeklyReportProjectSnapshot }) {
   const pct = p.tasksTotal > 0 ? Math.round((p.tasksCompleted / p.tasksTotal) * 100) : 0
   const statusColor: Record<string, string> = {
     ACTIVE:    'bg-green-100 text-green-700',
@@ -236,7 +549,6 @@ function ProjectRow({ project: p }: ProjectRowProps) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg px-5 py-4">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
-        {/* Name + meta */}
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-semibold text-gray-900">{p.name}</p>
@@ -253,32 +565,51 @@ function ProjectRow({ project: p }: ProjectRowProps) {
             Lead: {p.leadName ?? '—'} · {p.memberCount} member{p.memberCount !== 1 ? 's' : ''}
           </p>
         </div>
-        {/* This-week completed badge */}
         {p.completedThisWeek > 0 && (
           <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">
             +{p.completedThisWeek} done this week
           </span>
         )}
       </div>
-
-      {/* Progress bar */}
       <div className="flex items-center gap-3">
         <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-          <div
-            className="h-2 rounded-full bg-blue-500 transition-all"
-            style={{ width: `${pct}%` }}
-          />
+          <div className="h-2 rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
         </div>
         <span className="text-xs font-medium text-gray-600 w-20 text-right">
-          {p.tasksCompleted}/{p.tasksTotal} tasks ({pct}%)
+          {p.tasksCompleted}/{p.tasksTotal} ({pct}%)
         </span>
       </div>
-
-      {/* Task breakdown */}
       <div className="flex gap-4 mt-2 text-xs text-gray-500">
         <span>{p.tasksInProgress} in progress</span>
         <span>{p.tasksTotal - p.tasksCompleted - p.tasksInProgress} to-do</span>
       </div>
+    </div>
+  )
+}
+
+// ─── Shared atoms ─────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, color }: { label: string; value: number | string; color?: 'red' }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</p>
+      <p className={`text-xl font-bold ${color === 'red' ? 'text-red-600' : 'text-gray-900'}`}>{value}</p>
+    </div>
+  )
+}
+
+function BackLink() {
+  return (
+    <Link href="/dashboard/reports" className="text-blue-600 hover:text-blue-800 text-sm font-medium inline-flex items-center gap-1">
+      ← Back to Reports
+    </Link>
+  )
+}
+
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
     </div>
   )
 }

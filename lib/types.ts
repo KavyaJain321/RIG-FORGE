@@ -320,9 +320,77 @@ export interface WeeklyReportSnapshot {
 
 export interface WeeklyReportSummary {
   id: string
+  reportType: string
+  label: string | null
   weekStart: Date
   weekEnd: Date
   generatedAt: Date
+  generatedById: string | null
+  filterIds: string[]
+}
+
+// ─── Project Report ───────────────────────────────────────────────────────────
+
+export interface ProjectReportMemberStat {
+  userId: string
+  name: string
+  tasksCompleted: number
+  tasksInProgress: number
+}
+
+export interface ProjectReportProjectEntry {
+  projectId: string
+  name: string
+  status: string
+  leadName: string | null
+  memberCount: number
+  tasks: {
+    total: number
+    completed: number
+    inProgress: number
+    overdue: number
+    completedInRange: number
+  }
+  members: ProjectReportMemberStat[]
+  ticketsInRange: number
+}
+
+export interface ProjectReportSnapshot {
+  type: 'PROJECT'
+  dateFrom: string
+  dateTo: string
+  projects: ProjectReportProjectEntry[]
+}
+
+// ─── Employee Report ──────────────────────────────────────────────────────────
+
+export interface EmployeeReportProjectStat {
+  id: string
+  name: string
+  tasksCompleted: number
+}
+
+export interface EmployeeReportEntry {
+  userId: string
+  name: string
+  email: string
+  role: string
+  daysActive: number
+  activeDays: string[]
+  projects: EmployeeReportProjectStat[]
+  tasksCompleted: { id: string; title: string; projectName: string; completedAt: string }[]
+  tasksInProgress: { id: string; title: string; projectName: string; dueDate: string | null }[]
+  overdueTasksCount: number
+  ticketsRaised: number
+  ticketsHelped: number
+  dailyLogs: { date: string; workSummary: string; notes: string | null }[]
+}
+
+export interface EmployeeReportSnapshot {
+  type: 'EMPLOYEE'
+  dateFrom: string
+  dateTo: string
+  employees: EmployeeReportEntry[]
 }
 
 // ─── Notifications ─────────────────────────────────────────────────────────

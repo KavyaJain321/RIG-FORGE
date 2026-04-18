@@ -14,20 +14,28 @@ export async function GET(request: NextRequest) {
 
   try {
     const reports = await prisma.weeklyReport.findMany({
-      orderBy: { weekStart: 'desc' },
+      orderBy: { generatedAt: 'desc' },
       select: {
         id: true,
+        reportType: true,
+        label: true,
         weekStart: true,
         weekEnd: true,
         generatedAt: true,
+        generatedById: true,
+        filterIds: true,
       },
     })
 
     const data: WeeklyReportSummary[] = reports.map((r) => ({
       id: r.id,
+      reportType: r.reportType,
+      label: r.label,
       weekStart: r.weekStart,
       weekEnd: r.weekEnd,
       generatedAt: r.generatedAt,
+      generatedById: r.generatedById,
+      filterIds: r.filterIds,
     }))
 
     return successResponse(data)

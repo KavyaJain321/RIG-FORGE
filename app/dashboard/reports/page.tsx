@@ -6,44 +6,250 @@ import Link from 'next/link'
 
 import { useAuth } from '@/hooks/useAuth'
 import { isAdminRole } from '@/lib/auth'
-import type { WeeklyReportSummary, DailyLogEntry, ApiResponse } from '@/lib/types'
+import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
+import type { WeeklyReportSummary, ApiResponse, DailyLogEntry } from '@/lib/types'
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatDate(date: Date | string): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
+function fmtDate(d: Date | string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function formatDateShort(date: Date | string): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+function today() { return new Date().toISOString().split('T')[0] }
+function sevenDaysAgo() {
+  const d = new Date(); d.setDate(d.getDate() - 7)
+  return d.toISOString().split('T')[0]
 }
 
-// ─── Admin helpers ────────────────────────────────────────────────────────────
-
-function isCurrentWeekAlreadyGenerated(reports: WeeklyReportSummary[]): boolean {
-  if (reports.length === 0) return false
-  const latest = reports[0]
-  const now = new Date()
-  const dayOfWeek = now.getDay()
-  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-  const currentMonday = new Date(now)
-  currentMonday.setDate(now.getDate() - daysToMonday)
-  currentMonday.setHours(0, 0, 0, 0)
-  const lastMonday = new Date(currentMonday)
-  lastMonday.setDate(currentMonday.getDate() - 7)
-  const reportWeekStart = new Date(latest.weekStart)
-  return reportWeekStart >= lastMonday && reportWeekStart < currentMonday
+const TYPE_BADGE: Record<string, string> = {
+  PROJECT:  'bg-violet-100 text-violet-700',
+  EMPLOYEE: 'bg-blue-100   text-blue-700',
+  WEEKLY:   'bg-gray-100   text-gray-600',
 }
 
-// ─── Employee: Weekly note section ────────────────────────────────────────────
+// ─── Generator Form ───────────────────────────────────────────────────────────
+
+interface ProjectOption  { id: string; name: string }
+interface EmployeeOption { id: string; name: string; email: string }
+
+function GeneratorForm({ onGenerated }: { onGenerated: () => void }) {
+  const [type, setType]           = useState<'PROJECT' | 'EMPLOYEE' | 'WEEKLY'>('PROJECT')
+  const [dateFrom, setDateFrom]   = useState(sevenDaysAgo())
+  const [dateTo, setDateTo]       = useState(today())
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [projects,  setProjects]  = useState<ProjectOption[]>([])
+  const [employees, setEmployees] = useState<EmployeeOption[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [error, setError]         = useState<string | null>(null)
+
+  useEffect(() => {
+    void fetch('/api/projects?status=ALL&limit=100', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j: { data?: { items?: ProjectOption[] } }) => setProjects(j.data?.items ?? []))
+      .catch(() => {})
+
+    void fetch('/api/users?limit=100', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j: { data?: { items?: EmployeeOption[] } }) => setEmployees(j.data?.items ?? []))
+      .catch(() => {})
+  }, [])
+
+  // reset selection when type changes
+  useEffect(() => { setSelectedIds([]) }, [type])
+
+  const options: MultiSelectOption[] =
+    type === 'PROJECT'
+      ? projects.map((p) => ({ id: p.id, label: p.name }))
+      : type === 'EMPLOYEE'
+        ? employees.map((e) => ({ id: e.id, label: e.name, sub: e.email }))
+        : []
+
+  async function handleGenerate() {
+    setError(null)
+    if (type !== 'WEEKLY' && selectedIds.length === 0) {
+      setError('Please select at least one item')
+      return
+    }
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/reports/generate', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, dateFrom, dateTo, filterIds: selectedIds }),
+      })
+      const json = await res.json() as { error?: string }
+      if (!res.ok) { setError(json.error ?? 'Failed to generate'); return }
+      onGenerated()
+    } catch { setError('Network error') }
+    finally { setGenerating(false) }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-6 mb-8 shadow-sm">
+      <h2 className="text-base font-semibold text-gray-900 mb-5">Generate New Report</h2>
+
+      {/* Type */}
+      <div className="mb-5">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Report Type</p>
+        <div className="flex gap-3 flex-wrap">
+          {(['PROJECT', 'EMPLOYEE', 'WEEKLY'] as const).map((t) => (
+            <label key={t} className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name="reportType" value={t} checked={type === t} onChange={() => setType(t)} className="accent-blue-600" />
+              <span className="text-sm font-medium text-gray-700">
+                {t === 'PROJECT' ? '📁 Project Report' : t === 'EMPLOYEE' ? '👥 Employee Report' : '📅 Weekly Report'}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Date range (hidden for WEEKLY) */}
+      {type !== 'WEEKLY' && (
+        <div className="mb-5 flex gap-4 flex-wrap">
+          <div className="flex-1 min-w-[160px]">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">From</label>
+            <input type="date" value={dateFrom} max={dateTo} onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div className="flex-1 min-w-[160px]">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">To</label>
+            <input type="date" value={dateTo} min={dateFrom} max={today()} onChange={(e) => setDateTo(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+      )}
+
+      {/* Multi-select */}
+      {type !== 'WEEKLY' && (
+        <div className="mb-5">
+          <label className="text-xs font-medium text-gray-500 uppercase tracking-wide block mb-1">
+            {type === 'PROJECT' ? 'Projects' : 'Employees'}
+          </label>
+          <MultiSelect
+            options={options}
+            selected={selectedIds}
+            onChange={setSelectedIds}
+            placeholder={type === 'PROJECT' ? 'Select projects…' : 'Select employees…'}
+          />
+        </div>
+      )}
+
+      {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+
+      <button
+        onClick={() => void handleGenerate()}
+        disabled={generating}
+        className="flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors"
+      >
+        {generating && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+        {generating ? 'Generating…' : 'Generate Report'}
+      </button>
+    </div>
+  )
+}
+
+// ─── Report List ──────────────────────────────────────────────────────────────
+
+function ReportList() {
+  const router = useRouter()
+  const [reports, setReports]     = useState<WeeklyReportSummary[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [error, setError]         = useState<string | null>(null)
+
+  const fetchReports = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res  = await fetch('/api/reports', { credentials: 'include' })
+      const body = await res.json() as { data: WeeklyReportSummary[] }
+      setReports(body.data ?? [])
+    } catch { setError('Failed to load reports') }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { void fetchReports() }, [fetchReports])
+
+  async function handleDelete(id: string) {
+    setDeletingId(id)
+    try {
+      await fetch(`/api/reports/${id}`, { method: 'DELETE', credentials: 'include' })
+      setReports((prev) => prev.filter((r) => r.id !== id))
+    } catch { setError('Failed to delete') }
+    finally { setDeletingId(null); setConfirmId(null) }
+  }
+
+  if (loading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" /></div>
+  if (error)   return <p className="text-sm text-red-600">{error}</p>
+
+  if (reports.length === 0) return (
+    <div className="text-center py-16 text-gray-400">
+      <p className="text-4xl mb-3">📋</p>
+      <p className="text-base font-medium text-gray-600">No reports yet</p>
+      <p className="text-sm mt-1">Use the form above to generate your first report.</p>
+    </div>
+  )
+
+  return (
+    <div className="space-y-3">
+      {reports.map((r) => {
+        const typeBadge = TYPE_BADGE[r.reportType] ?? TYPE_BADGE.WEEKLY
+        const isConfirming = confirmId === r.id
+        return (
+          <div key={r.id} className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex items-center justify-between gap-4 hover:border-gray-300 transition-colors">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${typeBadge}`}>
+                  {r.reportType}
+                </span>
+                <p className="text-sm font-semibold text-gray-900 truncate">
+                  {r.label ?? `Report · ${fmtDate(r.weekStart)} – ${fmtDate(r.weekEnd)}`}
+                </p>
+              </div>
+              <p className="text-xs text-gray-400">Generated {fmtDate(r.generatedAt)}</p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Link
+                href={`/dashboard/reports/${r.id}`}
+                className="px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 rounded-lg transition-colors"
+              >
+                View →
+              </Link>
+
+              {isConfirming ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-500">Delete?</span>
+                  <button
+                    onClick={() => void handleDelete(r.id)}
+                    disabled={deletingId === r.id}
+                    className="px-2.5 py-1 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {deletingId === r.id ? '…' : 'Yes'}
+                  </button>
+                  <button onClick={() => setConfirmId(null)} className="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmId(r.id)}
+                  className="px-2.5 py-1.5 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Delete report"
+                >
+                  🗑
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Employee weekly note (unchanged for regular employees) ───────────────────
 
 const MAX_NOTE_LENGTH = 2000
 
@@ -55,250 +261,101 @@ function WeeklyNoteSection() {
   const [editing, setEditing] = useState(false)
   const [error, setError]     = useState<string | null>(null)
 
-  // What Friday this note belongs to — just for display
   const thisWeekFriday = (() => {
     const now = new Date()
-    const day = now.getUTCDay()
-    const daysSinceMon = day === 0 ? 6 : day - 1
-    const friday = new Date(now)
-    friday.setUTCDate(now.getUTCDate() - daysSinceMon + 4)
-    return friday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const day = now.getDay()
+    const diff = day <= 5 ? 5 - day : 6
+    const fri = new Date(now)
+    fri.setDate(now.getDate() + diff)
+    return fri.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   })()
 
-  const fetchNote = useCallback(async () => {
-    try {
-      const res  = await fetch('/api/weekly-note', { credentials: 'include' })
-      const json = await res.json() as ApiResponse<DailyLogEntry | null>
-      if (res.ok && json.data) {
-        setEntry(json.data)
-        setDraft(json.data.workSummary)
-      }
-    } catch {
-      // Network issue — leave form blank, user can still try to submit
-    } finally {
-      setLoading(false)
-    }
+  useEffect(() => {
+    const now = new Date()
+    const day = now.getDay()
+    const diff = day <= 5 ? 5 - day : 6
+    const fri = new Date(now)
+    fri.setDate(now.getDate() + diff)
+    fri.setHours(0,0,0,0)
+    const iso = fri.toISOString()
+
+    fetch(`/api/daily-log/me?date=${iso}`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j: ApiResponse<DailyLogEntry>) => {
+        if (j.data) { setEntry(j.data); setDraft(j.data.workSummary) }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { void fetchNote() }, [fetchNote])
-
   async function handleSave() {
-    const trimmed = draft.trim()
-    if (!trimmed || saving) return
-    setSaving(true)
-    setError(null)
+    setSaving(true); setError(null)
+    const now = new Date()
+    const day = now.getDay()
+    const diff = day <= 5 ? 5 - day : 6
+    const fri = new Date(now)
+    fri.setDate(now.getDate() + diff)
+    fri.setHours(0,0,0,0)
     try {
-      const res  = await fetch('/api/weekly-note', {
-        method: 'POST',
-        credentials: 'include',
+      const res = await fetch('/api/daily-log', {
+        method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: trimmed }),
+        body: JSON.stringify({ date: fri.toISOString(), workSummary: draft }),
       })
-      const json = await res.json() as ApiResponse<DailyLogEntry>
-      if (!res.ok || json.error) {
-        setError(json.error ?? 'Could not save note')
-        return
-      }
-      setEntry(json.data)
-      setEditing(false)
-    } catch {
-      setError('Network error — could not save')
-    } finally {
-      setSaving(false)
-    }
+      const j = await res.json() as ApiResponse<DailyLogEntry>
+      if (!res.ok) { setError((j as { error: string }).error ?? 'Failed to save'); return }
+      setEntry(j.data!); setEditing(false)
+    } catch { setError('Network error') }
+    finally { setSaving(false) }
   }
 
-  function handleCancel() {
-    setDraft(entry?.workSummary ?? '')
-    setEditing(false)
-    setError(null)
-  }
-
-  const showForm = entry === null || editing
+  if (loading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" /></div>
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-10">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-neutral-800">Weekly Note</h1>
-        <p className="text-sm text-neutral-500 mt-1">
-          Week ending {thisWeekFriday} — anything to flag? (optional)
-        </p>
-      </div>
-
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-neutral-100">
-        {loading ? (
-          <div className="space-y-3">
-            <div className="shimmer h-4 w-40 rounded" />
-            <div className="shimmer h-24 rounded-xl" />
-          </div>
-        ) : showForm ? (
-          <div className="space-y-4">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              maxLength={MAX_NOTE_LENGTH}
-              rows={5}
-              placeholder="Anything to flag this week? (optional)"
-              className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-300 resize-none"
-            />
-            {draft.length > MAX_NOTE_LENGTH - 200 && (
-              <p className="text-xs text-neutral-400 text-right">
-                {draft.length} / {MAX_NOTE_LENGTH}
-              </p>
-            )}
-            {error && (
-              <p className="text-xs text-red-600">{error}</p>
-            )}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => void handleSave()}
-                disabled={saving || !draft.trim()}
-                className="px-4 py-2 bg-neutral-900 text-white text-xs font-semibold rounded-xl hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                {saving ? 'Saving…' : 'Save note'}
-              </button>
-              {editing && (
-                <button
-                  onClick={handleCancel}
-                  className="px-4 py-2 text-neutral-500 hover:text-neutral-700 text-xs font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </div>
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-1">Weekly Summary</h1>
+      <p className="text-sm text-gray-500 mb-6">Week ending {thisWeekFriday}</p>
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        {!editing && entry ? (
+          <>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{entry.workSummary}</p>
+            <button onClick={() => setEditing(true)} className="mt-4 text-xs text-blue-600 hover:text-blue-800 font-medium">Edit</button>
+          </>
         ) : (
-          /* Saved state — read-only with edit link */
-          <div className="space-y-3">
-            <div className="bg-neutral-50 rounded-xl px-4 py-3">
-              <p className="text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed">
-                {entry.workSummary}
-              </p>
+          <>
+            <textarea
+              value={draft} onChange={(e) => setDraft(e.target.value.slice(0, MAX_NOTE_LENGTH))}
+              rows={6} placeholder="Summarise what you worked on this week…"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-xs text-gray-400">{draft.length}/{MAX_NOTE_LENGTH}</span>
+              <div className="flex gap-2">
+                {editing && <button onClick={() => setEditing(false)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>}
+                <button onClick={() => void handleSave()} disabled={saving || draft.trim().length === 0}
+                  className="px-4 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-700 disabled:opacity-50">
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => setEditing(true)}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Edit note
-            </button>
-          </div>
+            {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+          </>
         )}
       </div>
     </div>
   )
 }
 
-// ─── Admin: Reports list ──────────────────────────────────────────────────────
+// ─── Admin section ────────────────────────────────────────────────────────────
 
 function AdminReportsSection() {
-  const [reports, setReports]           = useState<WeeklyReportSummary[]>([])
-  const [fetchError, setFetchError]     = useState<string | null>(null)
-  const [generating, setGenerating]     = useState(false)
-  const [generateError, setGenerateError] = useState<string | null>(null)
-
-  const fetchReports = useCallback(async () => {
-    setFetchError(null)
-    try {
-      const res  = await fetch('/api/reports')
-      const body = await res.json() as { data: WeeklyReportSummary[]; error?: string }
-      if (!res.ok) {
-        setFetchError(body.error ?? 'Failed to load reports')
-        return
-      }
-      setReports(body.data)
-    } catch {
-      setFetchError('Network error loading reports')
-    }
-  }, [])
-
-  useEffect(() => { void fetchReports() }, [fetchReports])
-
-  async function handleGenerate() {
-    setGenerating(true)
-    setGenerateError(null)
-    try {
-      const res  = await fetch('/api/reports/generate', { method: 'POST' })
-      const body = await res.json() as { error?: string }
-      if (!res.ok) {
-        setGenerateError(body.error ?? 'Failed to generate report')
-        return
-      }
-      await fetchReports()
-    } catch {
-      setGenerateError('Network error generating report')
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const alreadyGenerated = isCurrentWeekAlreadyGenerated(reports)
-
+  const [listKey, setListKey] = useState(0)
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Weekly Reports</h1>
-        <div className="flex flex-col items-end gap-1">
-          <button
-            onClick={() => void handleGenerate()}
-            disabled={generating || alreadyGenerated}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {generating && (
-              <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-            )}
-            {generating ? 'Generating…' : "Generate This Week's Report"}
-          </button>
-          {alreadyGenerated && (
-            <p className="text-xs text-gray-500">Report already generated for this week</p>
-          )}
-          {generateError && (
-            <p className="text-xs text-red-600">{generateError}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Fetch error */}
-      {fetchError && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {fetchError}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {reports.length === 0 && !fetchError && (
-        <div className="text-center py-16 text-gray-500">
-          <p className="text-lg font-medium mb-1">No reports generated yet.</p>
-          <p className="text-sm">Click &quot;Generate&quot; to create the first report.</p>
-        </div>
-      )}
-
-      {/* Reports list */}
-      {reports.length > 0 && (
-        <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg overflow-hidden">
-          {reports.map((report) => (
-            <div
-              key={report.id}
-              className="flex items-center justify-between px-5 py-4 bg-white hover:bg-gray-50 transition-colors"
-            >
-              <div>
-                <p className="font-medium text-gray-900">
-                  Week of {formatDate(report.weekStart)} – {formatDate(report.weekEnd)}
-                </p>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  Generated {formatDateShort(report.generatedAt)}
-                </p>
-              </div>
-              <Link
-                href={`/dashboard/reports/${report.id}`}
-                className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
-              >
-                View Report →
-              </Link>
-            </div>
-          ))}
-        </div>
-      )}
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Reports</h1>
+      <GeneratorForm onGenerated={() => setListKey((k) => k + 1)} />
+      <h2 className="text-base font-semibold text-gray-700 mb-4">Saved Reports</h2>
+      <ReportList key={listKey} />
     </div>
   )
 }
@@ -313,13 +370,11 @@ export default function ReportsPage() {
     if (!loading && !user) router.replace('/login')
   }, [user, loading, router])
 
-  if (loading || !user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-      </div>
-    )
-  }
+  if (loading || !user) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin" />
+    </div>
+  )
 
   if (isAdminRole(user.role)) return <AdminReportsSection />
   return <WeeklyNoteSection />
