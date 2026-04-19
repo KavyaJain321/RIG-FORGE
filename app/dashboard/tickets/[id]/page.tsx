@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
+import { isAdminRole } from '@/lib/auth'
 import TicketStatusBadge from '@/components/tickets/TicketStatusBadge'
 
 interface TicketDetail {
@@ -48,6 +49,13 @@ export default function TicketDetailPage() {
     }
   }, [loading, user, router, fetchTicket])
 
+  // Employees can only view their own tickets — redirect if forbidden
+  useEffect(() => {
+    if (ticket && user && !isAdminRole(user.role) && ticket.raisedById !== user.id) {
+      router.replace('/dashboard/tickets')
+    }
+  }, [ticket, user, router])
+
   async function doAction(endpoint: string) {
     if (!ticket) return
     setActionLoading(true)
@@ -68,9 +76,10 @@ export default function TicketDetailPage() {
     <div className="flex-1 p-6"><p className="font-mono text-xs text-text-muted">Ticket not found.</p></div>
   )
 
-  const isRaiser = ticket.raisedById === user.id
-  const isHelper = ticket.helperId === user.id
-  const isOpen = ticket.status === 'OPEN'
+  const isRaiser  = ticket.raisedById === user.id
+  const isHelper  = ticket.helperId === user.id
+  const isAdmin   = isAdminRole(user.role)
+  const isOpen    = ticket.status === 'OPEN'
   const isAccepted = ticket.status === 'ACCEPTED'
 
   return (
@@ -117,13 +126,13 @@ export default function TicketDetailPage() {
 
           {/* Action area */}
           <div className="border-t border-border-default pt-4">
-            {/* OPEN — third party can help */}
-            {isOpen && !isRaiser && !confirmAccept && (
+            {/* OPEN — only admins can accept/help (not the raiser, not employees) */}
+            {isOpen && !isRaiser && isAdmin && !confirmAccept && (
               <button type="button" onClick={() => setConfirmAccept(true)} className="w-full h-10 bg-accent text-white font-mono text-xs rounded-card hover:opacity-90 transition-opacity">
                 Yes, I Can Help
               </button>
             )}
-            {isOpen && !isRaiser && confirmAccept && (
+            {isOpen && !isRaiser && isAdmin && confirmAccept && (
               <div className="flex flex-col gap-3">
                 <p className="font-mono text-xs text-text-secondary text-center">By accepting, you&apos;re committing to help with this ticket.</p>
                 <div className="flex gap-3">

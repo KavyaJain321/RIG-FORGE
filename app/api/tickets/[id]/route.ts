@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { verifyToken, getTokenFromCookies, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }): Promise<NextResponse> {
@@ -19,6 +19,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       },
     })
     if (!ticket) return errorResponse('Ticket not found', 404)
+
+    // Employees can only view tickets they raised themselves
+    if (!isAdminRole(payload.role) && ticket.raisedById !== payload.userId) {
+      return errorResponse('Forbidden', 403)
+    }
 
     return successResponse({
       id: ticket.id,

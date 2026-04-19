@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { verifyToken, getTokenFromCookies, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -17,6 +17,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const where: Record<string, unknown> = {}
     if (status) where.status = status
     if (projectId) where.projectId = projectId
+
+    // Employees can only see tickets they raised themselves
+    if (!isAdminRole(payload.role)) {
+      where.raisedById = payload.userId
+    }
 
     const tickets = await prisma.ticket.findMany({
       where,
@@ -86,11 +91,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     })
 
-    // Notify all users (broadcast)
-    const allUsers = await prisma.user.findMany({ where: { isOnboarding: false, id: { not: payload.userId } }, select: { id: true } })
-    if (allUsers.length > 0) {
+    // Notify only admins and super admins (not employees)
+    const adminUsers = await prisma.user.findMany({
+      where: {
+        isOnboarding: false,
+        id: { not: payload.userId },
+        role: { in: ['ADMIN', 'SUPER_ADMIN'] },
+      },
+      select: { id: true },
+    })
+    if (adminUsers.length > 0) {
       await prisma.notification.createMany({
-        data: allUsers.map((u) => ({
+        data: adminUsers.map((u) => ({
           userId: u.id,
           type: 'TICKET_RAISED' as const,
           title: 'New help ticket',

@@ -139,7 +139,7 @@ export default function Topbar() {
         </Link>
 
         {/* ── Mobile nav (hamburger) ─────────────────────────────────────── */}
-        <div className="relative lg:hidden" ref={mobileNavRef}>
+        <div className={`relative lg:hidden ${user?.mustChangePassword ? 'hidden' : ''}`} ref={mobileNavRef}>
           <button
             type="button"
             aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
@@ -173,22 +173,29 @@ export default function Topbar() {
         </div>
 
         {/* ── Navigation tabs (desktop only) ──────────────────────────────── */}
-        <nav className="topbar-nav">
-          {navItems.map(({ href, label }) => {
-            const active = isNavActive(href, pathname)
-
-            return (
-              <div key={href} className="flex items-center">
-                <Link
-                  href={href}
-                  className={`topbar-link${active ? ' topbar-link--active' : ''}`}
-                >
-                  {label}
-                </Link>
-              </div>
-            )
-          })}
-        </nav>
+        {user?.mustChangePassword ? (
+          <nav className="topbar-nav">
+            <span className="font-mono text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
+              ⚠ Please change your password to continue
+            </span>
+          </nav>
+        ) : (
+          <nav className="topbar-nav">
+            {navItems.map(({ href, label }) => {
+              const active = isNavActive(href, pathname)
+              return (
+                <div key={href} className="flex items-center">
+                  <Link
+                    href={href}
+                    className={`topbar-link${active ? ' topbar-link--active' : ''}`}
+                  >
+                    {label}
+                  </Link>
+                </div>
+              )
+            })}
+          </nav>
+        )}
 
         {/* ── Right controls ──────────────────────────────────────────────── */}
         <div className="topbar-controls">
