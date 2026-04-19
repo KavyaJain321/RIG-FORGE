@@ -54,6 +54,7 @@ enum MessageVisibility {
 }
 
 enum NotificationType {
+  WELCOME
   TICKET_RAISED
   TICKET_ACCEPTED
   TICKET_COMPLETED

@@ -1,11 +1,17 @@
 import { type NextRequest } from 'next/server'
+import { type NotificationType } from '@prisma/client'
 
 import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 // Ticket notification types — employees should never see these
-const TICKET_TYPES = ['TICKET_RAISED', 'TICKET_ACCEPTED', 'TICKET_COMPLETED', 'TICKET_CANCELLED']
+const TICKET_TYPES: NotificationType[] = [
+  'TICKET_RAISED',
+  'TICKET_ACCEPTED',
+  'TICKET_COMPLETED',
+  'TICKET_CANCELLED',
+]
 
 // ─── GET /api/notifications ───────────────────────────────────────────────────
 
