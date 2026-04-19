@@ -81,6 +81,8 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     // ── Hash and update ─────────────────────────────────────────────────
     const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
+    const wasForcedChange = claims.mustChangePassword
+
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -89,6 +91,25 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         mustChangePassword: false,  // remove the forced-change flag
       },
     })
+
+    // Send welcome notification on first-ever login (forced password change)
+    if (wasForcedChange) {
+      const alreadyWelcomed = await prisma.notification.findFirst({
+        where: { userId: user.id, type: 'WELCOME' },
+        select: { id: true },
+      })
+      if (!alreadyWelcomed) {
+        await prisma.notification.create({
+          data: {
+            userId: user.id,
+            type: 'WELCOME',
+            title: `Welcome to RIG FORGE, ${user.name}!`,
+            body: 'Your account is set up and ready. Explore your projects, raise tickets, and keep your daily logs updated.',
+            linkTo: '/dashboard',
+          },
+        })
+      }
+    }
 
     // ── Issue a fresh JWT so mustChangePassword=false takes effect ──────
     const newToken = signToken({

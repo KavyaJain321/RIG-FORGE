@@ -5,6 +5,7 @@ import { create } from 'zustand'
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export type NotificationType =
+  | 'WELCOME'
   | 'TICKET_RAISED'
   | 'TICKET_ACCEPTED'
   | 'TICKET_COMPLETED'
@@ -36,12 +37,14 @@ interface NotificationState {
   unreadCount: number
   connected: boolean
 
-  addNotification: (n: NotificationItem) => void
-  setNotifications: (items: NotificationItem[]) => void
-  setUnreadCount: (n: number) => void
-  markRead: (id: string) => void
-  markAllRead: () => void
-  setConnected: (b: boolean) => void
+  addNotification:     (n: NotificationItem) => void
+  setNotifications:    (items: NotificationItem[]) => void
+  setUnreadCount:      (n: number) => void
+  markRead:            (id: string) => void
+  markAllRead:         () => void
+  removeNotification:  (id: string) => void
+  removeNotifications: (ids: string[]) => void
+  setConnected:        (b: boolean) => void
 }
 
 export const useNotificationStore = create<NotificationState>((set) => ({
@@ -51,30 +54,23 @@ export const useNotificationStore = create<NotificationState>((set) => ({
 
   addNotification: (n) =>
     set((state) => {
-      // Deduplicate — real-time events may arrive after a REST fetch
       const exists = state.notifications.some((item) => item.id === n.id)
       if (exists) return state
-
       const updated = [n, ...state.notifications]
-      const unreadDelta = n.read ? 0 : 1
-
       return {
         notifications: updated,
-        unreadCount: state.unreadCount + unreadDelta,
+        unreadCount: state.unreadCount + (n.read ? 0 : 1),
       }
     }),
 
   setNotifications: (items) =>
     set((state) => {
-      // Merge with any live-received notifications not yet in the REST result
       const existingIds = new Set(items.map((i) => i.id))
       const liveOnly = state.notifications.filter((n) => !existingIds.has(n.id))
       const merged = [...liveOnly, ...items].sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )
-      const unreadCount = merged.filter((n) => !n.read).length
-      return { notifications: merged, unreadCount }
+      return { notifications: merged, unreadCount: merged.filter((n) => !n.read).length }
     }),
 
   setUnreadCount: (n) => set({ unreadCount: n }),
@@ -84,11 +80,7 @@ export const useNotificationStore = create<NotificationState>((set) => ({
       const notifications = state.notifications.map((n) =>
         n.id === id ? { ...n, read: true } : n
       )
-      const unreadCount = Math.max(
-        0,
-        notifications.filter((n) => !n.read).length
-      )
-      return { notifications, unreadCount }
+      return { notifications, unreadCount: notifications.filter((n) => !n.read).length }
     }),
 
   markAllRead: () =>
@@ -96,6 +88,19 @@ export const useNotificationStore = create<NotificationState>((set) => ({
       notifications: state.notifications.map((n) => ({ ...n, read: true })),
       unreadCount: 0,
     })),
+
+  removeNotification: (id) =>
+    set((state) => {
+      const notifications = state.notifications.filter((n) => n.id !== id)
+      return { notifications, unreadCount: notifications.filter((n) => !n.read).length }
+    }),
+
+  removeNotifications: (ids) =>
+    set((state) => {
+      const set_ = new Set(ids)
+      const notifications = state.notifications.filter((n) => !set_.has(n.id))
+      return { notifications, unreadCount: notifications.filter((n) => !n.read).length }
+    }),
 
   setConnected: (b) => set({ connected: b }),
 }))
