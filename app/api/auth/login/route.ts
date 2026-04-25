@@ -24,18 +24,23 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     const token = signToken({ userId: user.id, email: user.email, role: user.role, isOnboarding: user.isOnboarding, mustChangePassword: user.mustChangePassword })
     if (!token) return errorResponse('Authentication service unavailable', 503)
 
-    // If approved user: set WORKING + create daily activity
+    // If approved user: set WORKING + create daily activity.
+    // Fire-and-forget: a transient DB blip on these presence writes must NOT
+    // fail the whole login response — the user is already authenticated.
     if (!user.isOnboarding) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      await Promise.all([
+      void Promise.all([
         prisma.user.update({ where: { id: user.id }, data: { currentStatus: 'WORKING' } }),
         prisma.dailyActivity.upsert({
           where: { userId_date: { userId: user.id, date: today } },
           update: { wasActive: true, lastSeenAt: new Date() },
           create: { userId: user.id, date: today, wasActive: true, lastSeenAt: new Date() },
         }),
-      ])
+      ]).catch((err: unknown) => {
+        const code = (err as { code?: string })?.code ?? 'UNKNOWN'
+        console.warn(`[POST /api/auth/login] presence update failed (non-fatal, code=${code})`)
+      })
     }
 
     const authUser: AuthUser = {
