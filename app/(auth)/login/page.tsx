@@ -9,6 +9,7 @@ import Card from '@/components/ui/Card'
 import Input from '@/components/ui/Input'
 import { SmokeBackground } from '@/components/ui/spooky-smoke-animation'
 import { useAuthStore } from '@/store/authStore'
+import { fetchWithRetry } from '@/lib/fetch-with-retry'
 import type { AuthUser, ApiResponse } from '@/lib/types'
 
 export default function LoginPage() {
@@ -35,11 +36,16 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const res = await fetch('/api/auth/login', {
+      // fetchWithRetry silently retries once on 500/502/503/504 — hides
+      // transient server blips (e.g., post-cold-start stale-pool errors)
+      // from the user. Wrong-password 401s are NOT retried.
+      const res = await fetchWithRetry('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ email: email.trim(), password }),
+        retries: 1,
+        retryDelayMs: 2000,
       })
 
       const json: ApiResponse<AuthUser> = await res.json() as ApiResponse<AuthUser>
