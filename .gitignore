@@ -22,3 +22,18 @@ prisma/migrations/
 .DS_Store
 Thumbs.db
 nul
+
+# Build cache
+*.tsbuildinfo
+
+# Logs
+*.log
+
+# Local IDE / Claude config
+.claude/
+
+# Generated credentials — never commit (contain plaintext passwords)
+employee_credentials.xlsx
+news-prism-onboarding.xlsx
+*-credentials.xlsx
+*-onboarding.xlsx
