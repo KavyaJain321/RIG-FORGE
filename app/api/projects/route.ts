@@ -154,6 +154,12 @@ export async function POST(
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return errorResponse('name is required', 400)
     }
+    if (name.length > 100) {
+      return errorResponse('name must not exceed 100 characters', 400)
+    }
+    if (typeof description === 'string' && description.length > 500) {
+      return errorResponse('description must not exceed 500 characters', 400)
+    }
 
     // Reject HTML/script tags in name and description (BUG-002)
     const HTML_TAG_RE = /<[^>]+>/i

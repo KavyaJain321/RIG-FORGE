@@ -18,9 +18,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (ticket.status !== 'OPEN') return errorResponse('Ticket is no longer open', 400)
     if (ticket.raisedById === payload.userId) return errorResponse('Cannot accept your own ticket', 400)
 
-    const updated = await prisma.ticket.update({
-      where: { id: params.id },
+    // Atomic accept — conditional UPDATE so two concurrent acceptors don't
+    // both win (the second would otherwise overwrite helperId).
+    const flip = await prisma.ticket.updateMany({
+      where: { id: params.id, status: 'OPEN' },
       data: { status: 'ACCEPTED', helperId: payload.userId, acceptedAt: new Date() },
+    })
+    if (flip.count === 0) return errorResponse('Ticket is no longer open', 409)
+
+    const updated = await prisma.ticket.findUniqueOrThrow({
+      where: { id: params.id },
       include: { helper: { select: { name: true } } },
     })
 

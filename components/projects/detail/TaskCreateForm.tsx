@@ -43,6 +43,7 @@ export default function TaskCreateForm({
   const todayStr = new Date().toISOString().split('T')[0] ?? ''
 
   async function handleSubmit() {
+    if (submitting) return
     if (!title.trim()) return
     setSubmitting(true)
     setFooterError(null)

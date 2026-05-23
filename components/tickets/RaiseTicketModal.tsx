@@ -30,6 +30,7 @@ export default function RaiseTicketModal({ userRole, onClose, onCreated }: Raise
   }, [userRole])
 
   async function handleSubmit() {
+    if (loading) return
     setError('')
     if (title.trim().length < 5) { setError('Title must be at least 5 characters'); return }
     if (!projectId) { setError('Please select a project'); return }

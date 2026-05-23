@@ -35,8 +35,8 @@ export async function GET(
       snapshot:      report.snapshot,
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return errorResponse(message, 500)
+    console.error('[/api/reports/[weekId]]', error)
+    return errorResponse('Internal server error', 500)
   }
 }
 
@@ -62,7 +62,7 @@ export async function DELETE(
     await prisma.weeklyReport.delete({ where: { id: weekId } })
     return successResponse({ deleted: true })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error'
-    return errorResponse(message, 500)
+    console.error('[/api/reports/[weekId]]', error)
+    return errorResponse('Internal server error', 500)
   }
 }

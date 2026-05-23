@@ -111,6 +111,9 @@ export async function PATCH(
         if (typeof name !== 'string' || name.trim().length === 0) {
           return errorResponse('name must be a non-empty string', 400)
         }
+        if (name.length > 100) {
+          return errorResponse('name must not exceed 100 characters', 400)
+        }
         // Reject HTML/script tags (BUG-002)
         if (/<[^>]+>/i.test(name)) {
           return errorResponse('Project name must not contain HTML or script tags', 400)
@@ -164,6 +167,9 @@ export async function PATCH(
 
     // ── Admin OR lead fields ──────────────────────────────────────────────────
     if (description !== undefined) {
+      if (typeof description === 'string' && description.length > 500) {
+        return errorResponse('description must not exceed 500 characters', 400)
+      }
       // Reject HTML/script tags (BUG-002)
       if (typeof description === 'string' && /<[^>]+>/i.test(description)) {
         return errorResponse('Project description must not contain HTML or script tags', 400)

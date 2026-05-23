@@ -20,7 +20,14 @@ export async function POST(request: NextRequest, { params }: { params: { userId:
     const { projectIds } = (body as Record<string, unknown>)
     const ids: string[] = Array.isArray(projectIds) ? projectIds as string[] : []
 
-    await prisma.user.update({ where: { id: userId }, data: { isOnboarding: false } })
+    // Atomic flip — only the first concurrent admin succeeds.
+    // updateMany with the isOnboarding predicate makes this a single
+    // conditional UPDATE at the DB layer; the loser sees count === 0.
+    const flip = await prisma.user.updateMany({
+      where: { id: userId, isOnboarding: true },
+      data: { isOnboarding: false },
+    })
+    if (flip.count === 0) return errorResponse('User is already approved', 400)
 
     if (ids.length > 0) {
       await prisma.projectMember.createMany({

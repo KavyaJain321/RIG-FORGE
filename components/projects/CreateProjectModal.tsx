@@ -115,6 +115,7 @@ export default function CreateProjectModal({
 
   // ── Submit ──────────────────────────────────────────────────────────────────
   async function handleSubmit() {
+    if (submitting) return
     if (!name.trim()) {
       setError('Project name is required')
       return
