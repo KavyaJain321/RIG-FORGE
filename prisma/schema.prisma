@@ -97,6 +97,8 @@ model User {
   ticketsHelped   Ticket[]        @relation("TicketsHelped")
   dailyLogs       DailyLog[]
   dailyActivities DailyActivity[]
+  conversations   AssistantConversation[]
+  assistantUsage  AssistantUsage[]
 }
 
 model Project {
@@ -278,4 +280,81 @@ model Notification {
 
   @@index([userId])
   @@index([read])
+}
+
+// ─── Forgie (AI Assistant) ────────────────────────────────────────────────────
+// Tables that power the in-app AI chatbot. Conversations are per-user.
+// AssistantMessage stores both user prompts and AI responses (role = USER / ASSISTANT).
+// AssistantUsage tracks per-user, per-day token spend for soft rate-limiting.
+// AssistantResponseCache lets common queries skip the LLM round-trip.
+
+enum AssistantMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+model AssistantConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?  // auto-summarized after first exchange, null until then
+  isPinned  Boolean  @default(false)
+  isArchived Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User                @relation(fields: [userId], references: [id])
+  messages AssistantMessage[]
+
+  @@index([userId])
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+model AssistantMessage {
+  id             String               @id @default(cuid())
+  conversationId String
+  role           AssistantMessageRole
+  content        String               // the text the user saw / sent
+  toolCalls      Json?                // structured tool invocations, if any
+  toolResults    Json?                // outputs returned by tools
+  provider       String?              // "groq" | "gemini" | "cerebras" | null for USER
+  model          String?              // e.g. "llama-3.3-70b-versatile"
+  inputTokens    Int?
+  outputTokens   Int?
+  latencyMs      Int?
+  createdAt      DateTime             @default(now())
+
+  conversation AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model AssistantUsage {
+  id           String   @id @default(cuid())
+  userId       String
+  date         DateTime @db.Date
+  hour         Int      // 0-23 — for per-hour rate limiting
+  messageCount Int      @default(0)
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  provider     String   // "groq" | "gemini" | "cerebras"
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date, hour, provider])
+  @@index([userId, date])
+}
+
+model AssistantResponseCache {
+  id            String   @id @default(cuid())
+  cacheKey      String   @unique  // hash of (userId|query|userContext)
+  response      String              // the cached final assistant text
+  toolResults   Json?               // any tool results that produced it
+  hits          Int      @default(0)
+  expiresAt     DateTime            // typically createdAt + 5 min
+  createdAt     DateTime @default(now())
+
+  @@index([expiresAt])
 }
