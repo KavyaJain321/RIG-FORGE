@@ -30,6 +30,7 @@ import { buildSystemPrompt } from '@/lib/assistant/prompts'
 import { buildForgieContext, renderContextBlock } from '@/lib/assistant/context'
 import { checkRateLimit, recordUsage } from '@/lib/assistant/rate-limit'
 import { lookupCache, storeCache, maybeSweepCache } from '@/lib/assistant/cache'
+import { buildReadTools, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
 
 const MAX_HISTORY_MESSAGES = 10  // last 10 turns kept in context
 
@@ -162,6 +163,8 @@ export async function POST(request: NextRequest) {
       }),
       '',
       renderContextBlock(forgieCtx),
+      '',
+      TOOL_USE_GUIDANCE,
     ].join('\n')
 
     // ── 9. Load conversation history ────────────────────────────────────────
@@ -184,10 +187,11 @@ export async function POST(request: NextRequest) {
       })),
     ]
 
-    // ── 10. Call LLM with multi-provider fallback ──────────────────────────
-    const result = await generate(messages)
+    // ── 10. Call LLM with multi-provider fallback + read tools ─────────────
+    const readTools = buildReadTools({ userId: user.id, role: user.role })
+    const result = await generate(messages, { tools: readTools })
 
-    // ── 11. Persist assistant message ──────────────────────────────────────
+    // ── 11. Persist assistant message (incl. tool-call trace) ──────────────
     await prisma.assistantMessage.create({
       data: {
         conversationId: conversation.id,
@@ -198,6 +202,9 @@ export async function POST(request: NextRequest) {
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
         latencyMs: result.latencyMs,
+        toolCalls: result.toolCalls.length > 0
+          ? (result.toolCalls as unknown as object)  // Prisma Json
+          : undefined,
       },
     })
 
@@ -240,6 +247,8 @@ export async function POST(request: NextRequest) {
         model: result.model,
         latencyMs: result.latencyMs,
         fallback: result.fallback,
+        // Lightweight summary the UI can use to show "Forgie checked X" pills.
+        toolsUsed: result.toolCalls.map((c) => c.name),
       },
     })
   } catch (error) {

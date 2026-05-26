@@ -11,7 +11,7 @@
  * be layered on once the basic path is working.
  */
 
-import { generateText, type ModelMessage } from 'ai'
+import { generateText, stepCountIs, type ModelMessage, type ToolSet } from 'ai'
 
 import {
   isAssistantEnabled,
@@ -19,6 +19,13 @@ import {
   reportRateLimit,
   type ProviderName,
 } from './provider'
+
+export interface ToolCallRecord {
+  name: string
+  args: unknown
+  result: unknown
+  errored: boolean
+}
 
 export interface GenerateResult {
   text: string
@@ -28,11 +35,25 @@ export interface GenerateResult {
   outputTokens: number | null
   latencyMs: number
   fallback: boolean                  // true if no provider was reachable
+  toolCalls: ToolCallRecord[]        // empty if the model didn't reach for tools
 }
 
-const MAX_FALLBACK_ATTEMPTS = 4  // generous — covers full provider rotation
+// Cap on how many provider/key attempts we make in one request. Should be
+// >= the total number of API keys across all providers so the full pool
+// gets a chance before we surrender. Bumping it costs nothing — the loop
+// exits early as soon as selectNextModel() returns null.
+const MAX_FALLBACK_ATTEMPTS = 10
+const MAX_TOOL_STEPS = 3         // up to 3 tool calls per LLM turn
 
-export async function generate(messages: ModelMessage[]): Promise<GenerateResult> {
+export interface GenerateOptions {
+  /** Optional tools the LLM may call mid-generation. */
+  tools?: ToolSet
+}
+
+export async function generate(
+  messages: ModelMessage[],
+  options: GenerateOptions = {},
+): Promise<GenerateResult> {
   if (!isAssistantEnabled()) {
     return canned("Forgie is currently disabled. Set ASSISTANT_ENABLED=true and add API keys to enable.")
   }
@@ -51,14 +72,58 @@ export async function generate(messages: ModelMessage[]): Promise<GenerateResult
     }
 
     try {
-      const result = await generateText({
-        model: selection.model,
-        messages,
-        // Slightly above default — keeps responses varied across identical
-        // queries without going off the rails. Forgie should sound a little
-        // different each time, not robotic.
-        temperature: 0.85,
-      })
+      // Per-attempt: if tool calling fails (provider rejects the schema),
+      // we retry the SAME key without tools so the user still gets an
+      // answer from context. Tool-call errors aren't the user's fault.
+      let result
+      try {
+        result = await generateText({
+          model: selection.model,
+          messages,
+          temperature: 0.85,
+          ...(options.tools && {
+            tools: options.tools,
+            stopWhen: stepCountIs(MAX_TOOL_STEPS),
+          }),
+        })
+      } catch (toolErr) {
+        const usedTools = !!options.tools
+        const isToolErr = usedTools && looksLikeToolCallError(toolErr)
+        if (!isToolErr) throw toolErr
+        console.warn(
+          `[llm] ${selection.provider} rejected tool schema, retrying without tools: ${errToSummary(toolErr)}`,
+        )
+        result = await generateText({
+          model: selection.model,
+          messages,
+          temperature: 0.85,
+        })
+      }
+
+      // Flatten tool calls/results across steps into a single audit-friendly list
+      const toolCalls: ToolCallRecord[] = []
+      for (const step of result.steps ?? []) {
+        const calls = step.content.filter((c) => c.type === 'tool-call')
+        const results = step.content.filter(
+          (c) => c.type === 'tool-result' || c.type === 'tool-error',
+        )
+        for (const call of calls) {
+          const match = results.find(
+            (r) => 'toolCallId' in r && r.toolCallId === call.toolCallId,
+          )
+          toolCalls.push({
+            name: call.toolName,
+            args: call.input,
+            result:
+              match && 'output' in match
+                ? match.output
+                : match && 'error' in match
+                  ? String(match.error)
+                  : null,
+            errored: match?.type === 'tool-error',
+          })
+        }
+      }
 
       return {
         text: result.text,
@@ -68,6 +133,7 @@ export async function generate(messages: ModelMessage[]): Promise<GenerateResult
         outputTokens: result.usage?.outputTokens ?? null,
         latencyMs: Date.now() - t0,
         fallback: false,
+        toolCalls,
       }
     } catch (err) {
       lastError = err
@@ -102,6 +168,7 @@ function canned(text: string, latencyMs = 0): GenerateResult {
     outputTokens: null,
     latencyMs,
     fallback: true,
+    toolCalls: [],
   }
 }
 
@@ -111,6 +178,18 @@ function errToSummary(err: unknown): string {
   const code = e.statusCode ?? e.status ?? '?'
   const msg = e.message?.split('\n')[0]?.slice(0, 200) ?? e.name ?? 'unknown'
   return `[${code}] ${msg}`
+}
+
+function looksLikeToolCallError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const e = err as { statusCode?: number; status?: number; message?: string }
+  const code = e.statusCode ?? e.status
+  // Tool-related errors are typically 400 (bad request) with messages
+  // mentioning function/tool call problems. We're conservative — only
+  // match clear tool-call failures to avoid masking real bugs.
+  if (code !== 400) return false
+  if (typeof e.message !== 'string') return false
+  return /tool|function|failed_generation|adjust your prompt/i.test(e.message)
 }
 
 function looksLikeRateLimit(err: unknown): boolean {

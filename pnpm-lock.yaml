@@ -53,6 +53,9 @@ importers:
       socket.io-client:
         specifier: 4.7.5
         version: 4.7.5
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
       zustand:
         specifier: 4.5.4
         version: 4.5.4(@types/react@18.3.3)(react@18.3.1)
