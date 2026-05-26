@@ -7,6 +7,7 @@ import { useAssistantStore } from '@/store/assistantStore'
 import { useAuthStore } from '@/store/authStore'
 import Message from './Message'
 import Composer from './Composer'
+import HistoryView from './HistoryView'
 
 /**
  * Forgie's chat panel. Slides out from the right edge.
@@ -15,6 +16,7 @@ import Composer from './Composer'
 export default function ChatPanel() {
   const {
     isOpen,
+    view,
     close,
     conversationId,
     messages,
@@ -26,6 +28,7 @@ export default function ChatPanel() {
     finalizeAssistant,
     setSending,
     setError,
+    setView,
     setConversationId,
     reset,
   } = useAssistantStore()
@@ -187,6 +190,18 @@ export default function ChatPanel() {
           <div className="flex items-center gap-1">
             <button
               type="button"
+              onClick={() => setView(view === 'history' ? 'chat' : 'history')}
+              title={view === 'history' ? 'Back to chat' : 'Conversation history'}
+              className={[
+                'p-1.5 rounded-full transition-colors',
+                view === 'history' ? 'bg-black/10 text-[#1A1A1A]' : 'hover:bg-black/5 text-[#666]',
+              ].join(' ')}
+              aria-label="Conversation history"
+            >
+              <HistoryIcon />
+            </button>
+            <button
+              type="button"
               onClick={reset}
               title="New conversation"
               className="p-1.5 rounded-full hover:bg-black/5 transition-colors text-[#666]"
@@ -206,35 +221,40 @@ export default function ChatPanel() {
           </div>
         </div>
 
-        {/* Body — messages */}
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto px-4 py-4 space-y-3"
-        >
-          {messages.length === 0 ? (
-            <EmptyState firstName={firstName} />
-          ) : (
-            messages.map((m) => (
-              <Message key={m.id} msg={m} conversationId={conversationId} />
-            ))
-          )}
+        {/* Body — chat or history */}
+        {view === 'history' ? (
+          <HistoryView />
+        ) : (
+          <>
+            <div
+              ref={scrollRef}
+              className="flex-1 overflow-y-auto px-4 py-4 space-y-3"
+            >
+              {messages.length === 0 ? (
+                <EmptyState firstName={firstName} />
+              ) : (
+                messages.map((m) => (
+                  <Message key={m.id} msg={m} conversationId={conversationId} />
+                ))
+              )}
 
-          {isSending && <TypingIndicator />}
+              {isSending && <TypingIndicator />}
 
-          {error && (
-            <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg p-3">
-              {error}
+              {error && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg p-3">
+                  {error}
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Composer */}
-        <Composer
-          value={input}
-          onChange={setInput}
-          onSubmit={handleSend}
-          disabled={isSending}
-        />
+            <Composer
+              value={input}
+              onChange={setInput}
+              onSubmit={handleSend}
+              disabled={isSending}
+            />
+          </>
+        )}
       </div>
 
       <style>{`
@@ -307,6 +327,15 @@ function TypingIndicator() {
       <span className="w-2 h-2 rounded-full bg-[#999999] animate-bounce" style={{ animationDelay: '150ms' }} />
       <span className="w-2 h-2 rounded-full bg-[#999999] animate-bounce" style={{ animationDelay: '300ms' }} />
     </div>
+  )
+}
+
+function HistoryIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
   )
 }
 
