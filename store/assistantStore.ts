@@ -7,6 +7,16 @@
 
 import { create } from 'zustand'
 
+export interface PendingAction {
+  actionId: string
+  action: 'create_task' | 'create_ticket' | 'update_task_status' | string
+  args: Record<string, unknown>
+  label: string
+  status: 'pending' | 'confirming' | 'confirmed' | 'cancelled' | 'failed'
+  resultText?: string  // human label once executed
+  errorText?: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -14,6 +24,7 @@ export interface ChatMessage {
   provider?: string | null
   cached?: boolean
   fallback?: boolean
+  pendingActions?: PendingAction[]
   createdAt: Date
 }
 
@@ -30,6 +41,11 @@ interface AssistantState {
 
   appendUser: (content: string) => void
   appendAssistant: (content: string, meta?: Partial<ChatMessage>) => void
+  updateActionStatus: (
+    messageId: string,
+    actionId: string,
+    patch: Partial<PendingAction>,
+  ) => void
   setSending: (sending: boolean) => void
   setError: (err: string | null) => void
   setConversationId: (id: string) => void
@@ -73,6 +89,19 @@ export const useAssistantStore = create<AssistantState>((set) => ({
           ...meta,
         },
       ],
+    })),
+
+  updateActionStatus: (messageId, actionId, patch) =>
+    set((s) => ({
+      messages: s.messages.map((m) => {
+        if (m.id !== messageId || !m.pendingActions) return m
+        return {
+          ...m,
+          pendingActions: m.pendingActions.map((a) =>
+            a.actionId === actionId ? { ...a, ...patch } : a,
+          ),
+        }
+      }),
     })),
 
   setSending: (sending) => set({ isSending: sending }),

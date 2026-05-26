@@ -2,8 +2,15 @@
 
 import ReactMarkdown from 'react-markdown'
 import type { ChatMessage } from '@/store/assistantStore'
+import ActionCard from './ActionCard'
 
-export default function Message({ msg }: { msg: ChatMessage }) {
+export default function Message({
+  msg,
+  conversationId,
+}: {
+  msg: ChatMessage
+  conversationId: string | null
+}) {
   const isUser = msg.role === 'user'
 
   return (
@@ -33,6 +40,20 @@ export default function Message({ msg }: { msg: ChatMessage }) {
           {msg.provider && !msg.cached && msg.provider !== 'cache' && (
             <span>via {msg.provider}</span>
           )}
+        </div>
+      )}
+
+      {/* Inline confirmation cards for any proposed write actions */}
+      {!isUser && msg.pendingActions && msg.pendingActions.length > 0 && (
+        <div className="w-full max-w-[85%] flex flex-col gap-1.5">
+          {msg.pendingActions.map((action) => (
+            <ActionCard
+              key={action.actionId}
+              messageId={msg.id}
+              action={action}
+              conversationId={conversationId}
+            />
+          ))}
         </div>
       )}
     </div>

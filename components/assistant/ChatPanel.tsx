@@ -75,6 +75,12 @@ export default function ChatPanel() {
             provider: string | null
             cached?: boolean
             fallback?: boolean
+            pendingActions?: Array<{
+              actionId: string
+              action: string
+              args: Record<string, unknown>
+              label: string
+            }>
           }
         }
         error?: string
@@ -87,10 +93,15 @@ export default function ChatPanel() {
 
       if (!conversationId) setConversationId(json.data.conversationId)
 
+      const pendingActions = (json.data.assistantMessage.pendingActions ?? []).map(
+        (a) => ({ ...a, status: 'pending' as const }),
+      )
+
       appendAssistant(json.data.assistantMessage.content, {
         provider: json.data.assistantMessage.provider,
         cached: json.data.assistantMessage.cached ?? false,
         fallback: json.data.assistantMessage.fallback ?? false,
+        pendingActions: pendingActions.length > 0 ? pendingActions : undefined,
       })
     } catch {
       setError('Network error. Check your connection and try again.')
@@ -161,7 +172,9 @@ export default function ChatPanel() {
           {messages.length === 0 ? (
             <EmptyState firstName={firstName} />
           ) : (
-            messages.map((m) => <Message key={m.id} msg={m} />)
+            messages.map((m) => (
+              <Message key={m.id} msg={m} conversationId={conversationId} />
+            ))
           )}
 
           {isSending && <TypingIndicator />}

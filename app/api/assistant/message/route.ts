@@ -30,7 +30,7 @@ import { buildSystemPrompt } from '@/lib/assistant/prompts'
 import { buildForgieContext, renderContextBlock } from '@/lib/assistant/context'
 import { checkRateLimit, recordUsage } from '@/lib/assistant/rate-limit'
 import { lookupCache, storeCache, maybeSweepCache } from '@/lib/assistant/cache'
-import { buildReadTools, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
+import { buildAllTools, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
 
 const MAX_HISTORY_MESSAGES = 10  // last 10 turns kept in context
 
@@ -187,9 +187,9 @@ export async function POST(request: NextRequest) {
       })),
     ]
 
-    // ── 10. Call LLM with multi-provider fallback + read tools ─────────────
-    const readTools = buildReadTools({ userId: user.id, role: user.role })
-    const result = await generate(messages, { tools: readTools })
+    // ── 10. Call LLM with multi-provider fallback + read + propose tools ─
+    const allTools = buildAllTools({ userId: user.id, role: user.role })
+    const result = await generate(messages, { tools: allTools })
 
     // ── 11. Persist assistant message (incl. tool-call trace) ──────────────
     await prisma.assistantMessage.create({
@@ -237,7 +237,26 @@ export async function POST(request: NextRequest) {
 
     void maybeSweepCache()
 
-    // ── 14. Return ─────────────────────────────────────────────────────────
+    // ── 14. Extract pending actions (write proposals) for the UI ───────────
+    // The model called propose_* tools, which return { proposed, action, args }.
+    // We surface these as actionable cards in the chat UI.
+    const pendingActions = result.toolCalls
+      .filter((c) => c.name.startsWith('propose_') && !c.errored)
+      .map((c) => {
+        const r = c.result as { proposed?: boolean; action?: string; args?: Record<string, unknown> } | null
+        if (!r || !r.action || !r.args) return null
+        return {
+          actionId: `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+          action: r.action,
+          args: r.args,
+          // Best-effort human label for the confirmation card.
+          // The UI can override with richer rendering using args.
+          label: buildActionLabel(r.action, r.args, forgieCtx),
+        }
+      })
+      .filter((p): p is NonNullable<typeof p> => p !== null)
+
+    // ── 15. Return ─────────────────────────────────────────────────────────
     return successResponse({
       conversationId: conversation.id,
       assistantMessage: {
@@ -247,12 +266,45 @@ export async function POST(request: NextRequest) {
         model: result.model,
         latencyMs: result.latencyMs,
         fallback: result.fallback,
-        // Lightweight summary the UI can use to show "Forgie checked X" pills.
         toolsUsed: result.toolCalls.map((c) => c.name),
+        pendingActions,
       },
     })
   } catch (error) {
     console.error('[POST /api/assistant/message]', error)
     return errorResponse('Forgie hit a snag. Try again in a moment.', 500)
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function buildActionLabel(
+  action: string,
+  args: Record<string, unknown>,
+  ctx: { myProjects: Array<{ id: string; name: string }> },
+): string {
+  // Best-effort: prefer human names over IDs where we can resolve them.
+  const projectName = typeof args.projectId === 'string'
+    ? ctx.myProjects.find((p) => p.id === args.projectId)?.name ?? args.projectId
+    : undefined
+
+  switch (action) {
+    case 'create_task': {
+      const title = typeof args.title === 'string' ? args.title : 'New task'
+      const due = typeof args.dueDate === 'string' ? ` (due ${args.dueDate.slice(0, 10)})` : ''
+      const priority = typeof args.priority === 'string' && args.priority !== 'MEDIUM'
+        ? ` · ${args.priority}` : ''
+      return `Create task "${title}" in ${projectName ?? 'project'}${due}${priority}`
+    }
+    case 'create_ticket': {
+      const title = typeof args.title === 'string' ? args.title : 'New ticket'
+      return `Raise ticket "${title}" in ${projectName ?? 'project'}`
+    }
+    case 'update_task_status': {
+      const status = typeof args.newStatus === 'string' ? args.newStatus : '?'
+      return `Mark task as ${status}`
+    }
+    default:
+      return action
   }
 }

@@ -99,6 +99,7 @@ model User {
   dailyActivities DailyActivity[]
   conversations   AssistantConversation[]
   assistantUsage  AssistantUsage[]
+  auditLogs       AssistantAuditLog[]
 }
 
 model Project {
@@ -304,8 +305,9 @@ model AssistantConversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User                @relation(fields: [userId], references: [id])
-  messages AssistantMessage[]
+  user      User                @relation(fields: [userId], references: [id])
+  messages  AssistantMessage[]
+  auditLogs AssistantAuditLog[]
 
   @@index([userId])
   @@index([userId, updatedAt(sort: Desc)])
@@ -357,4 +359,25 @@ model AssistantResponseCache {
   createdAt     DateTime @default(now())
 
   @@index([expiresAt])
+}
+
+// Every AI-triggered write action is recorded here. Lets admins answer
+// "what did Forgie do this week", and gives us a forensic trail if a
+// write turns out to be wrong. Records both successes and failures.
+model AssistantAuditLog {
+  id             String   @id @default(cuid())
+  userId         String                  // the human who confirmed the action
+  conversationId String?
+  action         String                  // "create_task", "create_ticket", etc.
+  args           Json                    // exact arguments executed
+  result         Json?                   // returned data on success
+  success        Boolean  @default(true)
+  error          String?
+  createdAt      DateTime @default(now())
+
+  user           User                    @relation(fields: [userId], references: [id])
+  conversation   AssistantConversation?  @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([createdAt])
 }

@@ -113,6 +113,64 @@ export function buildReadTools(caller: ToolUser): ToolSet {
   }
 }
 
+// ─── Write proposal tools ────────────────────────────────────────────────────
+//
+// IMPORTANT: these tools DO NOT mutate state. Their execute() functions just
+// return a "proposed" marker. The actual write is gated on a human tapping
+// Confirm in the UI, which calls /api/assistant/actions/execute with the
+// same args. This keeps Forgie from auto-creating things based on an
+// LLM misinterpretation.
+
+const ProposeCreateTaskInput = z.object({
+  title: z.string().min(1).describe('Concise task title'),
+  projectId: z.string().describe('Exact project ID from the grounded context — do not guess'),
+  assigneeId: z.string().optional().describe('Optional — user ID of the assignee'),
+  dueDate: z.string().optional().describe('Optional ISO date string (YYYY-MM-DD or full ISO)'),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  description: z.string().optional(),
+})
+
+const ProposeCreateTicketInput = z.object({
+  title: z.string().min(5).describe('Ticket title, at least 5 characters'),
+  description: z.string().min(20).describe('Detailed description, at least 20 characters'),
+  projectId: z.string().describe('Exact project ID from the grounded context'),
+})
+
+const ProposeUpdateTaskStatusInput = z.object({
+  taskId: z.string().describe('Exact task ID from the grounded context'),
+  newStatus: z.enum(['TODO', 'IN_PROGRESS', 'DONE']),
+})
+
+export function buildProposeTools(): ToolSet {
+  return {
+    propose_create_task: tool({
+      description:
+        'Propose creating a new task. THE TASK IS NOT CREATED until the user taps Confirm on the resulting card. Use whenever the user asks to create or add a task. Always pass the exact projectId from the grounded context.',
+      inputSchema: ProposeCreateTaskInput,
+      execute: async (input) => ({ proposed: true, action: 'create_task', args: input }),
+    }),
+
+    propose_create_ticket: tool({
+      description:
+        'Propose raising a new support ticket on a project. NOT CREATED until the user confirms. Title must be 5+ chars, description must be 20+ chars.',
+      inputSchema: ProposeCreateTicketInput,
+      execute: async (input) => ({ proposed: true, action: 'create_ticket', args: input }),
+    }),
+
+    propose_update_task_status: tool({
+      description:
+        'Propose moving a task to TODO, IN_PROGRESS, or DONE. NOT CHANGED until the user confirms.',
+      inputSchema: ProposeUpdateTaskStatusInput,
+      execute: async (input) => ({ proposed: true, action: 'update_task_status', args: input }),
+    }),
+  }
+}
+
+// Convenience: read + propose tools combined for the message route.
+export function buildAllTools(caller: ToolUser): ToolSet {
+  return { ...buildReadTools(caller), ...buildProposeTools() }
+}
+
 // ─── Tool-use guidance for the system prompt ─────────────────────────────────
 // Appended to the system prompt so the model knows WHEN to reach for tools
 // instead of answering from the pre-loaded grounded context.
@@ -123,13 +181,29 @@ The GROUNDED DATA block already has the user's projects, their tasks,
 their tickets, and (for admins) an org snapshot. Use it for common
 questions — don't call tools for things already loaded.
 
-Call a tool only when:
+Call a READ tool only when:
 - The user asks about something specific not in the snapshot (a
-  particular project they're not directly on, a teammate not in the
-  context, a deeper drill-down).
-- You need a composite health view of a specific project (get_project_health).
-- The user names a teammate and you want their full profile (get_member).
+  particular project they're not on, a teammate not in the context,
+  a deeper drill-down).
+- You need a composite health view of a project (get_project_health).
+- You need a full profile for one teammate (get_member).
 - You need to search/filter beyond what's pre-loaded.
+
+# Proposing write actions
+
+When the user asks you to CREATE, ADD, RAISE, ASSIGN, OPEN, or CLOSE
+something, use the matching propose_* tool. These tools do NOT actually
+write — they signal the UI to show a confirmation card. Only when the
+user taps Confirm does the action happen.
+
+When using a propose_* tool:
+- Pull the projectId / taskId / userId from the grounded context, never
+  guess.
+- If you don't know which project/task/user they mean, ask first.
+  Don't propose with wrong IDs.
+- In your text reply, briefly say what you're about to propose so the
+  user knows what to confirm. One sentence is enough; the card will
+  show the full details.
 
 Tool-use rules:
 - One well-chosen call beats three broad ones.
