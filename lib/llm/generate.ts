@@ -54,6 +54,10 @@ export async function generate(messages: ModelMessage[]): Promise<GenerateResult
       const result = await generateText({
         model: selection.model,
         messages,
+        // Slightly above default — keeps responses varied across identical
+        // queries without going off the rails. Forgie should sound a little
+        // different each time, not robotic.
+        temperature: 0.85,
       })
 
       return {

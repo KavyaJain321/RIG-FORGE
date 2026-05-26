@@ -156,17 +156,31 @@ async function loadOrgSnapshot(): Promise<ForgieContext['orgSnapshot']> {
 }
 
 // ─── Render context as a system-prompt block ─────────────────────────────────
-// Compact JSON-ish; tells the LLM exactly what data it can ground on.
+// We give the model the data as JSON, but frame it conversationally so it
+// reads like "here's what's on this person's plate" rather than a database
+// dump. The "use only this" instruction is repeated here even though it's
+// in KNOWLEDGE_SCOPE — both spots reinforce honesty.
 
 export function renderContextBlock(ctx: ForgieContext): string {
-  return `Current grounded context (use only this for facts about the user's
-projects, tasks, and tickets — do not invent IDs, names, or numbers):
+  return `# Grounded data (the truth — ground all factual claims here)
+
+Here's what's actually in the platform for this person right now.
+Every project name, task title, deadline, ticket, and number below
+comes from the live database. Treat anything outside this block as
+unknown — don't invent details.
 
 \`\`\`json
 ${JSON.stringify(ctx, null, 2)}
 \`\`\`
 
-If the user asks something that isn't in this context (e.g., a specific
-project they're not on, or details about another employee outside their
-projects), say so honestly — don't speculate.`
+A few notes on reading this:
+- "myProjects" = projects this user is on (members only; admin sees
+  all active).
+- "myTasks" = tasks where they are the assignee.
+- "myTickets" = tickets they raised OR are helping with; "role" tells
+  you which.
+- "orgSnapshot" appears only for admins — broad counts across the
+  whole platform.
+- If a list is empty, that genuinely means there's nothing — don't
+  hedge with "I'm not sure".`
 }
