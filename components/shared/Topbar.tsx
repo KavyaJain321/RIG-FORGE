@@ -13,6 +13,8 @@ import Avatar from '@/components/ui/Avatar'
 import StatusDot from '@/components/ui/StatusDot'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import NotificationDropdown from '@/components/notifications/NotificationDropdown'
+import AskForgieButton from '@/components/assistant/AskForgieButton'
+import ChatPanel from '@/components/assistant/ChatPanel'
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
@@ -200,6 +202,9 @@ export default function Topbar() {
         {/* ── Right controls ──────────────────────────────────────────────── */}
         <div className="topbar-controls">
 
+          {/* Ask Forgie (AI assistant) — only shown for approved users */}
+          {user && !user.mustChangePassword && <AskForgieButton />}
+
           {/* Notification bell */}
           <NotificationBell
             ref={bellRef}
@@ -282,6 +287,9 @@ export default function Topbar() {
         />,
         document.body
       )}
+
+      {/* ── Forgie chat panel (portal, self-mounted) ────────────────────── */}
+      <ChatPanel />
     </>
   )
 }
