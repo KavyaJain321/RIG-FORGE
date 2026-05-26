@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import type { AdminDashboardData, AuthUser, ApiResponse } from '@/lib/types'
 import MemberSlideOver from '@/components/people/MemberSlideOver'
+import DailyLogDraftCard from '@/components/assistant/DailyLogDraftCard'
+import StandupCard from '@/components/assistant/StandupCard'
 
 interface AdminDashboardProps {
   user: AuthUser
@@ -133,6 +135,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             Dashboard
           </h1>
         </div>
+
+        {/* Forgie auto-generated cards */}
+        <StandupCard />
+        <DailyLogDraftCard />
 
         {/* Error banner */}
         {error !== null && (
