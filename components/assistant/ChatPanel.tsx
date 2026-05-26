@@ -21,7 +21,9 @@ export default function ChatPanel() {
     isSending,
     error,
     appendUser,
-    appendAssistant,
+    beginAssistant,
+    appendDelta,
+    finalizeAssistant,
     setSending,
     setError,
     setConversationId,
@@ -60,6 +62,9 @@ export default function ChatPanel() {
     setSending(true)
     setError(null)
 
+    // Create the assistant message up front so we can stream into it
+    const assistantId = beginAssistant()
+
     try {
       const res = await fetch('/api/assistant/message', {
         method: 'POST',
@@ -67,44 +72,81 @@ export default function ChatPanel() {
         credentials: 'include',
         body: JSON.stringify({ conversationId, content }),
       })
-      const json = (await res.json()) as {
-        data?: {
-          conversationId: string
-          assistantMessage: {
-            content: string
-            provider: string | null
-            cached?: boolean
-            fallback?: boolean
-            pendingActions?: Array<{
-              actionId: string
-              action: string
-              args: Record<string, unknown>
-              label: string
-            }>
-          }
-        }
-        error?: string
-      }
 
-      if (!res.ok || !json.data) {
-        setError(json.error ?? 'Forgie hit a snag. Try again in a moment.')
+      if (!res.ok) {
+        // Non-streaming error path (auth, validation, etc.)
+        let errBody: { error?: string } | null = null
+        try {
+          errBody = (await res.json()) as { error?: string }
+        } catch { /* ignore */ }
+        setError(errBody?.error ?? `Forgie returned HTTP ${res.status}.`)
+        finalizeAssistant(assistantId, { content: '', fallback: true })
         return
       }
 
-      if (!conversationId) setConversationId(json.data.conversationId)
+      // NDJSON streaming path
+      if (!res.body) {
+        setError('No response stream received.')
+        return
+      }
 
-      const pendingActions = (json.data.assistantMessage.pendingActions ?? []).map(
-        (a) => ({ ...a, status: 'pending' as const }),
-      )
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let finalMeta: Record<string, unknown> | null = null
 
-      appendAssistant(json.data.assistantMessage.content, {
-        provider: json.data.assistantMessage.provider,
-        cached: json.data.assistantMessage.cached ?? false,
-        fallback: json.data.assistantMessage.fallback ?? false,
-        pendingActions: pendingActions.length > 0 ? pendingActions : undefined,
-      })
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        // Process any complete lines
+        let newlineIdx = buffer.indexOf('\n')
+        while (newlineIdx >= 0) {
+          const line = buffer.slice(0, newlineIdx).trim()
+          buffer = buffer.slice(newlineIdx + 1)
+          newlineIdx = buffer.indexOf('\n')
+          if (!line) continue
+
+          try {
+            const frame = JSON.parse(line) as Record<string, unknown>
+            if (frame.type === 'start' && typeof frame.conversationId === 'string') {
+              if (!conversationId) setConversationId(frame.conversationId)
+            } else if (frame.type === 'text' && typeof frame.delta === 'string') {
+              appendDelta(assistantId, frame.delta)
+            } else if (frame.type === 'done') {
+              finalMeta = frame
+            } else if (frame.type === 'error' && typeof frame.error === 'string') {
+              setError(frame.error)
+            }
+          } catch {
+            // Malformed line — skip
+          }
+        }
+      }
+
+      // Finalize with the done frame's metadata
+      if (finalMeta) {
+        const rawActions = (finalMeta.pendingActions ?? []) as Array<{
+          actionId: string
+          action: string
+          args: Record<string, unknown>
+          label: string
+        }>
+        const pendingActions = rawActions.map((a) => ({
+          ...a,
+          status: 'pending' as const,
+        }))
+        finalizeAssistant(assistantId, {
+          provider: (finalMeta.provider ?? null) as string | null,
+          cached: Boolean(finalMeta.cached),
+          fallback: Boolean(finalMeta.fallback),
+          pendingActions: pendingActions.length > 0 ? pendingActions : undefined,
+        })
+      }
     } catch {
       setError('Network error. Check your connection and try again.')
+      finalizeAssistant(assistantId, { fallback: true })
     } finally {
       setSending(false)
     }

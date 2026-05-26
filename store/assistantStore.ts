@@ -41,6 +41,12 @@ interface AssistantState {
 
   appendUser: (content: string) => void
   appendAssistant: (content: string, meta?: Partial<ChatMessage>) => void
+  /** For streaming: create an empty assistant message we can fill in later. */
+  beginAssistant: () => string  // returns the message id
+  /** Append a token chunk to a streaming assistant message. */
+  appendDelta: (messageId: string, delta: string) => void
+  /** Finalize a streaming assistant message with metadata. */
+  finalizeAssistant: (messageId: string, patch: Partial<ChatMessage>) => void
   updateActionStatus: (
     messageId: string,
     actionId: string,
@@ -89,6 +95,29 @@ export const useAssistantStore = create<AssistantState>((set) => ({
           ...meta,
         },
       ],
+    })),
+
+  beginAssistant: () => {
+    const id = `a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    set((s) => ({
+      messages: [
+        ...s.messages,
+        { id, role: 'assistant', content: '', createdAt: new Date() },
+      ],
+    }))
+    return id
+  },
+
+  appendDelta: (messageId, delta) =>
+    set((s) => ({
+      messages: s.messages.map((m) =>
+        m.id === messageId ? { ...m, content: m.content + delta } : m,
+      ),
+    })),
+
+  finalizeAssistant: (messageId, patch) =>
+    set((s) => ({
+      messages: s.messages.map((m) => (m.id === messageId ? { ...m, ...patch } : m)),
     })),
 
   updateActionStatus: (messageId, actionId, patch) =>
