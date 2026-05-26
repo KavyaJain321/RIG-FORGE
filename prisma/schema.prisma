@@ -100,6 +100,7 @@ model User {
   conversations   AssistantConversation[]
   assistantUsage  AssistantUsage[]
   auditLogs       AssistantAuditLog[]
+  dailyLogDrafts  DailyLogDraft[]
 }
 
 model Project {
@@ -380,4 +381,33 @@ model AssistantAuditLog {
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([createdAt])
+}
+
+// AI-drafted daily logs awaiting user approval. Created by the
+// /api/cron/daily-log-drafts job at ~6pm IST; consumed via
+// /api/assistant/daily-log-draft (GET to fetch, POST to approve/edit).
+enum DailyLogDraftStatus {
+  PENDING
+  APPROVED
+  DISMISSED
+}
+
+model DailyLogDraft {
+  id              String              @id @default(cuid())
+  userId          String
+  date            DateTime            @db.Date
+  draftSummary    String              // the AI-drafted text
+  draftNotes      String?
+  evidence        Json                // raw activity used to draft (for transparency)
+  status          DailyLogDraftStatus @default(PENDING)
+  approvedAt      DateTime?
+  dismissedAt     DateTime?
+  createdDailyLogId String?           // link back if the user approved + a DailyLog was created
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([status])
 }
