@@ -11,6 +11,62 @@ interface RouteContext {
   params: { id: string }
 }
 
+// ─── GET /api/projects/[id]/members ──────────────────────────────────────────
+
+/**
+ * List members of a project.
+ * Auth: any authenticated user who is an admin OR a member of the project.
+ * Returns: Array of { userId, name, avatarUrl }.
+ */
+export async function GET(request: NextRequest, { params }: RouteContext) {
+  try {
+    const token = getTokenFromCookies(request)
+    if (!token) return errorResponse('Authentication required', 401)
+
+    const payload = verifyToken(token)
+    if (!payload) return errorResponse('Invalid or expired token', 401)
+
+    const { id: projectId } = params
+
+    const project = await prisma.project.findUnique({
+      where: { id: projectId, isActive: true },
+      select: { id: true },
+    })
+    if (!project) return errorResponse('Project not found', 404)
+
+    if (!isAdminRole(payload.role)) {
+      const membership = await prisma.projectMember.findUnique({
+        where: { userId_projectId: { userId: payload.userId, projectId } },
+        select: { id: true },
+      })
+      if (!membership) return errorResponse('Project not found', 404)
+    }
+
+    const members = await prisma.projectMember.findMany({
+      where: { projectId },
+      orderBy: { joinedAt: 'asc' },
+      select: {
+        user: {
+          select: { id: true, name: true, avatarUrl: true, isActive: true },
+        },
+      },
+    })
+
+    const result = members
+      .filter((m) => m.user.isActive)
+      .map((m) => ({
+        userId: m.user.id,
+        name: m.user.name,
+        avatarUrl: m.user.avatarUrl,
+      }))
+
+    return successResponse(result)
+  } catch (error) {
+    console.error('[GET /api/projects/[id]/members]', error)
+    return errorResponse('An unexpected error occurred', 500)
+  }
+}
+
 // ─── POST /api/projects/[id]/members ─────────────────────────────────────────
 
 /**

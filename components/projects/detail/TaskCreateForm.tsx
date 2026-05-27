@@ -198,7 +198,7 @@ export default function TaskCreateForm({
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
             min={todayStr}
-            className="bg-background-primary border border-border-default font-mono text-sm text-primary px-3 py-2 focus:border-accent focus:outline-none"
+            className="bg-background-primary border border-border-default font-mono text-sm text-primary px-3 py-2 focus:border-accent focus:outline-none [color-scheme:light]"
           />
         </div>
       </div>
