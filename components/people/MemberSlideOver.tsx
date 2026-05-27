@@ -547,14 +547,14 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
                       placeholder="Title..."
                       value={notifTitle}
                       onChange={(e) => setNotifTitle(e.target.value)}
-                      className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder-text-muted focus:outline-none focus:border-accent transition-colors"
+                      className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors"
                     />
                     <textarea
                       placeholder="Message body..."
                       value={notifBody}
                       onChange={(e) => setNotifBody(e.target.value)}
                       rows={3}
-                      className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder-text-muted focus:outline-none focus:border-accent transition-colors resize-none"
+                      className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors resize-none"
                     />
                     <button
                       type="button"

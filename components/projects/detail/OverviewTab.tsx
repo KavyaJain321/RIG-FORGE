@@ -649,7 +649,7 @@ function DetailsPanel({ project, isAdmin, onProjectChange }: DetailsPanelProps) 
               defaultValue={deadlineStr}
               min={todayStr}
               disabled={savingField === 'deadline'}
-              className="bg-background-primary border border-border-default px-3 py-1 font-mono text-xs text-primary focus:border-accent focus:outline-none transition-colors duration-150"
+              className="bg-background-primary border border-border-default px-3 py-1 font-mono text-xs text-primary focus:border-accent focus:outline-none transition-colors duration-150 [color-scheme:light]"
               onBlur={(e) => {
                 const val = e.target.value
                 void patchField({ deadline: val ? new Date(val).toISOString() : null })

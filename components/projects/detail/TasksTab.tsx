@@ -197,10 +197,13 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
     }
   }
 
+  const fieldClass =
+    'mt-1 w-full bg-background-primary border border-border-default rounded px-3 py-2 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-accent [color-scheme:light]'
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-surface-raised border border-border-default rounded-lg w-full max-w-lg mx-4 p-6 space-y-4">
-        <h2 className="text-lg font-semibold">New Task</h2>
+      <div className="bg-surface-raised border border-border-default rounded-lg w-full max-w-lg mx-4 p-6 space-y-4 text-primary">
+        <h2 className="text-lg font-semibold text-primary">New Task</h2>
 
         {error && (
           <div className="text-sm text-status-danger bg-status-danger/10 border border-status-danger/30 rounded px-3 py-2">
@@ -214,7 +217,7 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 w-full bg-background border border-border-default rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
+              className={fieldClass}
               placeholder="Task title"
               required
             />
@@ -226,7 +229,7 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="mt-1 w-full bg-background border border-border-default rounded px-3 py-2 text-sm focus:outline-none focus:border-accent resize-none"
+              className={`${fieldClass} resize-none`}
               placeholder="Optional description"
             />
           </div>
@@ -237,7 +240,7 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
               value={expectedOutput}
               onChange={(e) => setExpected(e.target.value)}
               rows={2}
-              className="mt-1 w-full bg-background border border-border-default rounded px-3 py-2 text-sm focus:outline-none focus:border-accent resize-none"
+              className={`${fieldClass} resize-none`}
               placeholder="What should be delivered?"
               required
             />
@@ -249,11 +252,13 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
               <select
                 value={assigneeId}
                 onChange={(e) => setAssigneeId(e.target.value)}
-                className="mt-1 w-full bg-background border border-border-default rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                className={fieldClass}
               >
-                <option value="">Unassigned</option>
+                <option value="" className="bg-background-primary text-primary">Unassigned</option>
                 {members.map((m) => (
-                  <option key={m.userId} value={m.userId}>{m.name}</option>
+                  <option key={m.userId} value={m.userId} className="bg-background-primary text-primary">
+                    {m.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -263,12 +268,12 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as Priority)}
-                className="mt-1 w-full bg-background border border-border-default rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                className={fieldClass}
               >
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
-                <option value="CRITICAL">Critical</option>
+                <option value="LOW" className="bg-background-primary text-primary">Low</option>
+                <option value="MEDIUM" className="bg-background-primary text-primary">Medium</option>
+                <option value="HIGH" className="bg-background-primary text-primary">High</option>
+                <option value="CRITICAL" className="bg-background-primary text-primary">Critical</option>
               </select>
             </div>
 
@@ -278,7 +283,7 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="mt-1 w-full bg-background border border-border-default rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                className={fieldClass}
               />
             </div>
 
@@ -287,11 +292,11 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                className="mt-1 w-full bg-background border border-border-default rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                className={fieldClass}
               >
-                <option value="TODO">To Do</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="DONE">Done</option>
+                <option value="TODO" className="bg-background-primary text-primary">To Do</option>
+                <option value="IN_PROGRESS" className="bg-background-primary text-primary">In Progress</option>
+                <option value="DONE" className="bg-background-primary text-primary">Done</option>
               </select>
             </div>
           </div>
@@ -300,14 +305,14 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+              className="px-4 py-2 text-sm text-muted hover:text-primary transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 text-sm bg-accent text-white rounded hover:bg-accent/80 disabled:opacity-50 transition-colors"
+              className="px-4 py-2 text-sm bg-accent text-white rounded hover:bg-accent-hover disabled:opacity-50 transition-colors"
             >
               {submitting ? 'Creating…' : 'Create Task'}
             </button>
@@ -457,7 +462,7 @@ export default function TasksTab({ projectId, isAdmin, isLead, currentUserId }: 
                   'px-3 py-1.5 text-xs font-medium rounded transition-colors',
                   filter === f
                     ? 'bg-accent text-white'
-                    : 'bg-surface-raised text-muted hover:text-foreground',
+                    : 'bg-surface-raised text-secondary hover:text-primary',
                 ].join(' ')}
               >
                 {f === 'all' ? 'All' : f === 'mine' ? 'My Tasks' : STATUS_LABELS[f as TaskStatus]}

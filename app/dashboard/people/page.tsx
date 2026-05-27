@@ -177,7 +177,7 @@ function PeoplePageInner() {
             placeholder="Search by name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-border-default rounded px-3 py-1.5 text-sm bg-surface-raised text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-accent w-56"
+            className="border border-border-default rounded px-3 py-1.5 text-sm bg-surface-raised text-text-primary placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent w-56"
           />
           <select value={role} onChange={(e) => setRole(e.target.value)} className="border border-border-default rounded px-3 py-1.5 text-sm bg-surface-raised text-text-primary focus:outline-none">
             <option value="">All Roles</option>
@@ -200,7 +200,7 @@ function PeoplePageInner() {
             placeholder="Search teammates..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-border-default rounded px-3 py-1.5 text-sm bg-surface-raised text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-accent w-56"
+            className="border border-border-default rounded px-3 py-1.5 text-sm bg-surface-raised text-text-primary placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent w-56"
           />
         </div>
       )}
