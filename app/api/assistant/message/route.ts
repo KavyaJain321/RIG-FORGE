@@ -423,6 +423,16 @@ function buildActionLabel(
       const status = typeof args.newStatus === 'string' ? args.newStatus : '?'
       return `Mark task as ${status}`
     }
+    case 'gh_create_repo': {
+      const name = typeof args.name === 'string' ? args.name : 'new-repo'
+      const visibility = args.private === false ? 'public' : 'private'
+      return `Create GitHub repo "${name}" (${visibility})`
+    }
+    case 'gh_create_issue': {
+      const title = typeof args.title === 'string' ? args.title : 'New issue'
+      const repo = typeof args.repo === 'string' ? args.repo : 'repo'
+      return `File GitHub issue "${title}" on ${repo}`
+    }
     default:
       return action
   }

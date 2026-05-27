@@ -26,6 +26,7 @@ import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 import { createTask, updateTaskStatus } from '@/lib/assistant/tools/tasks'
 import { createTicket } from '@/lib/assistant/tools/tickets'
+import { createRepo, createIssue, isGithubEnabled } from '@/lib/assistant/tools/github'
 
 // ─── Per-action arg schemas (server-side validation) ─────────────────────────
 
@@ -49,9 +50,30 @@ const UpdateTaskStatusArgs = z.object({
   newStatus: z.enum(['TODO', 'IN_PROGRESS', 'DONE']),
 })
 
+const GhCreateRepoArgs = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(350).optional(),
+  private: z.boolean().optional(),
+  autoInit: z.boolean().optional(),
+})
+
+const GhCreateIssueArgs = z.object({
+  repo: z.string().min(1),
+  title: z.string().min(3).max(200),
+  body: z.string().max(8000).optional(),
+  labels: z.array(z.string()).optional(),
+  assignees: z.array(z.string()).optional(),
+})
+
 const Body = z.object({
   conversationId: z.string().min(1).nullable().optional(),
-  action: z.enum(['create_task', 'create_ticket', 'update_task_status']),
+  action: z.enum([
+    'create_task',
+    'create_ticket',
+    'update_task_status',
+    'gh_create_repo',
+    'gh_create_issue',
+  ]),
   args: z.record(z.string(), z.unknown()),
 })
 
@@ -119,6 +141,24 @@ export async function POST(request: NextRequest) {
           throw new Error(`Invalid args for update_task_status: ${a.error.issues[0]?.message ?? 'malformed'}`)
         }
         result = await updateTaskStatus(caller, a.data.taskId, a.data.newStatus)
+        break
+      }
+      case 'gh_create_repo': {
+        if (!isGithubEnabled()) throw new Error('GitHub is not configured on this server.')
+        const a = GhCreateRepoArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for gh_create_repo: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await createRepo(a.data)
+        break
+      }
+      case 'gh_create_issue': {
+        if (!isGithubEnabled()) throw new Error('GitHub is not configured on this server.')
+        const a = GhCreateIssueArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for gh_create_issue: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await createIssue(a.data)
         break
       }
     }

@@ -18,6 +18,7 @@ import * as projects from './tools/projects'
 import * as tasks from './tools/tasks'
 import * as members from './tools/members'
 import * as tickets from './tools/tickets'
+import * as github from './tools/github'
 import type { ToolUser } from './tools/projects'
 
 // ─── Read tools — safe to auto-execute ───────────────────────────────────────
@@ -110,6 +111,102 @@ export function buildReadTools(caller: ToolUser): ToolSet {
       }),
       execute: async (input) => tickets.listTickets(caller, input as tickets.ListTicketsArgs),
     }),
+
+    // ─── GitHub read tools (only available if GITHUB_TOKEN + GITHUB_ORG set) ─
+
+    ...(github.isGithubEnabled() && {
+      gh_list_repos: tool({
+        description:
+          'List repositories in the RIG 360 GitHub org. Use when the user asks "what repos do we have?" or wants a code inventory. Filter by type or sort order.',
+        inputSchema: z.object({
+          type: z.enum(['all', 'public', 'private', 'forks', 'sources', 'member']).optional(),
+          sort: z.enum(['created', 'updated', 'pushed', 'full_name']).optional(),
+          limit: z.number().int().positive().max(100).optional(),
+        }),
+        execute: async (input) => github.listRepos(input as github.ListReposArgs),
+      }),
+
+      gh_get_repo: tool({
+        description:
+          'Full detail on one GitHub repo: description, stars, language, default branch, open issue count, archived/private flags, URL. Use when the user names a repo.',
+        inputSchema: z.object({
+          repoName: z.string().describe('Just the repo name (no org prefix). e.g. "osint-scanner"'),
+        }),
+        execute: async ({ repoName }) => github.getRepo(repoName),
+      }),
+
+      gh_list_commits: tool({
+        description:
+          'Recent commits on a GitHub repo. Optional filters: author (GitHub username), date range, branch.',
+        inputSchema: z.object({
+          repo: z.string(),
+          author: z.string().optional().describe('GitHub username or email'),
+          since: z.string().optional().describe('ISO date lower bound'),
+          until: z.string().optional().describe('ISO date upper bound'),
+          branch: z.string().optional(),
+          limit: z.number().int().positive().max(100).optional(),
+        }),
+        execute: async (input) => github.listCommits(input as github.ListCommitsArgs),
+      }),
+
+      gh_list_pull_requests: tool({
+        description:
+          'List PRs on a GitHub repo. Default state=open. Optional: filter by author. Returns reviewers, labels, draft flag, URLs.',
+        inputSchema: z.object({
+          repo: z.string(),
+          state: z.enum(['open', 'closed', 'all']).optional(),
+          author: z.string().optional().describe('GitHub username'),
+          limit: z.number().int().positive().max(100).optional(),
+        }),
+        execute: async (input) => github.listPullRequests(input as github.ListPullRequestsArgs),
+      }),
+
+      gh_list_issues: tool({
+        description:
+          'List issues on a GitHub repo. PRs are excluded. Default state=open. Optional: assignee.',
+        inputSchema: z.object({
+          repo: z.string(),
+          state: z.enum(['open', 'closed', 'all']).optional(),
+          assignee: z.string().optional(),
+          limit: z.number().int().positive().max(100).optional(),
+        }),
+        execute: async (input) => github.listIssues(input as github.ListIssuesArgs),
+      }),
+
+      gh_get_user_activity: tool({
+        description:
+          "What a GitHub user has been doing across the org in the last N days — commits, PRs opened, issues opened. Critical for 1-on-1 prep ('what's Abhyam been working on this week?'). Default 7 days.",
+        inputSchema: z.object({
+          username: z.string().describe('GitHub username'),
+          days: z.number().int().positive().max(90).optional(),
+        }),
+        execute: async (input) => github.getGithubUserActivity(input as github.UserActivityArgs),
+      }),
+
+      gh_search_code: tool({
+        description:
+          'Search code in the org. Returns matching files + their paths. Optional: limit to one repo, filter by language or extension.',
+        inputSchema: z.object({
+          query: z.string().describe('Text to find inside files'),
+          repo: z.string().optional().describe('Optional — limit to this repo'),
+          language: z.string().optional(),
+          extension: z.string().optional(),
+          limit: z.number().int().positive().max(50).optional(),
+        }),
+        execute: async (input) => github.searchCode(input as github.SearchCodeArgs),
+      }),
+
+      gh_get_file_contents: tool({
+        description:
+          'Read a file from a GitHub repo (or list a directory). Returns text content for files < 100 KB. Use for "show me the README" or "what does the config look like" queries.',
+        inputSchema: z.object({
+          repo: z.string(),
+          path: z.string().describe('File or directory path within the repo'),
+          branch: z.string().optional(),
+        }),
+        execute: async (input) => github.getFileContents(input as github.GetFileContentsArgs),
+      }),
+    }),
   }
 }
 
@@ -163,6 +260,35 @@ export function buildProposeTools(): ToolSet {
       inputSchema: ProposeUpdateTaskStatusInput,
       execute: async (input) => ({ proposed: true, action: 'update_task_status', args: input }),
     }),
+
+    // ─── GitHub write proposals (only if GitHub is configured) ─────────────
+
+    ...(github.isGithubEnabled() && {
+      propose_gh_create_repo: tool({
+        description:
+          'Propose creating a new GitHub repo in the RIG 360 org. The repo is NOT created until the user taps Confirm. Repo name gets lowercased and hyphenated automatically. Defaults: private=true, auto_init=true (creates an initial commit with README).',
+        inputSchema: z.object({
+          name: z.string().min(1).max(100).describe('Repo name. Will be sanitized to lowercase + hyphens.'),
+          description: z.string().max(350).optional(),
+          private: z.boolean().optional().describe('Default true'),
+          autoInit: z.boolean().optional().describe('Default true — creates initial commit with README'),
+        }),
+        execute: async (input) => ({ proposed: true, action: 'gh_create_repo', args: input }),
+      }),
+
+      propose_gh_create_issue: tool({
+        description:
+          'Propose filing a GitHub issue on a repo. NOT FILED until the user confirms. Useful when a teammate reports a bug in chat and you want to formalize it as a tracked GitHub issue.',
+        inputSchema: z.object({
+          repo: z.string().describe('Just the repo name within the org'),
+          title: z.string().min(3).max(200),
+          body: z.string().max(8000).optional().describe('Optional issue description (markdown OK)'),
+          labels: z.array(z.string()).optional(),
+          assignees: z.array(z.string()).optional().describe('GitHub usernames to assign'),
+        }),
+        execute: async (input) => ({ proposed: true, action: 'gh_create_issue', args: input }),
+      }),
+    }),
   }
 }
 
@@ -188,6 +314,11 @@ Call a READ tool only when:
 - You need a composite health view of a project (get_project_health).
 - You need a full profile for one teammate (get_member).
 - You need to search/filter beyond what's pre-loaded.
+- The question is about CODE — call the gh_* tools to inspect GitHub
+  repos, commits, PRs, issues, file contents, or a person's recent
+  GitHub activity. Best for "what's Abhyam been working on?",
+  "what's open on the OSINT scanner repo?", "show me the README of
+  childsafe-monitor", "find where we use the Brave API in our code".
 
 # Proposing write actions
 

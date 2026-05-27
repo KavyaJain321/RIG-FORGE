@@ -176,7 +176,15 @@ function CheckIcon() {
 
 function buildResultText(action: string, result: unknown): string {
   if (!result || typeof result !== 'object') return 'Done.'
-  const r = result as { id?: string; title?: string; status?: string }
+  const r = result as {
+    id?: string
+    title?: string
+    status?: string
+    name?: string
+    fullName?: string
+    url?: string
+    number?: number
+  }
   switch (action) {
     case 'create_task':
       return `Task created${r.title ? `: "${r.title}"` : ''}.`
@@ -184,6 +192,10 @@ function buildResultText(action: string, result: unknown): string {
       return `Ticket raised${r.title ? `: "${r.title}"` : ''}.`
     case 'update_task_status':
       return `Task moved to ${r.status ?? 'new status'}.`
+    case 'gh_create_repo':
+      return `Repo created: ${r.fullName ?? r.name ?? '?'} — ${r.url ?? ''}`
+    case 'gh_create_issue':
+      return `Issue #${r.number ?? '?'} filed: "${r.title ?? ''}" — ${r.url ?? ''}`
     default:
       return 'Done.'
   }

@@ -47,6 +47,11 @@ ASSISTANT_USER_MSG_PER_HOUR=30
 # auto-drafted daily logs, standup digest, and project health
 # watchdog to be callable from an external scheduler.
 CRON_SECRET=<generate-a-long-random-string>
+
+# GitHub integration — optional. Skip these to disable Forgie's
+# GitHub tools (recommended only if your team uses GitHub).
+GITHUB_TOKEN=github_pat_xxxx
+GITHUB_ORG=RIG-360-MEDIA
 ```
 
 Save → Render auto-redeploys (~2 minutes).
