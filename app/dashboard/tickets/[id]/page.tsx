@@ -15,6 +15,16 @@ interface TicketDetail {
   createdAt: string; acceptedAt: string | null; completedAt: string | null; cancelledAt: string | null
 }
 
+interface TicketComment {
+  id: string
+  body: string
+  createdAt: string
+  authorId: string
+  authorName: string
+  authorAvatar: string | null
+  authorRole: string
+}
+
 function fmt(dateStr: string | null) {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -26,10 +36,15 @@ export default function TicketDetailPage() {
   const { loading } = useAuth()
   const { user } = useAuthStore()
   const [ticket, setTicket] = useState<TicketDetail | null>(null)
+  const [comments, setComments] = useState<TicketComment[]>([])
+  const [reply, setReply] = useState('')
+  const [posting, setPosting] = useState(false)
+  const [replyError, setReplyError] = useState<string | null>(null)
   const [fetching, setFetching] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [confirmAccept, setConfirmAccept] = useState(false)
   const [confirmComplete, setConfirmComplete] = useState(false)
+  const [confirmResolve, setConfirmResolve] = useState(false)
 
   const fetchTicket = useCallback(async () => {
     setFetching(true)
@@ -42,12 +57,20 @@ export default function TicketDetailPage() {
     }
   }, [params.id])
 
+  const fetchComments = useCallback(async () => {
+    const res = await fetch(`/api/tickets/${params.id as string}/comments`, { credentials: 'include' })
+    if (!res.ok) return
+    const json = await res.json() as { data: TicketComment[] | null }
+    if (json.data) setComments(json.data)
+  }, [params.id])
+
   useEffect(() => {
     if (!loading) {
       if (!user) { router.push('/login'); return }
       void fetchTicket()
+      void fetchComments()
     }
-  }, [loading, user, router, fetchTicket])
+  }, [loading, user, router, fetchTicket, fetchComments])
 
   // Employees can only view their own tickets — redirect if forbidden
   useEffect(() => {
@@ -66,6 +89,34 @@ export default function TicketDetailPage() {
       setActionLoading(false)
       setConfirmAccept(false)
       setConfirmComplete(false)
+      setConfirmResolve(false)
+    }
+  }
+
+  async function postReply() {
+    if (!ticket || posting) return
+    const body = reply.trim()
+    if (body.length === 0) return
+    setPosting(true)
+    setReplyError(null)
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}/comments`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      })
+      const json = await res.json() as { data: TicketComment | null; error: string | null }
+      if (!res.ok || !json.data) {
+        setReplyError(json.error ?? 'Failed to post reply')
+        return
+      }
+      setComments((prev) => [...prev, json.data!])
+      setReply('')
+    } catch {
+      setReplyError('Network error. Please try again.')
+    } finally {
+      setPosting(false)
     }
   }
 
@@ -81,6 +132,9 @@ export default function TicketDetailPage() {
   const isAdmin   = isAdminRole(user.role)
   const isOpen    = ticket.status === 'OPEN'
   const isAccepted = ticket.status === 'ACCEPTED'
+  const isClosed   = ticket.status === 'COMPLETED' || ticket.status === 'CANCELLED'
+  const canReply   = !isClosed && (isAdmin || isRaiser || isHelper)
+  const canResolve = !isClosed && (isAdmin || isRaiser || isHelper)
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
@@ -170,8 +224,119 @@ export default function TicketDetailPage() {
             )}
 
             {/* ACCEPTED — third party, no actions */}
-            {isAccepted && !isRaiser && !isHelper && (
+            {isAccepted && !isRaiser && !isHelper && !isAdmin && (
               <p className="font-mono text-xs text-text-muted text-center">{ticket.helperName} is helping with this ticket.</p>
+            )}
+
+            {/* "Mark as Resolved" — shown to:
+                 - admin raisers on an OPEN ticket (close without forcing accept flow)
+                 - any admin viewing an ACCEPTED ticket who isn't already the raiser/helper
+                   (the raiser/helper path uses the /complete endpoint above).
+                 Suppressed when other confirm flows are active. */}
+            {canResolve && !confirmResolve && !confirmAccept && !confirmComplete && (
+              (isOpen && isRaiser && isAdmin) ||
+              (isAccepted && !isRaiser && !isHelper && isAdmin)
+            ) && (
+              <button
+                type="button"
+                onClick={() => setConfirmResolve(true)}
+                className="w-full h-10 mt-2 bg-green-500 text-white font-mono text-xs rounded-card hover:opacity-90 transition-opacity"
+              >
+                Mark as Resolved
+              </button>
+            )}
+            {confirmResolve && (
+              <div className="flex gap-3 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setConfirmResolve(false)}
+                  className="flex-1 h-10 bg-background-tertiary border border-border-default rounded-card font-mono text-xs text-text-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void doAction('resolve')}
+                  disabled={actionLoading}
+                  className="flex-1 h-10 bg-green-500 text-white font-mono text-xs rounded-card hover:opacity-90 disabled:opacity-50"
+                >
+                  {actionLoading ? 'Resolving...' : 'Yes, Mark Resolved'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Replies / conversation thread */}
+          <div className="border-t border-border-default mt-6 pt-4">
+            <p className="font-mono text-xs text-text-muted uppercase tracking-widest mb-3">
+              Replies {comments.length > 0 && `(${comments.length})`}
+            </p>
+
+            {comments.length === 0 ? (
+              <p className="font-mono text-xs text-text-muted italic mb-3">
+                No replies yet.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3 mb-4">
+                {comments.map((c) => {
+                  const isAuthorAdmin = c.authorRole === 'ADMIN' || c.authorRole === 'SUPER_ADMIN'
+                  return (
+                    <div
+                      key={c.id}
+                      className="bg-background-tertiary border border-border-default rounded-card p-3"
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="font-mono text-xs text-text-primary">
+                          {c.authorId === user.id ? 'You' : c.authorName}
+                        </span>
+                        {isAuthorAdmin && (
+                          <span className="font-mono text-[9px] uppercase tracking-widest text-accent">
+                            Admin
+                          </span>
+                        )}
+                        <span className="font-mono text-[10px] text-text-muted ml-auto">
+                          {fmt(c.createdAt)}
+                        </span>
+                      </div>
+                      <p className="font-mono text-sm text-text-secondary whitespace-pre-wrap leading-relaxed">
+                        {c.body}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {canReply ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  placeholder={isRaiser ? 'Add more context or reply…' : 'Write a reply to the user…'}
+                  className="w-full bg-background-tertiary border border-border-default rounded-card px-3 py-2 font-mono text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent resize-none"
+                />
+                {replyError && (
+                  <p className="font-mono text-xs text-status-danger">{replyError}</p>
+                )}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void postReply()}
+                    disabled={posting || reply.trim().length === 0}
+                    className="h-9 px-4 bg-accent text-white font-mono text-xs rounded-card hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  >
+                    {posting ? 'Posting…' : 'Post Reply'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              isClosed && (
+                <p className="font-mono text-xs text-text-muted italic">
+                  This ticket is closed. Replies are disabled.
+                </p>
+              )
             )}
           </div>
         </div>

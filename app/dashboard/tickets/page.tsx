@@ -14,13 +14,17 @@ interface Ticket {
   id: string; title: string; description: string; status: string
   projectName: string; raisedByName: string; raisedById: string
   helperName: string | null; createdAt: string
+  commentCount?: number; hasResponse?: boolean
 }
+
+type AdminScope = 'ALL' | 'MINE'
 
 // ─── Admin ticket list (all tickets) ─────────────────────────────────────────
 
 function AdminTickets() {
   const { user } = useAuthStore()
   const [tab, setTab]           = useState<TabType>('OPEN')
+  const [scope, setScope]       = useState<AdminScope>('ALL')
   const [tickets, setTickets]   = useState<Ticket[]>([])
   const [fetching, setFetching] = useState(true)
   const [showRaise, setShowRaise] = useState(false)
@@ -29,13 +33,15 @@ function AdminTickets() {
   const fetchTickets = useCallback(async () => {
     setFetching(true)
     try {
-      const res  = await fetch(`/api/tickets?status=${tab}`, { credentials: 'include' })
+      const qs = new URLSearchParams({ status: tab })
+      if (scope === 'MINE') qs.set('mine', '1')
+      const res  = await fetch(`/api/tickets?${qs.toString()}`, { credentials: 'include' })
       const json = await res.json() as { data: Ticket[] | null }
       setTickets(json.data ?? [])
     } finally {
       setFetching(false)
     }
-  }, [tab])
+  }, [tab, scope])
 
   useEffect(() => { void fetchTickets() }, [fetchTickets])
 
@@ -66,6 +72,25 @@ function AdminTickets() {
           >
             + Raise Ticket
           </button>
+        </div>
+
+        {/* Scope: All tickets vs. only the ones I raised */}
+        <div className="flex gap-1 mb-3 bg-background-tertiary border border-border-default rounded-card p-1">
+          {(['ALL', 'MINE'] as AdminScope[]).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setScope(s)}
+              className={[
+                'flex-1 h-8 font-mono text-xs rounded transition-colors',
+                scope === s
+                  ? 'bg-surface-raised text-text-primary'
+                  : 'text-text-muted hover:text-text-secondary',
+              ].join(' ')}
+            >
+              {s === 'ALL' ? 'All tickets' : 'My tickets'}
+            </button>
+          ))}
         </div>
 
         <div className="flex gap-1 mb-4 bg-background-tertiary border border-border-default rounded-card p-1">
@@ -100,7 +125,9 @@ function AdminTickets() {
         ) : filtered.length === 0 ? (
           <div className="bg-surface-raised border border-border-default rounded-card p-8 text-center">
             <p className="font-mono text-xs text-text-muted">
-              No {tab.toLowerCase()} tickets{search ? ' matching your search' : ''}.
+              {scope === 'MINE'
+                ? `You have no ${tab.toLowerCase()} tickets${search ? ' matching your search' : ''}.`
+                : `No ${tab.toLowerCase()} tickets${search ? ' matching your search' : ''}.`}
             </p>
           </div>
         ) : (
