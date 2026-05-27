@@ -13,13 +13,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const projectId = searchParams.get('projectId')
+    const mine = searchParams.get('mine') === '1'
 
     const where: Record<string, unknown> = {}
     if (status) where.status = status
     if (projectId) where.projectId = projectId
 
-    // Employees can only see tickets they raised themselves
-    if (!isAdminRole(payload.role)) {
+    const isAdmin = isAdminRole(payload.role)
+    // Employees can only ever see their own raised tickets; admins
+    // can opt-in via ?mine=1.
+    if (!isAdmin || mine) {
       where.raisedById = payload.userId
     }
 
@@ -30,6 +33,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         project: { select: { name: true } },
         raisedBy: { select: { id: true, name: true, avatarUrl: true } },
         helper: { select: { id: true, name: true, avatarUrl: true } },
+        _count: { select: { comments: true } },
       },
     })
 
@@ -49,6 +53,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       acceptedAt: t.acceptedAt,
       completedAt: t.completedAt,
       cancelledAt: t.cancelledAt,
+      commentCount: t._count.comments,
+      hasResponse: t._count.comments > 0 || t.helperId !== null,
     }))
 
     return successResponse(result)

@@ -8,6 +8,7 @@ interface TicketCardProps {
     id: string; title: string; description: string; status: string
     projectName: string; raisedByName: string; raisedById: string
     helperName: string | null; createdAt: string
+    commentCount?: number; hasResponse?: boolean
   }
   currentUserId: string
 }
@@ -48,6 +49,14 @@ export default function TicketCard({ ticket, currentUserId }: TicketCardProps) {
               <span className="font-mono text-[10px] text-blue-400">
                 Helper: {ticket.helperName}
               </span>
+            )}
+            {ticket.commentCount !== undefined && ticket.commentCount > 0 && (
+              <span className="font-mono text-[10px] text-accent">
+                {ticket.commentCount} {ticket.commentCount === 1 ? 'reply' : 'replies'}
+              </span>
+            )}
+            {ticket.hasResponse && !ticket.helperName && (ticket.commentCount ?? 0) === 0 && (
+              <span className="font-mono text-[10px] text-accent">Responded</span>
             )}
           </div>
         </div>
