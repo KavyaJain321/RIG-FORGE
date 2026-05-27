@@ -37,7 +37,7 @@ ASSISTANT_PROVIDER_ORDER=groq,gemini,cerebras
 
 # Models per provider
 GROQ_MODEL=llama-3.3-70b-versatile
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-flash-latest
 CEREBRAS_MODEL=gpt-oss-120b
 
 # Soft rate-limit per user (messages per hour)
