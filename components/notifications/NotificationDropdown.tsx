@@ -92,12 +92,12 @@ function AdminBroadcastPanel() {
           </div>
           {target === 'ONE' && (
             <input type="text" placeholder="User ID or email..." value={userId} onChange={e => setUserId(e.target.value)}
-              className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder-text-muted focus:outline-none focus:border-accent transition-colors" />
+              className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors" />
           )}
           <input type="text" placeholder="Notification title..." value={title} onChange={e => setTitle(e.target.value)}
-            className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder-text-muted focus:outline-none focus:border-accent transition-colors" />
+            className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors" />
           <textarea placeholder="Message..." value={body} onChange={e => setBody(e.target.value)} rows={3}
-            className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder-text-muted focus:outline-none focus:border-accent transition-colors resize-none" />
+            className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors resize-none" />
           {feedback && (
             <p className={`font-mono text-[10px] tracking-wide ${feedback.ok ? 'text-status-success' : 'text-status-danger'}`}>
               {feedback.ok ? '✓ ' : '✕ '}{feedback.msg}

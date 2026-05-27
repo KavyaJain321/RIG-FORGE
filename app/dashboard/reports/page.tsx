@@ -189,7 +189,7 @@ function GeneratorForm({ onGenerated }: { onGenerated: () => void }) {
                   value={dateFrom}
                   max={dateTo}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow [color-scheme:light]"
                 />
               </div>
               <div className="flex-1 min-w-[150px]">
@@ -200,7 +200,7 @@ function GeneratorForm({ onGenerated }: { onGenerated: () => void }) {
                   min={dateFrom}
                   max={today()}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow [color-scheme:light]"
                 />
               </div>
             </div>

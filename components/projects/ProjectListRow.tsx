@@ -307,7 +307,7 @@ export default function ProjectListRow({
             onChange={(e) => setEditDeadline(e.target.value)}
             onClick={(e) => e.stopPropagation()}
             min={new Date().toISOString().split('T')[0]}
-            className="w-full bg-background-primary border border-border-default px-2 py-1.5 font-mono text-xs text-primary focus:border-accent focus:outline-none"
+            className="w-full bg-background-primary border border-border-default px-2 py-1.5 font-mono text-xs text-primary focus:border-accent focus:outline-none [color-scheme:light]"
           />
         ) : (
           <>

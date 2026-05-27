@@ -275,7 +275,7 @@ export default function CreateProjectModal({
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
                 min={todayStr}
-                className="w-full bg-background-primary border border-border-default px-4 py-3 font-mono text-sm text-primary focus:border-accent focus:outline-none transition-colors duration-150"
+                className="w-full bg-background-primary border border-border-default px-4 py-3 font-mono text-sm text-primary focus:border-accent focus:outline-none transition-colors duration-150 [color-scheme:light]"
               />
             </div>
 
