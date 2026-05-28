@@ -102,6 +102,7 @@ model User {
   assistantUsage  AssistantUsage[]
   auditLogs       AssistantAuditLog[]
   dailyLogDrafts  DailyLogDraft[]
+  googleIntegration GoogleIntegration?
 }
 
 model Project {
@@ -426,6 +427,29 @@ model DailyLogDraft {
 
   @@unique([userId, date])
   @@index([status])
+}
+
+// Per-user Google OAuth tokens. Stored after the user clicks "Connect
+// Google" on their profile. Used by gcal_* tools to make calendar
+// API calls on their behalf. Refresh tokens never expire unless the
+// user revokes; access tokens expire in 1h and are auto-refreshed.
+//
+// SECURITY NOTE: For v0, tokens are stored as plain text. Production
+// hardening should encrypt at column level (or use a managed vault).
+// The DB connection itself is TLS to Supabase, so they're protected
+// in transit and at rest by Supabase's encryption.
+model GoogleIntegration {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  email         String              // the Google email they connected
+  accessToken   String              // expires ~1h
+  refreshToken  String              // long-lived
+  expiresAt     DateTime
+  scopes        String              // space-separated granted scopes
+  connectedAt   DateTime @default(now())
+  lastUsedAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // AI-generated daily team standup. One per day. Shown on the

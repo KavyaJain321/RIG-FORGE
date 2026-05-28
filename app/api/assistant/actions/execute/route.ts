@@ -27,6 +27,7 @@ import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { createTask, updateTaskStatus } from '@/lib/assistant/tools/tasks'
 import { createTicket } from '@/lib/assistant/tools/tickets'
 import { createRepo, createIssue, isGithubEnabled } from '@/lib/assistant/tools/github'
+import { createEvent, cancelEvent, isUserGcalConnected } from '@/lib/assistant/tools/gcal'
 
 // ─── Per-action arg schemas (server-side validation) ─────────────────────────
 
@@ -65,6 +66,20 @@ const GhCreateIssueArgs = z.object({
   assignees: z.array(z.string()).optional(),
 })
 
+const GcalCreateEventArgs = z.object({
+  title: z.string().min(1).max(200),
+  start: z.string().min(1),
+  end: z.string().min(1),
+  attendees: z.array(z.string()).optional(),
+  description: z.string().max(2000).optional(),
+  location: z.string().max(200).optional(),
+  withMeetLink: z.boolean().optional(),
+})
+
+const GcalCancelEventArgs = z.object({
+  eventId: z.string().min(1),
+})
+
 const Body = z.object({
   conversationId: z.string().min(1).nullable().optional(),
   action: z.enum([
@@ -73,6 +88,8 @@ const Body = z.object({
     'update_task_status',
     'gh_create_repo',
     'gh_create_issue',
+    'gcal_create_event',
+    'gcal_cancel_event',
   ]),
   args: z.record(z.string(), z.unknown()),
 })
@@ -159,6 +176,28 @@ export async function POST(request: NextRequest) {
           throw new Error(`Invalid args for gh_create_issue: ${a.error.issues[0]?.message ?? 'malformed'}`)
         }
         result = await createIssue(a.data)
+        break
+      }
+      case 'gcal_create_event': {
+        if (!(await isUserGcalConnected(caller.userId))) {
+          throw new Error('You need to connect Google Calendar first (Profile → Connect Google).')
+        }
+        const a = GcalCreateEventArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for gcal_create_event: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await createEvent(caller.userId, a.data)
+        break
+      }
+      case 'gcal_cancel_event': {
+        if (!(await isUserGcalConnected(caller.userId))) {
+          throw new Error('You need to connect Google Calendar first.')
+        }
+        const a = GcalCancelEventArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for gcal_cancel_event: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await cancelEvent(caller.userId, a.data)
         break
       }
     }

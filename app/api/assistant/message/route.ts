@@ -35,7 +35,7 @@ import { buildSystemPrompt } from '@/lib/assistant/prompts'
 import { buildForgieContext, renderContextBlock } from '@/lib/assistant/context'
 import { checkRateLimit, recordUsage } from '@/lib/assistant/rate-limit'
 import { lookupCache, storeCache, maybeSweepCache } from '@/lib/assistant/cache'
-import { buildAllTools, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
+import { buildAllToolsAsync, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
 
 const MAX_HISTORY_MESSAGES = 10
 
@@ -237,7 +237,10 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
         ]
 
         // ── Stream! ────────────────────────────────────────────────────────
-        const allTools = buildAllTools({ userId: args.user.id, role: args.user.role })
+        const allTools = await buildAllToolsAsync({
+          userId: args.user.id,
+          role: args.user.role,
+        })
         const start = await startStream(messages, { tools: allTools })
 
         if (!start.success) {
@@ -433,7 +436,32 @@ function buildActionLabel(
       const repo = typeof args.repo === 'string' ? args.repo : 'repo'
       return `File GitHub issue "${title}" on ${repo}`
     }
+    case 'gcal_create_event': {
+      const title = typeof args.title === 'string' ? args.title : 'New meeting'
+      const start = typeof args.start === 'string' ? formatWhen(args.start) : ''
+      const attendeeCount = Array.isArray(args.attendees) ? args.attendees.length : 0
+      const withWho = attendeeCount > 0 ? ` with ${attendeeCount} attendee${attendeeCount === 1 ? '' : 's'}` : ''
+      return `Schedule "${title}"${start ? ` ${start}` : ''}${withWho}`
+    }
+    case 'gcal_cancel_event': {
+      return `Cancel calendar event`
+    }
     default:
       return action
+  }
+}
+
+function formatWhen(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  } catch {
+    return iso
   }
 }

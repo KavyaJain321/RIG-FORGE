@@ -52,6 +52,13 @@ CRON_SECRET=<generate-a-long-random-string>
 # GitHub tools (recommended only if your team uses GitHub).
 GITHUB_TOKEN=github_pat_xxxx
 GITHUB_ORG=RIG-360-MEDIA
+
+# Google Calendar + Meet — optional. When set, each user can connect
+# their personal Google account from Profile → Connect Google.
+# Production redirect URI must match what's in Google Cloud Console.
+GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxx
+GOOGLE_REDIRECT_URI=https://rig-forge.onrender.com/api/auth/google/callback
 ```
 
 Save → Render auto-redeploys (~2 minutes).

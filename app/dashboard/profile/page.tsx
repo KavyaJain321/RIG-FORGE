@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { isAdminRole } from '@/lib/auth'
 import type { ApiResponse } from '@/lib/types'
 import type { ProfileResponse } from '@/app/api/users/me/profile/route'
+import GoogleConnectCard from '@/components/assistant/GoogleConnectCard'
 
 // ─── Day labels ────────────────────────────────────────────────────────────
 
@@ -252,6 +253,9 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4 space-y-4">
+
+      {/* ── Forgie integrations ──────────────────────────────────────── */}
+      <GoogleConnectCard />
 
       {/* ── Header card ──────────────────────────────────────────────── */}
       <div className="bg-background-secondary border border-border-default p-6">

@@ -196,6 +196,13 @@ function buildResultText(action: string, result: unknown): string {
       return `Repo created: ${r.fullName ?? r.name ?? '?'} — ${r.url ?? ''}`
     case 'gh_create_issue':
       return `Issue #${r.number ?? '?'} filed: "${r.title ?? ''}" — ${r.url ?? ''}`
+    case 'gcal_create_event': {
+      const ex = result as { title?: string; meetLink?: string | null; eventUrl?: string }
+      const meet = ex.meetLink ? ` · Meet: ${ex.meetLink}` : ''
+      return `Event created: "${ex.title ?? ''}"${meet}`
+    }
+    case 'gcal_cancel_event':
+      return `Event cancelled.`
     default:
       return 'Done.'
   }

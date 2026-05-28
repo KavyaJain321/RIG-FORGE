@@ -1,0 +1,175 @@
+/**
+ * Google OAuth helper.
+ *
+ * Centralizes:
+ *   - The OAuth2 client builder (client ID + secret + redirect URI)
+ *   - Connect URL generation (PKCE-style state parameter to prevent CSRF)
+ *   - Token exchange after callback
+ *   - Auto-refresh of access tokens that are about to expire
+ *
+ * The scopes we request match what Forgie's calendar tools need:
+ *   - calendar.events    read + write events on the user's primary calendar
+ *   - calendar.freebusy  used by find_free_time
+ *   - openid email       so we can record which Google account they connected
+ */
+
+import { google } from 'googleapis'
+import type { OAuth2Client } from 'google-auth-library'
+import { randomBytes } from 'crypto'
+
+import { prisma } from '@/lib/db'
+
+// Refresh access tokens this many ms before they expire.
+const REFRESH_THRESHOLD_MS = 5 * 60 * 1000  // 5 minutes
+
+export const GOOGLE_SCOPES = [
+  'openid',
+  'email',
+  'profile',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.freebusy',
+] as const
+
+export function isGoogleConfigured(): boolean {
+  return Boolean(
+    process.env.GOOGLE_CLIENT_ID &&
+      process.env.GOOGLE_CLIENT_SECRET &&
+      process.env.GOOGLE_REDIRECT_URI,
+  )
+}
+
+export function buildOAuth2Client(): OAuth2Client {
+  if (!isGoogleConfigured()) {
+    throw new Error(
+      'Google OAuth not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI in env.',
+    )
+  }
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI,
+  )
+}
+
+/**
+ * Generate the consent-screen URL the user is redirected to. The state
+ * token is a random nonce that the callback must echo back to prevent
+ * CSRF attacks where someone tricks a logged-in user into connecting an
+ * attacker's Google account.
+ */
+export function buildConnectUrl(stateToken: string): string {
+  const client = buildOAuth2Client()
+  return client.generateAuthUrl({
+    access_type: 'offline',       // request a refresh token, not just access
+    prompt: 'consent',            // force the consent screen so refresh_token is always returned
+    scope: [...GOOGLE_SCOPES],
+    state: stateToken,
+  })
+}
+
+export function makeStateToken(): string {
+  return randomBytes(24).toString('hex')
+}
+
+/**
+ * Exchange the OAuth code from the callback for tokens, plus pull the
+ * user's Google email so we can show "Connected as X" in the UI.
+ */
+export async function exchangeCodeForTokens(code: string): Promise<{
+  accessToken: string
+  refreshToken: string
+  expiresAt: Date
+  scope: string
+  email: string
+}> {
+  const client = buildOAuth2Client()
+  const { tokens } = await client.getToken(code)
+  if (!tokens.access_token) throw new Error('Google did not return an access token')
+  if (!tokens.refresh_token) {
+    throw new Error(
+      'No refresh token returned. User probably already authorized — revoke at https://myaccount.google.com/permissions and try again.',
+    )
+  }
+
+  client.setCredentials(tokens)
+  const oauth2 = google.oauth2({ version: 'v2', auth: client })
+  const me = await oauth2.userinfo.get()
+  const email = me.data.email
+  if (!email) throw new Error('Could not read connected Google email')
+
+  return {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresAt: new Date(tokens.expiry_date ?? Date.now() + 3600 * 1000),
+    scope: tokens.scope ?? GOOGLE_SCOPES.join(' '),
+    email,
+  }
+}
+
+/**
+ * Return an OAuth2Client authorized as the given user. If the access
+ * token is close to expiring, refresh it first and persist the new one.
+ *
+ * Throws if the user hasn't connected Google, or if their refresh token
+ * has been revoked.
+ */
+export async function getAuthorizedClient(userId: string): Promise<OAuth2Client> {
+  const integ = await prisma.googleIntegration.findUnique({ where: { userId } })
+  if (!integ) {
+    throw new Error('User has not connected Google. They need to go to Profile → Connect Google.')
+  }
+
+  const client = buildOAuth2Client()
+  client.setCredentials({
+    access_token: integ.accessToken,
+    refresh_token: integ.refreshToken,
+    expiry_date: integ.expiresAt.getTime(),
+  })
+
+  // If close to expiry, force a refresh and persist
+  const msUntilExpiry = integ.expiresAt.getTime() - Date.now()
+  if (msUntilExpiry < REFRESH_THRESHOLD_MS) {
+    const { credentials } = await client.refreshAccessToken()
+    if (credentials.access_token) {
+      const newExpiry = new Date(credentials.expiry_date ?? Date.now() + 3600 * 1000)
+      await prisma.googleIntegration.update({
+        where: { userId },
+        data: {
+          accessToken: credentials.access_token,
+          expiresAt: newExpiry,
+          // refresh_token only returned if rotated; preserve old one otherwise
+          ...(credentials.refresh_token && { refreshToken: credentials.refresh_token }),
+          lastUsedAt: new Date(),
+        },
+      })
+      client.setCredentials(credentials)
+    }
+  } else {
+    // Just stamp lastUsedAt
+    await prisma.googleIntegration
+      .update({ where: { userId }, data: { lastUsedAt: new Date() } })
+      .catch(() => {})
+  }
+
+  return client
+}
+
+/**
+ * Revoke and delete a user's Google connection.
+ */
+export async function disconnectGoogle(userId: string): Promise<void> {
+  const integ = await prisma.googleIntegration.findUnique({ where: { userId } })
+  if (!integ) return
+
+  // Best-effort revoke at Google's end
+  try {
+    const client = buildOAuth2Client()
+    client.setCredentials({ refresh_token: integ.refreshToken })
+    await client.revokeCredentials()
+  } catch (err) {
+    // Already revoked at Google's end? Whatever — still remove our record.
+    console.warn('[google] revoke failed (continuing):', err)
+  }
+
+  await prisma.googleIntegration.delete({ where: { userId } })
+}

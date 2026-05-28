@@ -19,6 +19,7 @@ import * as tasks from './tools/tasks'
 import * as members from './tools/members'
 import * as tickets from './tools/tickets'
 import * as github from './tools/github'
+import * as gcal from './tools/gcal'
 import type { ToolUser } from './tools/projects'
 
 // ─── Read tools — safe to auto-execute ───────────────────────────────────────
@@ -293,8 +294,87 @@ export function buildProposeTools(): ToolSet {
 }
 
 // Convenience: read + propose tools combined for the message route.
+// Synchronous version — Calendar tools are NOT included since they need
+// a per-user DB check. Use buildAllToolsAsync from the message route to
+// get the full set.
 export function buildAllTools(caller: ToolUser): ToolSet {
   return { ...buildReadTools(caller), ...buildProposeTools() }
+}
+
+// Async variant: also conditionally includes the per-user Google Calendar
+// tools when the user has connected their Google account. Use this from
+// API routes; use buildAllTools from sync contexts (tests, etc.).
+export async function buildAllToolsAsync(caller: ToolUser): Promise<ToolSet> {
+  const base: ToolSet = { ...buildReadTools(caller), ...buildProposeTools() }
+  if (await gcal.isUserGcalConnected(caller.userId)) {
+    Object.assign(base, buildGcalTools(caller))
+  }
+  return base
+}
+
+// ─── Google Calendar tools (per-user) ────────────────────────────────────────
+
+function buildGcalTools(caller: ToolUser): ToolSet {
+  return {
+    gcal_list_events: tool({
+      description:
+        "List the caller's upcoming Google Calendar events. Defaults to the next 7 days. Returns title, start, end, attendees, Meet link, and event URL.",
+      inputSchema: z.object({
+        timeMin: z.string().optional().describe('ISO datetime; default = now'),
+        timeMax: z.string().optional().describe('ISO datetime; default = +7d'),
+        query: z.string().optional().describe('Optional substring filter on event title'),
+        limit: z.number().int().positive().max(100).optional(),
+      }),
+      execute: async (input) => gcal.listEvents(caller.userId, input as gcal.ListEventsArgs),
+    }),
+
+    gcal_find_free_time: tool({
+      description:
+        'Find shared free slots across a set of attendees within a date range. Returns candidate slots that fit the requested duration during working hours.',
+      inputSchema: z.object({
+        attendees: z.array(z.string()).min(1).describe('Email addresses (include caller for self-availability)'),
+        durationMinutes: z.number().int().positive().max(480).optional().describe('Default 30'),
+        rangeStart: z.string().optional().describe('ISO datetime; default now'),
+        rangeEnd: z.string().optional().describe('ISO datetime; default +7d'),
+        workingHoursStart: z.number().int().min(0).max(23).optional().describe('Default 9'),
+        workingHoursEnd: z.number().int().min(0).max(24).optional().describe('Default 18'),
+        limit: z.number().int().positive().max(50).optional(),
+      }),
+      execute: async (input) => gcal.findFreeTime(caller.userId, input as gcal.FindFreeTimeArgs),
+    }),
+
+    propose_gcal_create_event: tool({
+      description:
+        'Propose creating a Google Calendar event. NOT CREATED until the user taps Confirm. Auto-adds a Meet link when attendees are provided (unless withMeetLink=false). Use full ISO datetime strings.',
+      inputSchema: z.object({
+        title: z.string().min(1).max(200),
+        start: z.string().describe('ISO datetime for event start'),
+        end: z.string().describe('ISO datetime for event end'),
+        attendees: z.array(z.string()).optional().describe('Email addresses'),
+        description: z.string().max(2000).optional(),
+        location: z.string().max(200).optional(),
+        withMeetLink: z.boolean().optional().describe('Default true if attendees present'),
+      }),
+      execute: async (input) => ({
+        proposed: true,
+        action: 'gcal_create_event',
+        args: input,
+      }),
+    }),
+
+    propose_gcal_cancel_event: tool({
+      description:
+        'Propose cancelling a Google Calendar event. NOT CANCELLED until the user confirms. Caller must own the event.',
+      inputSchema: z.object({
+        eventId: z.string().describe('The Google Calendar event ID'),
+      }),
+      execute: async (input) => ({
+        proposed: true,
+        action: 'gcal_cancel_event',
+        args: input,
+      }),
+    }),
+  }
 }
 
 // ─── Tool-use guidance for the system prompt ─────────────────────────────────
