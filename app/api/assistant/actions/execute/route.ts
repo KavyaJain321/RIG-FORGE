@@ -28,6 +28,12 @@ import { createTask, updateTaskStatus } from '@/lib/assistant/tools/tasks'
 import { createTicket } from '@/lib/assistant/tools/tickets'
 import { createRepo, createIssue, isGithubEnabled } from '@/lib/assistant/tools/github'
 import { createEvent, cancelEvent, isUserGcalConnected } from '@/lib/assistant/tools/gcal'
+import { sendMessage, isUserGmailEnabled } from '@/lib/assistant/tools/gmail'
+import {
+  createFolder,
+  createDoc,
+  isUserDriveEnabled,
+} from '@/lib/assistant/tools/gdrive'
 
 // ─── Per-action arg schemas (server-side validation) ─────────────────────────
 
@@ -80,6 +86,27 @@ const GcalCancelEventArgs = z.object({
   eventId: z.string().min(1),
 })
 
+const GmailSendArgs = z.object({
+  to: z.string().min(3),
+  subject: z.string().min(1).max(200),
+  body: z.string().min(1).max(20000),
+  cc: z.string().optional(),
+  bcc: z.string().optional(),
+  isHtml: z.boolean().optional(),
+})
+
+const DriveCreateFolderArgs = z.object({
+  name: z.string().min(1).max(200),
+  parentFolderId: z.string().optional(),
+})
+
+const DriveCreateDocArgs = z.object({
+  name: z.string().min(1).max(200),
+  content: z.string().min(1).max(50000),
+  format: z.enum(['text', 'gdoc']).optional(),
+  parentFolderId: z.string().optional(),
+})
+
 const Body = z.object({
   conversationId: z.string().min(1).nullable().optional(),
   action: z.enum([
@@ -90,6 +117,9 @@ const Body = z.object({
     'gh_create_issue',
     'gcal_create_event',
     'gcal_cancel_event',
+    'gmail_send',
+    'drive_create_folder',
+    'drive_create_doc',
   ]),
   args: z.record(z.string(), z.unknown()),
 })
@@ -198,6 +228,39 @@ export async function POST(request: NextRequest) {
           throw new Error(`Invalid args for gcal_cancel_event: ${a.error.issues[0]?.message ?? 'malformed'}`)
         }
         result = await cancelEvent(caller.userId, a.data)
+        break
+      }
+      case 'gmail_send': {
+        if (!(await isUserGmailEnabled(caller.userId))) {
+          throw new Error('Gmail not connected. Reconnect Google from Profile to grant Gmail permissions.')
+        }
+        const a = GmailSendArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for gmail_send: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await sendMessage(caller.userId, a.data)
+        break
+      }
+      case 'drive_create_folder': {
+        if (!(await isUserDriveEnabled(caller.userId))) {
+          throw new Error('Drive not connected. Reconnect Google from Profile to grant Drive permissions.')
+        }
+        const a = DriveCreateFolderArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for drive_create_folder: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await createFolder(caller.userId, a.data)
+        break
+      }
+      case 'drive_create_doc': {
+        if (!(await isUserDriveEnabled(caller.userId))) {
+          throw new Error('Drive not connected. Reconnect Google from Profile to grant Drive permissions.')
+        }
+        const a = DriveCreateDocArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for drive_create_doc: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await createDoc(caller.userId, a.data)
         break
       }
     }

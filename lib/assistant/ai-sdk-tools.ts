@@ -20,6 +20,8 @@ import * as members from './tools/members'
 import * as tickets from './tools/tickets'
 import * as github from './tools/github'
 import * as gcal from './tools/gcal'
+import * as gmail from './tools/gmail'
+import * as gdrive from './tools/gdrive'
 import type { ToolUser } from './tools/projects'
 
 // ─── Read tools — safe to auto-execute ───────────────────────────────────────
@@ -301,14 +303,25 @@ export function buildAllTools(caller: ToolUser): ToolSet {
   return { ...buildReadTools(caller), ...buildProposeTools() }
 }
 
-// Async variant: also conditionally includes the per-user Google Calendar
-// tools when the user has connected their Google account. Use this from
-// API routes; use buildAllTools from sync contexts (tests, etc.).
+// Async variant: also conditionally includes the per-user Google tools
+// (Calendar / Gmail / Drive) when the user has the right scopes granted.
+// Use this from API routes; use buildAllTools from sync contexts.
 export async function buildAllToolsAsync(caller: ToolUser): Promise<ToolSet> {
   const base: ToolSet = { ...buildReadTools(caller), ...buildProposeTools() }
-  if (await gcal.isUserGcalConnected(caller.userId)) {
-    Object.assign(base, buildGcalTools(caller))
-  }
+
+  // Calendar, Gmail, Drive are independent — a user might have authorized
+  // some but not others (e.g. legacy connection from before P8 added
+  // Gmail/Drive scopes). We check each separately.
+  const [hasGcal, hasGmail, hasDrive] = await Promise.all([
+    gcal.isUserGcalConnected(caller.userId),
+    gmail.isUserGmailEnabled(caller.userId),
+    gdrive.isUserDriveEnabled(caller.userId),
+  ])
+
+  if (hasGcal) Object.assign(base, buildGcalTools(caller))
+  if (hasGmail) Object.assign(base, buildGmailTools(caller))
+  if (hasDrive) Object.assign(base, buildGdriveTools(caller))
+
   return base
 }
 
@@ -371,6 +384,122 @@ function buildGcalTools(caller: ToolUser): ToolSet {
       execute: async (input) => ({
         proposed: true,
         action: 'gcal_cancel_event',
+        args: input,
+      }),
+    }),
+  }
+}
+
+// ─── Gmail tools (per-user) ──────────────────────────────────────────────────
+
+function buildGmailTools(caller: ToolUser): ToolSet {
+  return {
+    gmail_search: tool({
+      description:
+        "Search the caller's Gmail. Supports Gmail's filter syntax: from:, to:, subject:, after:YYYY/MM/DD, before:, is:unread, has:attachment, label:. Returns message metadata + snippets.",
+      inputSchema: z.object({
+        query: z.string().describe('Gmail search query'),
+        limit: z.number().int().positive().max(50).optional(),
+      }),
+      execute: async (input) =>
+        gmail.searchMessages(caller.userId, input as gmail.SearchArgs),
+    }),
+
+    gmail_get_message: tool({
+      description:
+        'Get the full body of one Gmail message by ID (from gmail_search results). Use when the snippet isn\'t enough and you need the full text.',
+      inputSchema: z.object({
+        messageId: z.string(),
+      }),
+      execute: async (input) =>
+        gmail.getMessage(caller.userId, input as gmail.GetMessageArgs),
+    }),
+
+    propose_gmail_send: tool({
+      description:
+        "Propose sending an email FROM the caller's Gmail account. NOT SENT until the user confirms. Default is plain text; pass isHtml=true for HTML formatting. Always include a clear subject.",
+      inputSchema: z.object({
+        to: z.string().describe('Recipient email(s), comma-separated for multiple'),
+        subject: z.string().min(1).max(200),
+        body: z.string().min(1).max(20000),
+        cc: z.string().optional(),
+        bcc: z.string().optional(),
+        isHtml: z.boolean().optional(),
+      }),
+      execute: async (input) => ({
+        proposed: true,
+        action: 'gmail_send',
+        args: input,
+      }),
+    }),
+  }
+}
+
+// ─── Drive tools (per-user) ──────────────────────────────────────────────────
+
+function buildGdriveTools(caller: ToolUser): ToolSet {
+  return {
+    drive_search: tool({
+      description:
+        "Search the caller's Google Drive. Matches file name AND file content (for indexed files). Optional filters by mimeType or parent folder. Returns id, name, type, modified time, URL.",
+      inputSchema: z.object({
+        query: z.string(),
+        mimeType: z.string().optional().describe('e.g. application/pdf'),
+        parentFolderId: z.string().optional(),
+        includeTrashed: z.boolean().optional(),
+        limit: z.number().int().positive().max(50).optional(),
+      }),
+      execute: async (input) =>
+        gdrive.searchDrive(caller.userId, input as gdrive.DriveSearchArgs),
+    }),
+
+    drive_list_folder: tool({
+      description:
+        'List contents of one Drive folder by ID. Returns files + subfolders sorted with folders first.',
+      inputSchema: z.object({
+        folderId: z.string(),
+        limit: z.number().int().positive().max(200).optional(),
+      }),
+      execute: async (input) =>
+        gdrive.listFolder(caller.userId, input as gdrive.ListFolderArgs),
+    }),
+
+    drive_get_file: tool({
+      description:
+        'Get a Drive file: metadata + content (when the file is text/markdown/JSON/Google Doc and under 100 KB). Use when the user asks "show me the content of X" or "what does X say".',
+      inputSchema: z.object({
+        fileId: z.string(),
+      }),
+      execute: async (input) =>
+        gdrive.getFile(caller.userId, input as gdrive.GetFileArgs),
+    }),
+
+    propose_drive_create_folder: tool({
+      description:
+        "Propose creating a new folder in the caller's Drive. NOT CREATED until the user confirms. Use parentFolderId to nest inside an existing folder; omit it to create at the Drive root.",
+      inputSchema: z.object({
+        name: z.string().min(1).max(200),
+        parentFolderId: z.string().optional(),
+      }),
+      execute: async (input) => ({
+        proposed: true,
+        action: 'drive_create_folder',
+        args: input,
+      }),
+    }),
+
+    propose_drive_create_doc: tool({
+      description:
+        "Propose creating a text file or Google Doc in the caller's Drive. NOT CREATED until the user confirms. Default format='text' creates a .txt; format='gdoc' creates a real Google Doc that's editable in Docs.",
+      inputSchema: z.object({
+        name: z.string().min(1).max(200),
+        content: z.string().min(1).max(50000),
+        format: z.enum(['text', 'gdoc']).optional(),
+        parentFolderId: z.string().optional(),
+      }),
+      execute: async (input) => ({
+        proposed: true,
+        action: 'drive_create_doc',
         args: input,
       }),
     }),

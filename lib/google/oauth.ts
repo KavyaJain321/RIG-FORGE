@@ -26,9 +26,28 @@ export const GOOGLE_SCOPES = [
   'openid',
   'email',
   'profile',
+  // Calendar (P7)
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.freebusy',
+  // Gmail (P8)
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.readonly',
+  // Drive (P8) — drive.file = only files the app creates; drive.readonly = read everything
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.readonly',
 ] as const
+
+// Per-feature scope checks so we can gate tools per user when their stored
+// integration was authorized BEFORE these scopes existed (legacy connections).
+export function scopesIncludeGmail(scopes: string): boolean {
+  return scopes.includes('gmail.send') || scopes.includes('gmail.readonly')
+}
+export function scopesIncludeDrive(scopes: string): boolean {
+  return scopes.includes('drive.file') || scopes.includes('drive.readonly')
+}
+export function scopesIncludeCalendar(scopes: string): boolean {
+  return scopes.includes('calendar.events') || scopes.includes('calendar.freebusy')
+}
 
 export function isGoogleConfigured(): boolean {
   return Boolean(

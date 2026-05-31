@@ -32,13 +32,19 @@ export async function GET(request: NextRequest) {
 
   const integ = await prisma.googleIntegration.findUnique({
     where: { userId: claims.userId },
-    select: { email: true, connectedAt: true },
+    select: { email: true, connectedAt: true, scopes: true },
   })
 
+  const scopes = integ?.scopes ?? ''
   return successResponse({
     configured: true,
     connected: integ !== null,
     email: integ?.email ?? null,
     connectedAt: integ?.connectedAt ?? null,
+    features: {
+      calendar: scopes.includes('calendar.events') || scopes.includes('calendar.freebusy'),
+      gmail: scopes.includes('gmail.send') || scopes.includes('gmail.readonly'),
+      drive: scopes.includes('drive.file') || scopes.includes('drive.readonly'),
+    },
   })
 }

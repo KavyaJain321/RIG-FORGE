@@ -446,6 +446,24 @@ function buildActionLabel(
     case 'gcal_cancel_event': {
       return `Cancel calendar event`
     }
+    case 'gmail_send': {
+      const to = typeof args.to === 'string' ? args.to : ''
+      const subj = typeof args.subject === 'string' ? args.subject : '(no subject)'
+      const recipients = to.split(',').map((s) => s.trim()).filter(Boolean)
+      const recipientLabel = recipients.length === 1
+        ? recipients[0]
+        : `${recipients.length} recipient${recipients.length === 1 ? '' : 's'}`
+      return `Send email "${subj}" to ${recipientLabel}`
+    }
+    case 'drive_create_folder': {
+      const name = typeof args.name === 'string' ? args.name : 'New folder'
+      return `Create Drive folder "${name}"`
+    }
+    case 'drive_create_doc': {
+      const name = typeof args.name === 'string' ? args.name : 'New file'
+      const format = args.format === 'gdoc' ? 'Google Doc' : 'text file'
+      return `Create ${format} "${name}" in Drive`
+    }
     default:
       return action
   }

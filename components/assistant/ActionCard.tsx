@@ -203,6 +203,19 @@ function buildResultText(action: string, result: unknown): string {
     }
     case 'gcal_cancel_event':
       return `Event cancelled.`
+    case 'gmail_send': {
+      const ex = result as { subject?: string; to?: string }
+      return `Email sent: "${ex.subject ?? ''}" → ${ex.to ?? ''}`
+    }
+    case 'drive_create_folder': {
+      const ex = result as { name?: string; url?: string }
+      return `Folder created: "${ex.name ?? ''}"${ex.url ? ` — ${ex.url}` : ''}`
+    }
+    case 'drive_create_doc': {
+      const ex = result as { name?: string; url?: string; format?: string }
+      const fmt = ex.format === 'gdoc' ? 'Google Doc' : 'text file'
+      return `${fmt} created: "${ex.name ?? ''}"${ex.url ? ` — ${ex.url}` : ''}`
+    }
     default:
       return 'Done.'
   }

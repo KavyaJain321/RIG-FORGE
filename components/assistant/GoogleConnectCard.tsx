@@ -8,6 +8,11 @@ interface Status {
   connected: boolean
   email: string | null
   connectedAt: string | null
+  features?: {
+    calendar: boolean
+    gmail: boolean
+    drive: boolean
+  }
 }
 
 /**
@@ -114,26 +119,34 @@ export default function GoogleConnectCard() {
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <h3 className="text-sm font-mono uppercase tracking-widest text-[#1A1A1A]">
-            Google Calendar
+            Google Workspace
           </h3>
           {status.connected ? (
             <>
               <p className="text-sm text-[#1A1A1A] mt-2">
                 ✓ Connected as <span className="font-medium">{status.email}</span>
               </p>
-              <p className="text-xs text-[#999] mt-1">
-                Forgie can now schedule meetings, find free time across attendees,
-                and auto-generate Meet links on your behalf.
-              </p>
+              {/* Feature status grid */}
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                <FeatureBadge label="Calendar" enabled={status.features?.calendar ?? false} />
+                <FeatureBadge label="Gmail" enabled={status.features?.gmail ?? false} />
+                <FeatureBadge label="Drive" enabled={status.features?.drive ?? false} />
+              </div>
+              {!(status.features?.gmail && status.features?.drive) && (
+                <p className="text-xs text-amber-700 mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                  Some features need new permissions. Click <strong>Reconnect</strong> to
+                  grant access to Gmail and Drive.
+                </p>
+              )}
             </>
           ) : (
             <>
               <p className="text-sm text-[#666] mt-2">
-                Let Forgie schedule meetings and create Meet links for you.
+                Let Forgie use your Calendar, Gmail, and Drive on your behalf.
               </p>
               <p className="text-xs text-[#999] mt-1">
-                Forgie will only read/write events in your primary calendar. You can
-                disconnect any time.
+                Forgie can schedule meetings, send emails, and create folders/docs.
+                Read access is limited to what you authorize. Disconnect any time.
               </p>
             </>
           )}
@@ -143,20 +156,48 @@ export default function GoogleConnectCard() {
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={status.connected ? disconnect : connect}
-          disabled={busy}
-          className={[
-            'shrink-0 h-9 px-4 text-sm font-medium rounded-lg transition-colors disabled:opacity-50',
-            status.connected
-              ? 'bg-white border border-black/10 text-[#666] hover:text-[#1A1A1A]'
-              : 'bg-[#1A1A1A] text-white hover:bg-[#333]',
-          ].join(' ')}
-        >
-          {busy ? '...' : status.connected ? 'Disconnect' : 'Connect Google'}
-        </button>
+        <div className="shrink-0 flex flex-col gap-2">
+          {status.connected && !(status.features?.gmail && status.features?.drive) && (
+            <button
+              type="button"
+              onClick={connect}
+              disabled={busy}
+              className="h-9 px-4 text-sm font-medium rounded-lg bg-[#1A1A1A] text-white hover:bg-[#333] transition-colors disabled:opacity-50"
+            >
+              Reconnect
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={status.connected ? disconnect : connect}
+            disabled={busy}
+            className={[
+              'h-9 px-4 text-sm font-medium rounded-lg transition-colors disabled:opacity-50',
+              status.connected
+                ? 'bg-white border border-black/10 text-[#666] hover:text-[#1A1A1A]'
+                : 'bg-[#1A1A1A] text-white hover:bg-[#333]',
+            ].join(' ')}
+          >
+            {busy ? '...' : status.connected ? 'Disconnect' : 'Connect Google'}
+          </button>
+        </div>
       </div>
+    </div>
+  )
+}
+
+function FeatureBadge({ label, enabled }: { label: string; enabled: boolean }) {
+  return (
+    <div
+      className={[
+        'flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-medium',
+        enabled
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          : 'bg-[#F2F2EE] border-black/5 text-[#999]',
+      ].join(' ')}
+    >
+      <span aria-hidden="true">{enabled ? '✓' : '○'}</span>
+      <span>{label}</span>
     </div>
   )
 }
