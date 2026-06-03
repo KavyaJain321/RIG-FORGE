@@ -63,10 +63,14 @@ export default function ActionCard({
   if (action.status === 'confirmed') {
     return (
       <Wrapper tone="success">
-        <Row>
-          <CheckIcon />
-          <span className="text-sm">{action.resultText ?? 'Done.'}</span>
-        </Row>
+        <div className="flex items-start gap-2">
+          <div className="pt-0.5 shrink-0">
+            <CheckIcon />
+          </div>
+          <div className="text-sm leading-snug min-w-0 flex-1 [overflow-wrap:anywhere]">
+            {linkify(action.resultText ?? 'Done.')}
+          </div>
+        </div>
       </Wrapper>
     )
   }
@@ -172,6 +176,52 @@ function CheckIcon() {
   )
 }
 
+// ─── Linkify ─────────────────────────────────────────────────────────────────
+// Turn plain http(s)://... substrings in a result string into clickable
+// anchor tags. URLs use overflow-wrap:anywhere on the parent so they break
+// cleanly inside the card instead of overflowing horizontally.
+
+function linkify(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = []
+  const re = /(https?:\/\/[^\s]+)/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(
+        <span key={`t-${lastIndex}`}>{text.slice(lastIndex, match.index)}</span>,
+      )
+    }
+    // Strip trailing punctuation that often sticks to URLs in prose
+    // ("see https://x.com.") so we don't wrap the period in the anchor.
+    let url = match[0]
+    let trailing = ''
+    while (url.length > 1 && /[.,;:!?)\]]/.test(url[url.length - 1] ?? '')) {
+      trailing = url[url.length - 1] + trailing
+      url = url.slice(0, -1)
+    }
+    parts.push(
+      <a
+        key={`u-${match.index}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-emerald-700 underline underline-offset-2 hover:text-emerald-800"
+      >
+        {url}
+      </a>,
+    )
+    if (trailing) {
+      parts.push(<span key={`p-${match.index}`}>{trailing}</span>)
+    }
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) {
+    parts.push(<span key={`t-${lastIndex}`}>{text.slice(lastIndex)}</span>)
+  }
+  return parts.length > 0 ? parts : [<span key="all">{text}</span>]
+}
+
 // ─── Result text builders ────────────────────────────────────────────────────
 
 function buildResultText(action: string, result: unknown): string {
@@ -215,6 +265,23 @@ function buildResultText(action: string, result: unknown): string {
       const ex = result as { name?: string; url?: string; format?: string }
       const fmt = ex.format === 'gdoc' ? 'Google Doc' : 'text file'
       return `${fmt} created: "${ex.name ?? ''}"${ex.url ? ` — ${ex.url}` : ''}`
+    }
+    case 'create_project': {
+      const ex = result as { name?: string; leadName?: string | null; memberCount?: number }
+      const lead = ex.leadName ? ` · lead: ${ex.leadName}` : ''
+      const members = typeof ex.memberCount === 'number' ? ` · ${ex.memberCount} member${ex.memberCount === 1 ? '' : 's'}` : ''
+      return `Project created: "${ex.name ?? ''}"${lead}${members}`
+    }
+    case 'add_project_member': {
+      const ex = result as { userName?: string; projectName?: string }
+      return `${ex.userName ?? 'Member'} added to "${ex.projectName ?? 'project'}".`
+    }
+    case 'set_project_lead': {
+      const ex = result as { leadName?: string; projectName?: string; changed?: boolean }
+      if (ex.changed === false) {
+        return `${ex.leadName ?? 'They'} were already lead of "${ex.projectName ?? 'project'}" — no change.`
+      }
+      return `${ex.leadName ?? 'New lead'} is now lead of "${ex.projectName ?? 'project'}".`
     }
     default:
       return 'Done.'

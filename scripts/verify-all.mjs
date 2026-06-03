@@ -105,17 +105,17 @@ async function main() {
     ahmedTCH && ahmedChild,
     `TCH: ${ahmedTCH}, Childsafe: ${ahmedChild}`)
 
-  // 13. Rohun in Social Media Posting
+  // 13. Rohan in Social Media Posting
   const rohunSMP = hasMember('Social Media Posting', 'rohun@rigforge.com')
-  check(13, 'Rohun is member of Social Media Posting',
+  check(13, 'Rohan is member of Social Media Posting',
     rohunSMP,
     'Membership not found')
 
-  // 14. Pranavv in OSINT, Drone Mapping, News Prism
+  // 14. Pranav in OSINT, Drone Mapping, News Prism
   const pranavvOSINT = hasMember('Open Source Intelligence (OSINT)', 'pranavv@rigforge.com')
   const pranavvDrone = hasMember('Drone Mapping', 'pranavv@rigforge.com')
   const pranavvNews = hasMember('News Prism', 'pranavv@rigforge.com')
-  check(14, 'Pranavv is member of Open Source Intelligence (OSINT), Drone Mapping, and News Prism',
+  check(14, 'Pranav is member of Open Source Intelligence (OSINT), Drone Mapping, and News Prism',
     pranavvOSINT && pranavvDrone && pranavvNews,
     `OSINT: ${pranavvOSINT}, Drone Mapping: ${pranavvDrone}, News Prism: ${pranavvNews}`)
 

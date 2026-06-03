@@ -1,6 +1,7 @@
 'use client'
 
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { ChatMessage } from '@/store/assistantStore'
 import ActionCard from './ActionCard'
 
@@ -26,8 +27,27 @@ export default function Message({
         {isUser ? (
           <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
         ) : (
-          <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-headings:text-[#1A1A1A] prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-code:text-[#1A1A1A] prose-code:bg-black/5 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-pre:bg-[#1A1A1A] prose-pre:text-[#FAFAFA] prose-strong:text-[#1A1A1A]">
-            <ReactMarkdown>{msg.content}</ReactMarkdown>
+          <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-headings:text-[#1A1A1A] prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-code:text-[#1A1A1A] prose-code:bg-black/5 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-pre:bg-[#1A1A1A] prose-pre:text-[#FAFAFA] prose-strong:text-[#1A1A1A] prose-a:text-emerald-700 prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-emerald-800 [&_a]:[overflow-wrap:anywhere]">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                // Force every link to open in a new tab and add safe rel attrs.
+                // remark-gfm autolinks bare URLs as <a>, so this covers
+                // both `[label](url)` and raw `https://...` mentions.
+                a: ({ href, children, ...props }) => (
+                  <a
+                    {...props}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {children}
+                  </a>
+                ),
+              }}
+            >
+              {msg.content}
+            </ReactMarkdown>
           </div>
         )}
       </div>

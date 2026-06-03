@@ -26,6 +26,11 @@ import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 import { createTask, updateTaskStatus } from '@/lib/assistant/tools/tasks'
 import { createTicket } from '@/lib/assistant/tools/tickets'
+import {
+  createProject,
+  addProjectMember,
+  setProjectLead,
+} from '@/lib/assistant/tools/projects'
 import { createRepo, createIssue, isGithubEnabled } from '@/lib/assistant/tools/github'
 import { createEvent, cancelEvent, isUserGcalConnected } from '@/lib/assistant/tools/gcal'
 import { sendMessage, isUserGmailEnabled } from '@/lib/assistant/tools/gmail'
@@ -107,6 +112,26 @@ const DriveCreateDocArgs = z.object({
   parentFolderId: z.string().optional(),
 })
 
+const CreateProjectArgs = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  status: z.enum(['ACTIVE', 'ON_HOLD', 'COMPLETED', 'ARCHIVED']).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  deadline: z.string().optional(),
+  leadId: z.string().min(1),
+  memberIds: z.array(z.string()).optional(),
+})
+
+const AddProjectMemberArgs = z.object({
+  projectId: z.string().min(1),
+  userId: z.string().min(1),
+})
+
+const SetProjectLeadArgs = z.object({
+  projectId: z.string().min(1),
+  newLeadId: z.string().min(1),
+})
+
 const Body = z.object({
   conversationId: z.string().min(1).nullable().optional(),
   action: z.enum([
@@ -120,6 +145,9 @@ const Body = z.object({
     'gmail_send',
     'drive_create_folder',
     'drive_create_doc',
+    'create_project',
+    'add_project_member',
+    'set_project_lead',
   ]),
   args: z.record(z.string(), z.unknown()),
 })
@@ -261,6 +289,37 @@ export async function POST(request: NextRequest) {
           throw new Error(`Invalid args for drive_create_doc: ${a.error.issues[0]?.message ?? 'malformed'}`)
         }
         result = await createDoc(caller.userId, a.data)
+        break
+      }
+      case 'create_project': {
+        const a = CreateProjectArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for create_project: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        const projectArgs = {
+          ...a.data,
+          deadline: a.data.deadline ? new Date(a.data.deadline) : undefined,
+        }
+        if (projectArgs.deadline && isNaN(projectArgs.deadline.getTime())) {
+          throw new Error('deadline must be a valid ISO date string')
+        }
+        result = await createProject(caller, projectArgs)
+        break
+      }
+      case 'add_project_member': {
+        const a = AddProjectMemberArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for add_project_member: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await addProjectMember(caller, a.data)
+        break
+      }
+      case 'set_project_lead': {
+        const a = SetProjectLeadArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for set_project_lead: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await setProjectLead(caller, a.data)
         break
       }
     }

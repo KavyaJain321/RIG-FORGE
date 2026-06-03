@@ -52,10 +52,14 @@ function formatDate(date: Date | null): string {
 
 interface TaskRowProps {
   task: TaskSummary
+  currentUserId: string
+  canManage: boolean
   onStatusChange: (taskId: string, status: TaskStatus) => Promise<void>
+  onEdit: (task: TaskSummary) => void
+  onDelete: (task: TaskSummary) => void
 }
 
-function TaskRow({ task, onStatusChange }: TaskRowProps) {
+function TaskRow({ task, currentUserId, canManage, onStatusChange, onEdit, onDelete }: TaskRowProps) {
   const [expanded, setExpanded] = useState(false)
   const [updating, setUpdating] = useState(false)
 
@@ -66,7 +70,11 @@ function TaskRow({ task, onStatusChange }: TaskRowProps) {
     setUpdating(false)
   }
 
-  const overdue = isOverdue(task)
+  const overdue    = isOverdue(task)
+  const isAssignee = task.assigneeId === currentUserId
+  // Status can be changed by admin/lead or the task's assignee.
+  // Others get a read-only badge.
+  const canChangeStatus = canManage || isAssignee
 
   return (
     <>
@@ -75,7 +83,7 @@ function TaskRow({ task, onStatusChange }: TaskRowProps) {
         onClick={() => setExpanded((v) => !v)}
       >
         <td className="py-3 px-4 max-w-xs">
-          <span className="text-sm font-medium truncate block">{task.title}</span>
+          <span className="text-sm font-medium truncate block text-primary">{task.title}</span>
         </td>
         <td className="py-3 px-4 text-sm text-muted whitespace-nowrap">
           {task.assigneeName ?? 'Unassigned'}
@@ -96,22 +104,48 @@ function TaskRow({ task, onStatusChange }: TaskRowProps) {
           </span>
         </td>
         <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-          <select
-            value={task.status}
-            onChange={handleStatusChange}
-            disabled={updating}
-            className="text-xs bg-surface-raised border border-border-default rounded px-2 py-1 text-foreground focus:outline-none focus:border-accent disabled:opacity-50"
-          >
-            <option value="TODO">To Do</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="DONE">Done</option>
-          </select>
+          {canChangeStatus ? (
+            <select
+              value={task.status}
+              onChange={handleStatusChange}
+              disabled={updating}
+              className="text-xs bg-background-primary border border-border-default rounded px-2 py-1 text-primary focus:outline-none focus:border-accent disabled:opacity-50 [color-scheme:light]"
+            >
+              <option value="TODO" className="bg-background-primary text-primary">To Do</option>
+              <option value="IN_PROGRESS" className="bg-background-primary text-primary">In Progress</option>
+              <option value="DONE" className="bg-background-primary text-primary">Done</option>
+            </select>
+          ) : (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-surface-sunken text-secondary">
+              {STATUS_LABELS[task.status as TaskStatus] ?? task.status}
+            </span>
+          )}
         </td>
+        {canManage && (
+          <td className="py-3 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => onEdit(task)}
+              className="text-xs text-secondary hover:text-primary px-2 py-1 transition-colors"
+              title="Edit task"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(task)}
+              className="text-xs text-secondary hover:text-status-danger px-2 py-1 transition-colors ml-1"
+              title="Delete task"
+            >
+              Delete
+            </button>
+          </td>
+        )}
       </tr>
 
       {expanded && (
         <tr className="border-b border-border-default bg-surface-raised/30">
-          <td colSpan={5} className="px-6 py-4">
+          <td colSpan={canManage ? 6 : 5} className="px-6 py-4">
             <div className="space-y-2 text-sm">
               {task.description && (
                 <div>
@@ -139,23 +173,28 @@ function TaskRow({ task, onStatusChange }: TaskRowProps) {
   )
 }
 
-// ─── NewTaskModal ─────────────────────────────────────────────────────────────
+// ─── TaskFormModal ────────────────────────────────────────────────────────────
 
-interface NewTaskModalProps {
+interface TaskFormModalProps {
+  mode: 'create' | 'edit'
   projectId: string
   members: Member[]
+  task?: TaskSummary | null   // required when mode === 'edit'
   onClose: () => void
-  onCreated: (task: TaskSummary) => void
+  onSaved: (task: TaskSummary) => void
 }
 
-function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalProps) {
-  const [title, setTitle]               = useState('')
-  const [description, setDescription]   = useState('')
-  const [expectedOutput, setExpected]   = useState('')
-  const [assigneeId, setAssigneeId]     = useState('')
-  const [priority, setPriority]         = useState<Priority>('MEDIUM')
-  const [dueDate, setDueDate]           = useState('')
-  const [status, setStatus]             = useState<TaskStatus>('TODO')
+function TaskFormModal({ mode, projectId, members, task, onClose, onSaved }: TaskFormModalProps) {
+  const isEdit = mode === 'edit'
+  const [title, setTitle]               = useState(task?.title ?? '')
+  const [description, setDescription]   = useState(task?.description ?? '')
+  const [expectedOutput, setExpected]   = useState(task?.expectedOutput ?? '')
+  const [assigneeId, setAssigneeId]     = useState(task?.assigneeId ?? '')
+  const [priority, setPriority]         = useState<Priority>((task?.priority as Priority) ?? 'MEDIUM')
+  const [dueDate, setDueDate]           = useState(
+    task?.dueDate ? new Date(task.dueDate).toISOString().slice(0, 10) : '',
+  )
+  const [status, setStatus]             = useState<TaskStatus>((task?.status as TaskStatus) ?? 'TODO')
   const [submitting, setSubmitting]     = useState(false)
   const [error, setError]               = useState<string | null>(null)
 
@@ -168,27 +207,31 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
     setSubmitting(true)
     setError(null)
     try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
+      const url    = isEdit ? `/api/tasks/${task!.id}` : '/api/tasks'
+      const method = isEdit ? 'PATCH' : 'POST'
+      const payload: Record<string, unknown> = {
+        title: title.trim(),
+        description: description.trim() || null,
+        expectedOutput: expectedOutput.trim(),
+        assigneeId: assigneeId || null,
+        priority,
+        dueDate: dueDate || null,
+        status,
+      }
+      if (!isEdit) payload.projectId = projectId
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-          expectedOutput: expectedOutput.trim(),
-          projectId,
-          assigneeId: assigneeId || null,
-          priority,
-          dueDate: dueDate || null,
-          status,
-        }),
+        body: JSON.stringify(payload),
       })
       const json = await res.json() as ApiResponse<TaskSummary>
       if (!res.ok || json.error) {
-        setError(json.error ?? 'Failed to create task.')
+        setError(json.error ?? `Failed to ${isEdit ? 'update' : 'create'} task.`)
         return
       }
-      if (json.data) onCreated(json.data)
+      if (json.data) onSaved(json.data)
       onClose()
     } catch {
       setError('Network error. Please try again.')
@@ -203,7 +246,7 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-surface-raised border border-border-default rounded-lg w-full max-w-lg mx-4 p-6 space-y-4 text-primary">
-        <h2 className="text-lg font-semibold text-primary">New Task</h2>
+        <h2 className="text-lg font-semibold text-primary">{isEdit ? 'Edit Task' : 'New Task'}</h2>
 
         {error && (
           <div className="text-sm text-status-danger bg-status-danger/10 border border-status-danger/30 rounded px-3 py-2">
@@ -314,7 +357,9 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
               disabled={submitting}
               className="px-4 py-2 text-sm bg-accent text-white rounded hover:bg-accent-hover disabled:opacity-50 transition-colors"
             >
-              {submitting ? 'Creating…' : 'Create Task'}
+              {submitting
+                ? (isEdit ? 'Saving…' : 'Creating…')
+                : (isEdit ? 'Save Changes' : 'Create Task')}
             </button>
           </div>
         </form>
@@ -328,10 +373,14 @@ function NewTaskModal({ projectId, members, onClose, onCreated }: NewTaskModalPr
 interface TaskGroupProps {
   label: string
   tasks: TaskSummary[]
+  currentUserId: string
+  canManage: boolean
   onStatusChange: (taskId: string, status: TaskStatus) => Promise<void>
+  onEdit: (task: TaskSummary) => void
+  onDelete: (task: TaskSummary) => void
 }
 
-function TaskGroup({ label, tasks, onStatusChange }: TaskGroupProps) {
+function TaskGroup({ label, tasks, currentUserId, canManage, onStatusChange, onEdit, onDelete }: TaskGroupProps) {
   return (
     <div>
       <div className="flex items-center gap-3 px-4 py-2">
@@ -345,7 +394,15 @@ function TaskGroup({ label, tasks, onStatusChange }: TaskGroupProps) {
         <table className="w-full">
           <tbody>
             {tasks.map((t) => (
-              <TaskRow key={t.id} task={t} onStatusChange={onStatusChange} />
+              <TaskRow
+                key={t.id}
+                task={t}
+                currentUserId={currentUserId}
+                canManage={canManage}
+                onStatusChange={onStatusChange}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
             ))}
           </tbody>
         </table>
@@ -366,6 +423,10 @@ export default function TasksTab({ projectId, isAdmin, isLead, currentUserId }: 
   const [filter, setFilter]             = useState<FilterMode>(canManage ? 'all' : 'mine')
   const [search, setSearch]             = useState('')
   const [showModal, setShowModal]       = useState(false)
+  const [editingTask, setEditingTask]   = useState<TaskSummary | null>(null)
+  const [deletingTask, setDeletingTask] = useState<TaskSummary | null>(null)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+  const [deleteError, setDeleteError]   = useState<string | null>(null)
 
   const fetchTasks = useCallback(async () => {
     setError(null)
@@ -422,6 +483,33 @@ export default function TasksTab({ projectId, isAdmin, isLead, currentUserId }: 
 
   function handleTaskCreated(task: TaskSummary) {
     setTasks((prev) => [task, ...prev])
+  }
+
+  function handleTaskUpdated(task: TaskSummary) {
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)))
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deletingTask) return
+    setDeleteSubmitting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/tasks/${deletingTask.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const json = await res.json() as ApiResponse<{ id: string }>
+      if (!res.ok || json.error) {
+        setDeleteError(json.error ?? 'Failed to delete task.')
+        return
+      }
+      setTasks((prev) => prev.filter((t) => t.id !== deletingTask.id))
+      setDeletingTask(null)
+    } catch {
+      setDeleteError('Network error. Please try again.')
+    } finally {
+      setDeleteSubmitting(false)
+    }
   }
 
   // ── Filtering ──────────────────────────────────────────────────────────────
@@ -515,20 +603,92 @@ export default function TasksTab({ projectId, isAdmin, isLead, currentUserId }: 
       {/* Task groups */}
       {!loading && (
         <div className="space-y-6">
-          <TaskGroup label="To Do"       tasks={grouped.TODO}        onStatusChange={handleStatusChange} />
-          <TaskGroup label="In Progress" tasks={grouped.IN_PROGRESS} onStatusChange={handleStatusChange} />
-          <TaskGroup label="Done"        tasks={grouped.DONE}        onStatusChange={handleStatusChange} />
+          <TaskGroup
+            label="To Do"
+            tasks={grouped.TODO}
+            currentUserId={currentUserId}
+            canManage={canManage}
+            onStatusChange={handleStatusChange}
+            onEdit={setEditingTask}
+            onDelete={setDeletingTask}
+          />
+          <TaskGroup
+            label="In Progress"
+            tasks={grouped.IN_PROGRESS}
+            currentUserId={currentUserId}
+            canManage={canManage}
+            onStatusChange={handleStatusChange}
+            onEdit={setEditingTask}
+            onDelete={setDeletingTask}
+          />
+          <TaskGroup
+            label="Done"
+            tasks={grouped.DONE}
+            currentUserId={currentUserId}
+            canManage={canManage}
+            onStatusChange={handleStatusChange}
+            onEdit={setEditingTask}
+            onDelete={setDeletingTask}
+          />
         </div>
       )}
 
       {/* New task modal */}
       {showModal && (
-        <NewTaskModal
+        <TaskFormModal
+          mode="create"
           projectId={projectId}
           members={members}
           onClose={() => setShowModal(false)}
-          onCreated={handleTaskCreated}
+          onSaved={handleTaskCreated}
         />
+      )}
+
+      {/* Edit task modal */}
+      {editingTask && (
+        <TaskFormModal
+          mode="edit"
+          projectId={projectId}
+          members={members}
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSaved={handleTaskUpdated}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      {deletingTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-surface-raised border border-border-default rounded-lg w-full max-w-md mx-4 p-6 space-y-4 text-primary">
+            <h2 className="text-lg font-semibold text-primary">Delete task?</h2>
+            <p className="text-sm text-secondary">
+              This will remove <span className="font-medium text-primary">&ldquo;{deletingTask.title}&rdquo;</span> from the project. This action cannot be undone.
+            </p>
+            {deleteError && (
+              <div className="text-sm text-status-danger bg-status-danger/10 border border-status-danger/30 rounded px-3 py-2">
+                {deleteError}
+              </div>
+            )}
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => { setDeletingTask(null); setDeleteError(null) }}
+                disabled={deleteSubmitting}
+                className="px-4 py-2 text-sm text-secondary hover:text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteConfirm()}
+                disabled={deleteSubmitting}
+                className="px-4 py-2 text-sm bg-status-danger text-white rounded hover:opacity-90 disabled:opacity-50 transition-colors"
+              >
+                {deleteSubmitting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

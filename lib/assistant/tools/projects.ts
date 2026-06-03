@@ -140,6 +140,213 @@ export async function getProject(caller: ToolUser, projectId: string) {
   }
 }
 
+// ─── create_project (gated — UI must confirm) ─────────────────────────────────
+//
+// Mirrors the server-side rules of POST /api/projects: admin-only, name 1-100
+// chars, no HTML in name/description, leadId must reference a real active
+// user. Auto-creates the ProjectThread and adds the lead as a member, just
+// like the regular project-creation flow — so the project shows up correctly
+// everywhere else in the app.
+
+export interface CreateProjectArgs {
+  name: string
+  description?: string
+  status?: 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'ARCHIVED'
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  deadline?: Date
+  leadId: string
+  memberIds?: string[]   // optional extras to add as members at creation time
+}
+
+const HTML_TAG_RE = /<[^>]+>/i
+
+export async function createProject(caller: ToolUser, args: CreateProjectArgs) {
+  if (!isAdminRole(caller.role)) {
+    throw new Error('Only admins can create projects')
+  }
+
+  const name = args.name.trim()
+  if (name.length === 0) throw new Error('Project name is required')
+  if (name.length > 100) throw new Error('Project name must be at most 100 characters')
+  if (HTML_TAG_RE.test(name)) throw new Error('Project name must not contain HTML/script tags')
+
+  const description = args.description?.trim() ?? null
+  if (description && description.length > 500) {
+    throw new Error('Project description must be at most 500 characters')
+  }
+  if (description && HTML_TAG_RE.test(description)) {
+    throw new Error('Project description must not contain HTML/script tags')
+  }
+
+  // Verify the lead exists and is active
+  const leadUser = await prisma.user.findUnique({
+    where: { id: args.leadId, isActive: true },
+    select: { id: true, name: true },
+  })
+  if (!leadUser) throw new Error('leadId must reference an active user')
+
+  // Dedupe member IDs (lead is auto-added separately so drop them here)
+  const extraMembers = Array.from(
+    new Set((args.memberIds ?? []).filter((id) => id && id !== args.leadId)),
+  )
+
+  // Verify all extra members exist
+  if (extraMembers.length > 0) {
+    const found = await prisma.user.findMany({
+      where: { id: { in: extraMembers }, isActive: true },
+      select: { id: true },
+    })
+    if (found.length !== extraMembers.length) {
+      throw new Error('One or more memberIds reference unknown or inactive users')
+    }
+  }
+
+  const project = await prisma.project.create({
+    data: {
+      name,
+      description,
+      status: args.status ?? 'ACTIVE',
+      priority: args.priority ?? 'MEDIUM',
+      deadline: args.deadline ?? null,
+      leadId: args.leadId,
+      links: [],
+      members: {
+        // Lead is always a member; add the rest alongside.
+        create: [
+          { userId: args.leadId },
+          ...extraMembers.map((id) => ({ userId: id })),
+        ],
+      },
+      thread: { create: {} },
+    },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      priority: true,
+      deadline: true,
+      lead: { select: { id: true, name: true } },
+      _count: { select: { members: true } },
+    },
+  })
+
+  return {
+    id: project.id,
+    name: project.name,
+    status: project.status,
+    priority: project.priority,
+    deadline: project.deadline,
+    leadName: project.lead?.name ?? null,
+    memberCount: project._count.members,
+  }
+}
+
+// ─── add_project_member (gated — UI must confirm) ─────────────────────────────
+//
+// Admin OR the project lead can add a member.
+// Idempotent: re-adding an existing member returns the existing record.
+
+export interface AddProjectMemberArgs {
+  projectId: string
+  userId: string
+}
+
+export async function addProjectMember(caller: ToolUser, args: AddProjectMemberArgs) {
+  const project = await prisma.project.findUnique({
+    where: { id: args.projectId, isActive: true },
+    select: { id: true, name: true, leadId: true },
+  })
+  if (!project) throw new Error('Project not found')
+
+  const isAdmin = isAdminRole(caller.role)
+  const isLead = project.leadId === caller.userId
+  if (!isAdmin && !isLead) {
+    throw new Error('Only admins or the project lead can add members')
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: args.userId, isActive: true },
+    select: { id: true, name: true },
+  })
+  if (!target) throw new Error('User to add must reference an active user')
+
+  // Upsert — idempotent. The unique constraint on (userId, projectId) makes
+  // this safe even under concurrent requests.
+  await prisma.projectMember.upsert({
+    where: { userId_projectId: { userId: target.id, projectId: project.id } },
+    create: { userId: target.id, projectId: project.id },
+    update: {},
+  })
+
+  return {
+    projectId: project.id,
+    projectName: project.name,
+    userId: target.id,
+    userName: target.name,
+  }
+}
+
+// ─── set_project_lead (gated — UI must confirm) ───────────────────────────────
+//
+// Admin-only. Changes the lead and ensures the new lead is also a member.
+
+export interface SetProjectLeadArgs {
+  projectId: string
+  newLeadId: string
+}
+
+export async function setProjectLead(caller: ToolUser, args: SetProjectLeadArgs) {
+  if (!isAdminRole(caller.role)) {
+    throw new Error('Only admins can change the project lead')
+  }
+
+  const project = await prisma.project.findUnique({
+    where: { id: args.projectId, isActive: true },
+    select: { id: true, name: true, leadId: true },
+  })
+  if (!project) throw new Error('Project not found')
+
+  const newLead = await prisma.user.findUnique({
+    where: { id: args.newLeadId, isActive: true },
+    select: { id: true, name: true },
+  })
+  if (!newLead) throw new Error('newLeadId must reference an active user')
+
+  if (project.leadId === newLead.id) {
+    // No-op, but still return success so the UI confirms cleanly
+    return {
+      projectId: project.id,
+      projectName: project.name,
+      leadId: newLead.id,
+      leadName: newLead.name,
+      changed: false,
+    }
+  }
+
+  // Transaction: update lead + ensure new lead is a member
+  const updated = await prisma.$transaction(async (tx) => {
+    const p = await tx.project.update({
+      where: { id: project.id },
+      data: { leadId: newLead.id },
+      select: { id: true, name: true },
+    })
+    await tx.projectMember.upsert({
+      where: { userId_projectId: { userId: newLead.id, projectId: project.id } },
+      create: { userId: newLead.id, projectId: project.id },
+      update: {},
+    })
+    return p
+  })
+
+  return {
+    projectId: updated.id,
+    projectName: updated.name,
+    leadId: newLead.id,
+    leadName: newLead.name,
+    changed: true,
+  }
+}
+
 // ─── get_project_health ──────────────────────────────────────────────────────
 // Composite signal: velocity, overdue count, log frequency, ticket pileup.
 

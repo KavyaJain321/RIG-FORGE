@@ -153,11 +153,11 @@ All team members have been seeded. Default password for all accounts: `Forge@202
 
 | Role | Name | Email |
 |---|---|---|
-| **ADMIN** | Pranavv | pranavv@rigforge.com |
+| **ADMIN** | Pranav | pranavv@rigforge.com |
 | EMPLOYEE | Abhyam | abhyam@rigforge.com |
-| EMPLOYEE | Rhadesh | rhadesh@rigforge.com |
+| EMPLOYEE | Radhesh | rhadesh@rigforge.com |
 | EMPLOYEE | Sumit | sumit@rigforge.com |
-| EMPLOYEE | Kavya | kavya@rigforge.com |
+| **ADMIN** | Kavya Jain | kavya@rigforge.com |
 | EMPLOYEE | Yash | yash@rigforge.com |
 | EMPLOYEE | Daksh | daksh@rigforge.com |
 | EMPLOYEE | Ahmed | ahmed@rigforge.com |
@@ -167,7 +167,7 @@ All team members have been seeded. Default password for all accounts: `Forge@202
 | EMPLOYEE | Krishn | krishn@rigforge.com |
 | EMPLOYEE | Pankaj | pankaj@rigforge.com |
 | EMPLOYEE | Utkarsh | utkarsh@rigforge.com |
-| EMPLOYEE | Rohun | rohun@rigforge.com |
+| EMPLOYEE | Rohan | rohun@rigforge.com |
 
 > Members should change their password after first login via **Profile → Change Password**.
 

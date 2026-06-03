@@ -229,6 +229,26 @@ function humanAction(action: string): string {
       return 'raised a ticket'
     case 'update_task_status':
       return 'updated a task status'
+    case 'create_project':
+      return 'created a project'
+    case 'add_project_member':
+      return 'added a member to a project'
+    case 'set_project_lead':
+      return 'changed a project lead'
+    case 'gh_create_repo':
+      return 'created a GitHub repo'
+    case 'gh_create_issue':
+      return 'filed a GitHub issue'
+    case 'gcal_create_event':
+      return 'created a calendar event'
+    case 'gcal_cancel_event':
+      return 'cancelled a calendar event'
+    case 'gmail_send':
+      return 'sent an email'
+    case 'drive_create_folder':
+      return 'created a Drive folder'
+    case 'drive_create_doc':
+      return 'created a Drive file'
     default:
       return action.replace(/_/g, ' ')
   }

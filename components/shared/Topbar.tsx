@@ -256,12 +256,29 @@ export default function Topbar() {
 
                 {userMenuOpen && (
                   <div className="topbar-dropdown">
-                    <div className="px-3 py-2.5 border-b border-border-default">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false)
+                        router.push('/dashboard/profile')
+                      }}
+                      className="topbar-dropdown-item w-full text-left border-b border-border-default px-3 py-2.5 hover:bg-black/5 transition-colors"
+                    >
                       <p className="font-mono text-xs text-text-primary">{user.name}</p>
                       <p className="font-mono text-[10px] text-text-muted uppercase tracking-widest mt-0.5">
-                        {user.role}
+                        {user.role} · view profile
                       </p>
-                    </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false)
+                        router.push('/dashboard/profile')
+                      }}
+                      className="topbar-dropdown-item"
+                    >
+                      ▸ PROFILE
+                    </button>
                     <button
                       type="button"
                       onClick={() => void handleLogout()}

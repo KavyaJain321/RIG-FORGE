@@ -37,3 +37,6 @@ employee_credentials.xlsx
 news-prism-onboarding.xlsx
 *-credentials.xlsx
 *-onboarding.xlsx
+
+# Generated test-user xlsx (contains personal Gmail addresses)
+rig-team-google-test-users*.xlsx

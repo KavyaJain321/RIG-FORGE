@@ -29,7 +29,7 @@ import type { Role } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { errorResponse } from '@/lib/api-helpers'
-import { isAssistantEnabled } from '@/lib/llm/provider'
+import { isAssistantEnabled, reportRateLimit } from '@/lib/llm/provider'
 import { startStream, consumeStream } from '@/lib/llm/stream'
 import { buildSystemPrompt } from '@/lib/assistant/prompts'
 import { buildForgieContext, renderContextBlock } from '@/lib/assistant/context'
@@ -241,10 +241,64 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
           userId: args.user.id,
           role: args.user.role,
         })
-        const start = await startStream(messages, { tools: allTools })
 
-        if (!start.success) {
-          const fallbackMsg = pickFallbackMessage(start.reason)
+        // streamText() never throws synchronously — the actual API call (and
+        // any 429 / auth / network error) surfaces when the textStream is
+        // iterated. If a provider's keys are exhausted, the iterator throws
+        // BEFORE any text is written. In that case we mark the key cooled
+        // down and retry with the next available provider, up to a budget.
+        // Once we've streamed any text to the client, we commit — bailing
+        // mid-response would be jarring.
+        let fullText = ''
+        let metadata: Awaited<ReturnType<typeof consumeStream>> | null = null
+        const STREAM_ATTEMPT_BUDGET = 6
+        const failureLog: Array<{ provider: string; reason: string }> = []
+
+        for (let attempt = 0; attempt < STREAM_ATTEMPT_BUDGET; attempt++) {
+          const start = await startStream(messages, { tools: allTools })
+
+          if (!start.success) {
+            // All providers exhausted (synchronously). Fall through to the
+            // graceful error path below.
+            failureLog.push({ provider: 'none', reason: start.reason })
+            break
+          }
+
+          try {
+            metadata = await consumeStream(start, (delta) => {
+              fullText += delta
+              write(controller, { type: 'text', delta })
+            })
+            // Success — stream completed without throwing.
+            break
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err)
+            failureLog.push({ provider: start.provider, reason: reason.slice(0, 160) })
+            console.warn(
+              `[message-stream] ${start.provider} key ...${start.apiKey.slice(-6)} ` +
+              `errored ${fullText ? `after ${fullText.length} chars — committing partial response` : 'before any text — retrying'}: ${reason.slice(0, 200)}`,
+            )
+
+            // Mark this specific key cooling so the next attempt picks
+            // a different key (or falls through to the next provider).
+            reportRateLimit(start.provider, start.apiKey)
+
+            if (fullText.length > 0) {
+              // Some content already shown to the user — don't restart from
+              // scratch and double-send. Commit what we have.
+              break
+            }
+            // Otherwise retry with the next available provider/key.
+            continue
+          }
+        }
+
+        // If every attempt failed before producing any text, emit a graceful
+        // fallback message so the user sees SOMETHING instead of an empty
+        // response bubble.
+        if (!metadata && fullText.length === 0) {
+          const lastReason = failureLog[failureLog.length - 1]?.reason ?? 'all_attempts_exhausted'
+          const fallbackMsg = pickFallbackMessage(lastReason)
           write(controller, { type: 'text', delta: fallbackMsg })
           write(controller, {
             type: 'done',
@@ -259,28 +313,29 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
             provider: null,
             fallback: true,
           })
+          console.error(
+            `[message-stream] all ${failureLog.length} attempts failed:`,
+            failureLog,
+          )
           controller.close()
           return
         }
 
-        // Drain the text stream, emitting frames as they arrive
-        let fullText = ''
-        const metadata = await consumeStream(start, (delta) => {
-          fullText += delta
-          write(controller, { type: 'text', delta })
-        }).catch((err) => {
-          // Graceful tail: stream was committed, but errored partway.
-          // Don't throw — emit an end-of-stream marker indicating partial result.
-          console.error('[message-stream] mid-stream error:', err)
-          return null
-        })
-
         // ── Compute pending actions from tool calls ────────────────────────
+        // Llama 3.3 occasionally emits the same propose_* tool call multiple
+        // times in one response. Dedupe by (action + canonicalized args) so
+        // the user only sees one confirmation card per actually-distinct
+        // proposal.
+        const seenFingerprints = new Set<string>()
         const pendingActions = (metadata?.toolCalls ?? [])
           .filter((c) => c.name.startsWith('propose_') && !c.errored)
           .map((c) => {
             const r = c.result as { proposed?: boolean; action?: string; args?: Record<string, unknown> } | null
             if (!r || !r.action || !r.args) return null
+            // Stable-stringify by sorting object keys so { a, b } == { b, a }
+            const fingerprint = `${r.action}|${JSON.stringify(r.args, Object.keys(r.args).sort())}`
+            if (seenFingerprints.has(fingerprint)) return null
+            seenFingerprints.add(fingerprint)
             return {
               actionId: `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
               action: r.action,
@@ -463,6 +518,18 @@ function buildActionLabel(
       const name = typeof args.name === 'string' ? args.name : 'New file'
       const format = args.format === 'gdoc' ? 'Google Doc' : 'text file'
       return `Create ${format} "${name}" in Drive`
+    }
+    case 'create_project': {
+      const name = typeof args.name === 'string' ? args.name : 'New project'
+      const memberCount = Array.isArray(args.memberIds) ? args.memberIds.length : 0
+      const extras = memberCount > 0 ? ` + ${memberCount} member${memberCount === 1 ? '' : 's'}` : ''
+      return `Create project "${name}" (lead + you${extras})`
+    }
+    case 'add_project_member': {
+      return `Add member to ${projectName ?? 'project'}`
+    }
+    case 'set_project_lead': {
+      return `Change lead of ${projectName ?? 'project'}`
     }
     default:
       return action
