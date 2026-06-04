@@ -52,16 +52,9 @@ export default function Message({
         )}
       </div>
 
-      {/* Footer meta — only for assistant messages */}
-      {!isUser && (msg.provider || msg.cached || msg.fallback) && (
-        <div className="flex items-center gap-2 mt-1 px-1 font-mono text-[10px] text-[#999999] tracking-wide">
-          {msg.cached && <span className="text-[#888]">cached</span>}
-          {msg.fallback && <span className="text-amber-600">fallback</span>}
-          {msg.provider && !msg.cached && msg.provider !== 'cache' && (
-            <span>via {msg.provider}</span>
-          )}
-        </div>
-      )}
+      {/* Provider/cache/fallback meta is intentionally NOT shown to users —
+          which LLM served the reply is an internal detail. (Still tracked in
+          the DB + admin usage dashboard at /dashboard/assistant.) */}
 
       {/* Inline confirmation cards for any proposed write actions */}
       {!isUser && msg.pendingActions && msg.pendingActions.length > 0 && (
