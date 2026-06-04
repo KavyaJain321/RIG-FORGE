@@ -40,3 +40,7 @@ news-prism-onboarding.xlsx
 
 # Generated test-user xlsx (contains personal Gmail addresses)
 rig-team-google-test-users*.xlsx
+
+# Ad-hoc throwaway scripts that may hardcode passwords — keep out of git
+reset-test-users.mjs
+scripts/_*.mjs
