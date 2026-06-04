@@ -117,7 +117,7 @@ export default function ActionCard({
             type="button"
             onClick={confirm}
             disabled={busy}
-            className="flex-1 h-8 px-3 bg-[#1A1A1A] text-white text-xs font-medium rounded-lg hover:bg-[#333] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 h-9 px-3 bg-[#1A1A1A] text-white text-xs font-medium rounded-lg hover:bg-[#333] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
             {busy ? 'Doing it...' : 'Confirm'}
           </button>
@@ -125,7 +125,7 @@ export default function ActionCard({
             type="button"
             onClick={cancel}
             disabled={busy}
-            className="flex-1 h-8 px-3 bg-white border border-black/10 text-xs text-[#666] hover:text-[#1A1A1A] rounded-lg transition-colors disabled:opacity-60"
+            className="flex-1 h-9 px-3 bg-white border border-black/10 text-xs text-[#666] hover:text-[#1A1A1A] rounded-lg transition-colors disabled:opacity-60"
           >
             Cancel
           </button>

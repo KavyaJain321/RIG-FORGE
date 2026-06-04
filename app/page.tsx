@@ -2,6 +2,14 @@
 
 import Link from 'next/link'
 import { useEffect, useRef } from 'react'
+import { Instrument_Serif, Inter, Playfair_Display } from 'next/font/google'
+
+// ── Landing-page-only fonts ─────────────────────────────────────────────────
+// These are scoped here so they don't bloat the global CSS bundle loaded on
+// every dashboard page. They were previously in the root layout.
+const instrument = Instrument_Serif({ subsets: ['latin'], variable: '--font-instrument', weight: ['400'], style: ['normal', 'italic'], display: 'swap' })
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', weight: ['300', '400', '500', '600'], display: 'swap' })
+const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair', weight: ['400', '700', '900'], style: ['normal', 'italic'], display: 'swap' })
 
 const VIDEO_URL =
   'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_083109_283f3553-e28f-428b-a723-d639c617eb2b.mp4'
@@ -134,7 +142,7 @@ export default function LandingPage() {
   }, [])
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-white flex flex-col">
+    <div className={`${instrument.variable} ${inter.variable} ${playfair.variable} relative h-screen w-full overflow-hidden bg-white flex flex-col`}>
 
       {/* ── Video background ──────────────────────────────────────────────── */}
       <div

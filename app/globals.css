@@ -3,7 +3,23 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  /* Fix: app is light-mode only — declaring dark here caused browser chrome
+     (scrollbars, inputs, date pickers) to render in dark style unexpectedly. */
+  color-scheme: light;
+}
+
+/* ── Focus visibility (keyboard accessibility) ──────────────────────────────
+   Suppressing the browser default outline (focus:outline-none) is used
+   throughout the codebase without a visible replacement. This global rule
+   restores a clean focus indicator for keyboard users that:
+   - Only fires on keyboard navigation (focus-visible), not mouse click
+   - Matches the brand: 2px solid #1A1A1A with 2px white offset
+   - Overrides nothing for mouse users (no visible change for them)
+────────────────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid #1A1A1A;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 body {
@@ -202,6 +218,35 @@ body {
   0%   { transform: scale(1);   opacity: 1; }
   60%  { transform: scale(1.9); opacity: 0; }
   100% { transform: scale(1.9); opacity: 0; }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────
+   Users who set "Reduce Motion" in their OS accessibility preferences should
+   not see continuous animations (forge-pulse, shimmer, bell-pulse) or
+   animated transitions. Instant cuts communicate state without motion.
+   This was completely absent from the codebase.
+────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* Landing page reveal animations: show content immediately */
+  .animate-fade-rise,
+  .animate-fade-rise-delay,
+  .animate-fade-rise-delay-2 {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Forgie panel slide-in: show immediately */
+  .forge-slide-in {
+    animation: none !important;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
