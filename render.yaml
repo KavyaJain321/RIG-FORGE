@@ -1,7 +1,23 @@
 services:
   - type: web
     name: rig-forge
-    env: node
+    runtime: node
     plan: free
+    # IMPORTANT: this buildCommand is ONLY honored when the service is created
+    # as a Render *Blueprint* (from this render.yaml). If the service was
+    # created manually in the dashboard, Render IGNORES this file — you must
+    # set the Build Command in the dashboard Settings to match:
+    #   pnpm install && pnpm db:generate && pnpm build
     buildCommand: pnpm install && pnpm db:generate && pnpm build
     startCommand: pnpm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      # All secrets (DATABASE_URL, JWT_SECRET, the 15 LLM keys, Google OAuth,
+      # GITHUB_TOKEN, etc.) are set in the dashboard — never committed here.
+      # NEXT_PUBLIC_APP_URL and GOOGLE_REDIRECT_URI must point at the public
+      # Render URL in production:
+      #   NEXT_PUBLIC_APP_URL   = https://rig-forge.onrender.com
+      #   GOOGLE_REDIRECT_URI   = https://rig-forge.onrender.com/api/auth/google/callback
