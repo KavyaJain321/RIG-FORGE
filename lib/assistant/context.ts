@@ -162,7 +162,37 @@ async function loadOrgSnapshot(): Promise<ForgieContext['orgSnapshot']> {
 // in KNOWLEDGE_SCOPE — both spots reinforce honesty.
 
 export function renderContextBlock(ctx: ForgieContext): string {
-  return `# Grounded data (the truth — ground all factual claims here)
+  // RIG 360 is India-based — anchor all relative times to IST so Forgie can
+  // resolve "tomorrow", "next Monday", "in 2 hours" into real dates. Without
+  // this the model has no notion of "now" and stalls on any scheduling request.
+  const now = new Date()
+  const nowIST = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(now)
+  // ISO date (YYYY-MM-DD) in IST, for unambiguous arithmetic.
+  const isoDateIST = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now)
+
+  return `# Current date & time
+Right now it is **${nowIST} IST** (Asia/Kolkata, UTC+05:30). Today's date is ${isoDateIST}.
+Use THIS as your reference for every relative time the user mentions —
+"today", "tomorrow", "this Friday", "next Monday", "in 2 hours", "next week".
+When you create or move a calendar event, pass ISO-8601 datetimes that INCLUDE
+the +05:30 offset, e.g. tomorrow 4 PM → "${isoDateIST}T16:00:00+05:30" but with
+tomorrow's date. Never schedule in the past.
+
+# Grounded data (the truth — ground all factual claims here)
 
 Here's what's actually in the platform for this person right now.
 Every project name, task title, deadline, ticket, and number below

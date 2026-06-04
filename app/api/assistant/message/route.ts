@@ -345,6 +345,17 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
           })
           .filter((p): p is NonNullable<typeof p> => p !== null)
 
+        // ── Safety net: never leave an empty bubble ────────────────────────
+        // If the model streamed no text AND proposed no action card (can
+        // happen when it gets confused mid-reasoning), emit a gentle nudge
+        // so the user isn't staring at a blank response.
+        if (fullText.trim().length === 0 && pendingActions.length === 0) {
+          const nudge =
+            "Sorry — I didn't manage to put together a reply for that one. Mind rephrasing, or giving me a little more detail?"
+          write(controller, { type: 'text', delta: nudge })
+          fullText = nudge
+        }
+
         // ── Persist assistant message ──────────────────────────────────────
         await persistAssistant(args.conversationId, fullText, {
           provider: metadata?.provider ?? null,
