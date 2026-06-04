@@ -297,6 +297,7 @@ function PeoplePageInner() {
         isSuperAdmin={isSuperAdmin}
         currentUserId={user?.id}
         onClose={closeMember}
+        onRemoved={(id) => setMembers((prev) => prev.filter((m) => m.id !== id))}
       />
     </div>
   )

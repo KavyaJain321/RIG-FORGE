@@ -13,6 +13,8 @@ import Avatar from '@/components/ui/Avatar'
 import StatusDot from '@/components/ui/StatusDot'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import NotificationDropdown from '@/components/notifications/NotificationDropdown'
+import AskForgieButton from '@/components/assistant/AskForgieButton'
+import ChatPanel from '@/components/assistant/ChatPanel'
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
@@ -200,6 +202,9 @@ export default function Topbar() {
         {/* ── Right controls ──────────────────────────────────────────────── */}
         <div className="topbar-controls">
 
+          {/* Ask Forgie (AI assistant) — only shown for approved users */}
+          {user && !user.mustChangePassword && <AskForgieButton />}
+
           {/* Notification bell */}
           <NotificationBell
             ref={bellRef}
@@ -251,12 +256,29 @@ export default function Topbar() {
 
                 {userMenuOpen && (
                   <div className="topbar-dropdown">
-                    <div className="px-3 py-2.5 border-b border-border-default">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false)
+                        router.push('/dashboard/profile')
+                      }}
+                      className="topbar-dropdown-item w-full text-left border-b border-border-default px-3 py-2.5 hover:bg-black/5 transition-colors"
+                    >
                       <p className="font-mono text-xs text-text-primary">{user.name}</p>
                       <p className="font-mono text-[10px] text-text-muted uppercase tracking-widest mt-0.5">
-                        {user.role}
+                        {user.role} · view profile
                       </p>
-                    </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false)
+                        router.push('/dashboard/profile')
+                      }}
+                      className="topbar-dropdown-item"
+                    >
+                      ▸ PROFILE
+                    </button>
                     <button
                       type="button"
                       onClick={() => void handleLogout()}
@@ -282,6 +304,9 @@ export default function Topbar() {
         />,
         document.body
       )}
+
+      {/* ── Forgie chat panel (portal, self-mounted) ────────────────────── */}
+      <ChatPanel />
     </>
   )
 }

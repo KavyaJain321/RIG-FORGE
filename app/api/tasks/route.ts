@@ -91,9 +91,6 @@ export async function POST(request: NextRequest) {
 
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid or expired token', 401)
-    if (!isAdminRole(payload.role)) {
-      // leads can also create tasks — checked below after projectId validation
-    }
 
     let body: unknown
     try {
@@ -118,9 +115,16 @@ export async function POST(request: NextRequest) {
 
     const project = await prisma.project.findFirst({
       where: { id: projectId, isActive: true },
-      select: { id: true },
+      select: { id: true, leadId: true },
     })
     if (!project) return errorResponse('Project not found', 400)
+
+    // Only admin/super_admin or this project's lead can create tasks.
+    const isAdmin = isAdminRole(payload.role)
+    const isLead  = project.leadId === payload.userId
+    if (!isAdmin && !isLead) {
+      return errorResponse('Only admins or the project lead can create tasks', 403)
+    }
 
     let status: TaskStatus = 'TODO'
     if (typeof data.status === 'string') {

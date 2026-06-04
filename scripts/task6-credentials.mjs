@@ -2,10 +2,10 @@ console.log(`
 ╔══════════════╦══════════════════════════════╦═════════════╦══════════╗
 ║ Name         ║ Email                        ║ Password    ║ Role     ║
 ╠══════════════╬══════════════════════════════╬═════════════╬══════════╣
-║ Pranavv      ║ pranavv@rigforge.com         ║ Forge@2026  ║ ADMIN    ║
-║ Kavya        ║ kavya@rigforge.com           ║ Forge@2026  ║ ADMIN    ║
+║ Pranav       ║ pranavv@rigforge.com         ║ Forge@2026  ║ ADMIN    ║
+║ Kavya Jain   ║ kavya@rigforge.com           ║ Forge@2026  ║ ADMIN    ║
 ║ Abhyam       ║ abhyam@rigforge.com          ║ Forge@2026  ║ EMPLOYEE ║
-║ Rhadesh      ║ rhadesh@rigforge.com         ║ Forge@2026  ║ EMPLOYEE ║
+║ Radhesh      ║ rhadesh@rigforge.com         ║ Forge@2026  ║ EMPLOYEE ║
 ║ Sumit        ║ sumit@rigforge.com           ║ Forge@2026  ║ EMPLOYEE ║
 ║ Yash         ║ yash@rigforge.com            ║ Forge@2026  ║ EMPLOYEE ║
 ║ Daksh        ║ daksh@rigforge.com           ║ Forge@2026  ║ EMPLOYEE ║
@@ -16,7 +16,7 @@ console.log(`
 ║ Krishn       ║ krishn@rigforge.com          ║ Forge@2026  ║ EMPLOYEE ║
 ║ Pankaj       ║ pankaj@rigforge.com          ║ Forge@2026  ║ EMPLOYEE ║
 ║ Utkarsh      ║ utkarsh@rigforge.com         ║ Forge@2026  ║ EMPLOYEE ║
-║ Rohun        ║ rohun@rigforge.com           ║ Forge@2026  ║ EMPLOYEE ║
+║ Rohan        ║ rohun@rigforge.com           ║ Forge@2026  ║ EMPLOYEE ║
 ╚══════════════╩══════════════════════════════╩═════════════╩══════════╝
 
 ⚠️  All users must change their password after first login:

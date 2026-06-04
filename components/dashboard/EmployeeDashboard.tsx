@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import type { EmployeeDashboardData, AuthUser, ApiResponse } from '@/lib/types'
+import DailyLogDraftCard from '@/components/assistant/DailyLogDraftCard'
+import StandupCard from '@/components/assistant/StandupCard'
 
 interface EmployeeDashboardProps {
   user: AuthUser
@@ -138,6 +140,10 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
             {error}
           </div>
         )}
+
+        {/* Forgie auto-generated cards */}
+        <StandupCard />
+        <DailyLogDraftCard />
 
         {data !== null && (
           <>

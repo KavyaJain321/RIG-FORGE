@@ -18,6 +18,8 @@ interface MemberSlideOverProps {
   isSuperAdmin?: boolean
   currentUserId?: string   // required for employee guard
   onClose: () => void
+  /** Called after a successful removal so the parent can refresh its list. */
+  onRemoved?: (userId: string) => void
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -66,7 +68,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = false, currentUserId, onClose }: MemberSlideOverProps) {
+export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = false, currentUserId, onClose, onRemoved }: MemberSlideOverProps) {
   // CLIENT-SIDE GUARD: employee cannot view another user's profile
   // The API also enforces this (403), but we also never open the panel
   if (memberId && !isAdmin && currentUserId && memberId !== currentUserId) {
@@ -85,6 +87,10 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
   const [resettingPassword, setResettingPassword] = useState(false)
   const [resetResult, setResetResult] = useState<string | null>(null)
   const [showTempPassword, setShowTempPassword] = useState(false)
+
+  // Remove member state
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [removing, setRemoving] = useState(false)
 
   const { addToast } = useToast()
 
@@ -168,6 +174,30 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
       addToast('error', 'Network error')
     } finally {
       setSending(false)
+    }
+  }
+
+  const handleRemoveMember = async () => {
+    if (!member || removing) return
+    setRemoving(true)
+    try {
+      const res = await fetch(`/api/users/${member.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const json = await res.json() as ApiResponse<{ id: string; name: string }>
+      if (!res.ok || json.error) {
+        addToast('error', json.error ?? 'Failed to remove member')
+        return
+      }
+      addToast('success', `${member.name} has been removed`)
+      onRemoved?.(member.id)
+      onClose()
+    } catch {
+      addToast('error', 'Network error')
+    } finally {
+      setRemoving(false)
+      setConfirmingRemove(false)
     }
   }
 
@@ -534,6 +564,54 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
                       <p className="font-mono text-[10px] text-muted leading-relaxed">
                         This will generate a new temp password and force the user to change it on next login.
                       </p>
+                    </div>
+                  )}
+
+                  {/* Remove member — admin can remove EMPLOYEE; super_admin can also remove ADMIN.
+                       Never shown for SUPER_ADMIN target or for the viewer's own profile. */}
+                  {member.role !== 'SUPER_ADMIN' &&
+                    member.id !== currentUserId &&
+                    (isSuperAdmin || member.role === 'EMPLOYEE') && (
+                    <div className="forge-card p-4 space-y-3 border-status-danger/30">
+                      <p className="font-mono text-xs text-status-danger font-semibold tracking-wide">
+                        Remove Member
+                      </p>
+                      <p className="font-mono text-[10px] text-muted leading-relaxed">
+                        Deactivates this account. {member.name.split(' ')[0]} won&apos;t be able to log in or appear in lists. Their task and ticket history is preserved.
+                      </p>
+                      {!confirmingRemove ? (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingRemove(true)}
+                          className="w-full border border-status-danger text-status-danger font-mono text-xs tracking-widest py-2 hover:bg-status-danger hover:text-white transition-colors"
+                        >
+                          REMOVE MEMBER
+                        </button>
+                      ) : (
+                        <div className="space-y-2">
+                          <p className="font-mono text-[10px] text-status-danger leading-relaxed">
+                            Are you sure? This will deactivate {member.name}&apos;s account immediately.
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setConfirmingRemove(false)}
+                              disabled={removing}
+                              className="flex-1 border border-border-default text-secondary font-mono text-xs tracking-widest py-2 hover:text-primary transition-colors disabled:opacity-40"
+                            >
+                              CANCEL
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleRemoveMember()}
+                              disabled={removing}
+                              className="flex-1 bg-status-danger text-white font-mono text-xs tracking-widest py-2 hover:opacity-90 transition-opacity disabled:opacity-40"
+                            >
+                              {removing ? 'REMOVING...' : 'CONFIRM REMOVE'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 

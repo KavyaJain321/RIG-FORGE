@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { isAdminRole } from '@/lib/auth'
 import type { ApiResponse } from '@/lib/types'
 import type { ProfileResponse } from '@/app/api/users/me/profile/route'
+import GoogleConnectCard from '@/components/assistant/GoogleConnectCard'
 
 // ─── Day labels ────────────────────────────────────────────────────────────
 
@@ -94,13 +95,9 @@ export default function ProfilePage() {
   const [pwSuccess, setPwSuccess] = useState(false)
   const [pwError, setPwError] = useState<string | null>(null)
 
-  // ── Redirect admins ───────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!authLoading && user?.role && isAdminRole(user.role)) {
-      router.push('/dashboard')
-    }
-  }, [authLoading, user, router])
+  // (Legacy admin-redirect removed — admins now also use this page for
+  // integrations + password changes. Employee-specific sections below
+  // self-hide for admins via role checks.)
 
   // ── Fetch profile data ────────────────────────────────────────────────
 
@@ -141,7 +138,7 @@ export default function ProfilePage() {
   }, [])
 
   useEffect(() => {
-    if (!authLoading && user && user.role !== 'ADMIN') {
+    if (!authLoading && user) {
       void fetchProfile()
       void fetchTodayLog()
     }
@@ -222,6 +219,9 @@ export default function ProfilePage() {
   if (authLoading || profileLoading) {
     return (
       <div className="max-w-2xl mx-auto py-8 px-4 space-y-4">
+        {/* Forgie integrations render immediately — don't make the user
+            wait for the profile fetch to see the Google connect card. */}
+        <GoogleConnectCard />
         <SkeletonCard rows={4} />
         <SkeletonCard rows={3} />
         <SkeletonCard rows={5} />
@@ -231,7 +231,8 @@ export default function ProfilePage() {
 
   if (profileError) {
     return (
-      <div className="max-w-2xl mx-auto py-8 px-4">
+      <div className="max-w-2xl mx-auto py-8 px-4 space-y-4">
+        <GoogleConnectCard />
         <div className="bg-background-secondary border border-status-danger p-6 text-center">
           <p className="font-mono text-sm text-status-danger">{profileError}</p>
           <button
@@ -246,12 +247,23 @@ export default function ProfilePage() {
     )
   }
 
-  if (!profileData) return null
+  if (!profileData) {
+    // Admin or other case where profile data didn't load but auth is fine.
+    // Show just the integrations card so the user isn't stuck on a blank page.
+    return (
+      <div className="max-w-2xl mx-auto py-8 px-4 space-y-4">
+        <GoogleConnectCard />
+      </div>
+    )
+  }
 
   const { user: profileUser, projects, activityThisWeek, dailyLogsThisWeek } = profileData
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4 space-y-4">
+
+      {/* ── Forgie integrations ──────────────────────────────────────── */}
+      <GoogleConnectCard />
 
       {/* ── Header card ──────────────────────────────────────────────── */}
       <div className="bg-background-secondary border border-border-default p-6">

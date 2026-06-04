@@ -12,17 +12,25 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.79",
+    "@ai-sdk/groq": "^3.0.39",
+    "@ai-sdk/openai-compatible": "^2.0.48",
     "@prisma/client": "5.16.1",
+    "ai": "^6.0.191",
     "bcryptjs": "2.4.3",
     "cookie": "0.6.0",
+    "google-auth-library": "^10.6.2",
+    "googleapis": "^172.0.0",
     "jsonwebtoken": "9.0.2",
     "lucide-react": "^1.7.0",
     "next": "14.2.5",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "socket.io": "4.7.5",
     "socket.io-client": "4.7.5",
+    "zod": "^4.4.3",
     "zustand": "4.5.4"
   },
   "pnpm": {
@@ -45,6 +53,8 @@
     "postcss": "8.4.39",
     "prisma": "5.16.1",
     "tailwindcss": "3.4.6",
-    "typescript": "5.5.4"
+    "tsx": "^4.22.3",
+    "typescript": "5.5.4",
+    "xlsx": "^0.18.5"
   }
 }

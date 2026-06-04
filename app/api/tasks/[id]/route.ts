@@ -1,0 +1,217 @@
+import { type NextRequest, NextResponse } from 'next/server'
+import type { Priority, TaskStatus } from '@prisma/client'
+
+import { prisma } from '@/lib/db'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
+import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { buildTaskSummary } from '@/lib/tasks'
+
+const VALID_TASK_STATUSES: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'DONE']
+const VALID_PRIORITIES: Priority[]      = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+
+// ─── Shared loader ────────────────────────────────────────────────────────────
+
+type LoadedTask = {
+  id: string
+  projectId: string
+  assigneeId: string | null
+  status: TaskStatus
+  project: { leadId: string | null }
+}
+
+async function loadTask(id: string): Promise<LoadedTask | null> {
+  return prisma.task.findFirst({
+    where: { id, isActive: true },
+    select: {
+      id: true,
+      projectId: true,
+      assigneeId: true,
+      status: true,
+      project: { select: { leadId: true } },
+    },
+  })
+}
+
+// ─── PATCH /api/tasks/[id] ────────────────────────────────────────────────────
+
+/**
+ * Edit a task.
+ *
+ * Permissions:
+ *   - Status-only changes  → admin / super_admin / project lead / the task's assignee
+ *   - Any other field      → admin / super_admin / project lead
+ *
+ * Other fields: title, description, expectedOutput, priority, assigneeId,
+ * dueDate, status (when accompanied by other fields).
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+): Promise<NextResponse> {
+  try {
+    const token = getTokenFromCookies(request)
+    if (!token) return errorResponse('Authentication required', 401)
+    const payload = verifyToken(token)
+    if (!payload) return errorResponse('Invalid or expired token', 401)
+
+    const task = await loadTask(params.id)
+    if (!task) return errorResponse('Task not found', 404)
+
+    let body: unknown
+    try { body = await request.json() } catch { return errorResponse('Invalid JSON body', 400) }
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      return errorResponse('Request body must be an object', 400)
+    }
+    const data = body as Record<string, unknown>
+
+    const isAdmin    = isAdminRole(payload.role)
+    const isLead     = task.project.leadId === payload.userId
+    const isAssignee = task.assigneeId === payload.userId
+
+    // Decide which keys are present. If the request *only* touches `status`,
+    // we use the looser status-change permissions; otherwise the caller must
+    // be an admin or the project lead.
+    const writableKeys = ['title', 'description', 'expectedOutput', 'priority',
+                          'assigneeId', 'dueDate', 'status'] as const
+    const touched = writableKeys.filter((k) => k in data)
+    if (touched.length === 0) {
+      return errorResponse('No editable fields provided', 400)
+    }
+    const statusOnly = touched.length === 1 && touched[0] === 'status'
+
+    if (statusOnly) {
+      if (!isAdmin && !isLead && !isAssignee) {
+        return errorResponse('Only the assignee, project lead, or an admin can change task status', 403)
+      }
+    } else {
+      if (!isAdmin && !isLead) {
+        return errorResponse('Only admins or the project lead can edit tasks', 403)
+      }
+    }
+
+    // ── Build the prisma update payload ────────────────────────────────────
+    const update: Record<string, unknown> = {}
+
+    if ('title' in data) {
+      if (typeof data.title !== 'string' || data.title.trim().length === 0) {
+        return errorResponse('title must be a non-empty string', 400)
+      }
+      if (data.title.length > 200) return errorResponse('title must be 200 characters or fewer', 400)
+      update.title = data.title.trim()
+    }
+
+    if ('description' in data) {
+      if (data.description !== null && typeof data.description !== 'string') {
+        return errorResponse('description must be a string or null', 400)
+      }
+      update.description = typeof data.description === 'string' ? data.description.trim() : null
+    }
+
+    if ('expectedOutput' in data) {
+      if (data.expectedOutput !== null && typeof data.expectedOutput !== 'string') {
+        return errorResponse('expectedOutput must be a string or null', 400)
+      }
+      update.expectedOutput = typeof data.expectedOutput === 'string'
+        ? data.expectedOutput.trim() || null
+        : null
+    }
+
+    if ('priority' in data) {
+      if (typeof data.priority !== 'string' || !VALID_PRIORITIES.includes(data.priority as Priority)) {
+        return errorResponse(`priority must be one of: ${VALID_PRIORITIES.join(', ')}`, 400)
+      }
+      update.priority = data.priority as Priority
+    }
+
+    if ('assigneeId' in data) {
+      if (data.assigneeId === null || data.assigneeId === '') {
+        update.assigneeId = null
+      } else if (typeof data.assigneeId === 'string') {
+        const membership = await prisma.projectMember.findUnique({
+          where: { userId_projectId: { userId: data.assigneeId, projectId: task.projectId } },
+          include: { user: { select: { isActive: true } } },
+        })
+        if (!membership || !membership.user.isActive) {
+          return errorResponse('assignee must be an active member of the project', 400)
+        }
+        update.assigneeId = data.assigneeId
+      } else {
+        return errorResponse('assigneeId must be a user ID or null', 400)
+      }
+    }
+
+    if ('dueDate' in data) {
+      if (data.dueDate === null || data.dueDate === '') {
+        update.dueDate = null
+      } else if (typeof data.dueDate === 'string') {
+        const parsed = new Date(data.dueDate)
+        if (Number.isNaN(parsed.getTime())) return errorResponse('dueDate is not a valid date', 400)
+        update.dueDate = parsed
+      } else {
+        return errorResponse('dueDate must be an ISO string or null', 400)
+      }
+    }
+
+    if ('status' in data) {
+      if (typeof data.status !== 'string' || !VALID_TASK_STATUSES.includes(data.status as TaskStatus)) {
+        return errorResponse(`status must be one of: ${VALID_TASK_STATUSES.join(', ')}`, 400)
+      }
+      const next = data.status as TaskStatus
+      update.status = next
+      // Maintain completedAt invariant
+      if (next === 'DONE' && task.status !== 'DONE') update.completedAt = new Date()
+      if (next !== 'DONE' && task.status === 'DONE') update.completedAt = null
+    }
+
+    await prisma.task.update({ where: { id: task.id }, data: update })
+
+    const full = await prisma.task.findUniqueOrThrow({
+      where: { id: task.id },
+      include: {
+        project: { select: { name: true } },
+        assignee: { select: { name: true, avatarUrl: true } },
+      },
+    })
+    return successResponse(buildTaskSummary(full))
+  } catch (error) {
+    console.error('[PATCH /api/tasks/[id]]', error)
+    return errorResponse('An unexpected error occurred', 500)
+  }
+}
+
+// ─── DELETE /api/tasks/[id] ───────────────────────────────────────────────────
+
+/**
+ * Soft-delete a task (sets isActive = false). Allowed for admin, super_admin,
+ * or the project's lead.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } },
+): Promise<NextResponse> {
+  try {
+    const token = getTokenFromCookies(request)
+    if (!token) return errorResponse('Authentication required', 401)
+    const payload = verifyToken(token)
+    if (!payload) return errorResponse('Invalid or expired token', 401)
+
+    const task = await loadTask(params.id)
+    if (!task) return errorResponse('Task not found', 404)
+
+    const isAdmin = isAdminRole(payload.role)
+    const isLead  = task.project.leadId === payload.userId
+    if (!isAdmin && !isLead) {
+      return errorResponse('Only admins or the project lead can delete tasks', 403)
+    }
+
+    await prisma.task.update({
+      where: { id: task.id },
+      data: { isActive: false },
+    })
+
+    return successResponse({ id: task.id })
+  } catch (error) {
+    console.error('[DELETE /api/tasks/[id]]', error)
+    return errorResponse('An unexpected error occurred', 500)
+  }
+}
