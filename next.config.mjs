@@ -2,6 +2,23 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+
+  // Skip type-checking AND linting during `next build`.
+  //
+  // WHY: on Render's free tier the build OOMs (JS heap > 2 GB) specifically
+  // during the "Linting and checking validity of types" phase — webpack
+  // compiles fine, then `tsc` blows the heap and the build dies before
+  // writing .next/BUILD_ID, leaving a broken deploy.
+  //
+  // This is SAFE because types and lint are verified locally (and should be
+  // in CI) via `tsc --noEmit` / `next lint` before every push — we don't
+  // need to re-run them inside the memory-constrained production build.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 }
 
 export default nextConfig
