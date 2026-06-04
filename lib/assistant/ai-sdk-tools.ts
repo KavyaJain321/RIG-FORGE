@@ -79,8 +79,15 @@ export function buildReadTools(caller: ToolUser): ToolSet {
     }),
 
     list_members: tool({
-      description:
-        'Browse the team. Filters: search (partial name), projectId (members of), role, status (WORKING/NOT_WORKING). Use when looking up colleagues or checking who is on a project.',
+      description: [
+        'Browse the team. Filters: search (partial name), projectId (members of),',
+        'role, status (WORKING/NOT_WORKING). Use when looking up colleagues or',
+        'checking who is on a project.',
+        'For admins each member includes `contactEmail` — their DELIVERABLE inbox',
+        '(their connected Google account, else a manually-set personal Gmail).',
+        'ALWAYS use `contactEmail` as the recipient when emailing someone — never',
+        'the `email` field (that is just a name@rigforge.com login and will bounce).',
+      ].join(' '),
       inputSchema: z.object({
         search: z.string().optional(),
         projectId: z.string().optional(),
@@ -92,8 +99,17 @@ export function buildReadTools(caller: ToolUser): ToolSet {
     }),
 
     get_member: tool({
-      description:
-        'Detail on one teammate: their projects, projects they lead, open task count, overdue count, last daily log. Accepts user id OR partial name.',
+      description: [
+        'Detail on one teammate: their projects, projects they lead, open task',
+        'count, overdue count, last daily log. Accepts user id OR partial name.',
+        'For admins the result includes `contactEmail` (the DELIVERABLE inbox:',
+        'their connected Google account if present, otherwise a manual personal',
+        'Gmail) and `contactEmailSource` ("google-connected" | "manual" | null).',
+        'When the user asks you to email a teammate by name, call this FIRST to',
+        'get their `contactEmail`, then use THAT as the recipient. If contactEmail',
+        'is null, tell the user you have no email on file for that person instead',
+        'of guessing or using the @rigforge.com login address.',
+      ].join(' '),
       inputSchema: z.object({
         userIdOrName: z.string()
           .describe('Internal user ID, or a name fragment like "Pranav" or "Abhyam"'),
@@ -482,6 +498,16 @@ function buildGmailTools(caller: ToolUser): ToolSet {
         'until the user confirms. Default is plain text; pass isHtml=true for',
         'HTML formatting.',
         '',
+        'RECIPIENT RESOLUTION — read carefully:',
+        'If the user names a TEAMMATE instead of giving a literal email address',
+        '("send a mail to Radhesh", "email Rohit Gandhi sir"), you MUST first call',
+        'get_member with that name and use the returned `contactEmail` as the `to`.',
+        'NEVER send to a name@rigforge.com address — those are login identifiers',
+        'with no mailbox and will bounce. If get_member returns contactEmail=null,',
+        'do NOT send; tell the user there is no email on file for that person and',
+        'ask them to provide one (or have that teammate connect Google / fill it in).',
+        'Only when the user supplies a literal email address may you use it directly.',
+        '',
         'CRITICAL URL HANDLING — read carefully:',
         '',
         'When a calendar event, Meet link, Drive folder, or Drive file was',
@@ -662,6 +688,16 @@ Call a READ tool only when:
   GitHub activity. Best for "what's Abhyam been working on?",
   "what's open on the OSINT scanner repo?", "show me the README of
   childsafe-monitor", "find where we use the Brave API in our code".
+
+# Emailing teammates by name
+
+A teammate's @rigforge.com address is a LOGIN ID, not a real inbox —
+mail to it bounces. When the user says "email <name>" / "send a mail to
+<name>" without giving a literal address, call get_member with that
+name FIRST and use the returned \`contactEmail\` (their connected Google
+account, else a manual personal Gmail) as the recipient. If
+contactEmail is null, don't send — tell the user there's no email on
+file for that person and suggest they connect Google or have it added.
 
 # Proposing write actions
 

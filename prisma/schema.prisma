@@ -76,7 +76,8 @@ enum NotificationType {
 model User {
   id            String     @id @default(cuid())
   name          String
-  email         String     @unique
+  email         String     @unique      // RIG login identifier (e.g. name@rigforge.com) — NOT a real mailbox
+  personalEmail String?                 // deliverable Gmail (manual bootstrap). Authoritative source is the connected GoogleIntegration.email when present.
   passwordHash  String
   role          Role
   avatarUrl          String?

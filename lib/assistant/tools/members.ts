@@ -11,6 +11,37 @@ import { isAdminRole } from '@/lib/auth'
 import type { Prisma } from '@prisma/client'
 import type { ToolUser } from './projects'
 
+// ─── Contact-email resolution ────────────────────────────────────────────────
+//
+// A teammate's deliverable inbox is NOT their `email` field — that's a RIG
+// login identifier (name@rigforge.com) with no real mailbox behind it.
+// The real address is resolved with this priority:
+//   1. The Google account they CONNECTED (googleIntegration.email) — verified,
+//      authoritative, auto-captured during OAuth. Wins over everything.
+//   2. The manually-entered `personalEmail` bootstrap.
+//   3. null — no deliverable address on file yet.
+//
+// So once someone connects Google, their real Gmail is used automatically,
+// even if it differs from what was typed in manually.
+
+interface ContactEmailInputs {
+  personalEmail?: string | null
+  googleIntegration?: { email: string } | null
+}
+
+export function resolveContactEmail(u: ContactEmailInputs): {
+  contactEmail: string | null
+  contactEmailSource: 'google-connected' | 'manual' | null
+} {
+  if (u.googleIntegration?.email) {
+    return { contactEmail: u.googleIntegration.email, contactEmailSource: 'google-connected' }
+  }
+  if (u.personalEmail) {
+    return { contactEmail: u.personalEmail, contactEmailSource: 'manual' }
+  }
+  return { contactEmail: null, contactEmailSource: null }
+}
+
 export interface ListMembersArgs {
   search?: string         // partial name match
   projectId?: string      // only members of this project
@@ -47,21 +78,45 @@ export async function listMembers(caller: ToolUser, args: ListMembersArgs = {}) 
       avatarUrl: true,
       currentStatus: true,
       // admin-only fields:
-      ...(isAdmin && { email: true, createdAt: true }),
+      ...(isAdmin && {
+        email: true,
+        createdAt: true,
+        personalEmail: true,
+        googleIntegration: { select: { email: true } },
+      }),
       _count: { select: { projects: true, tasks: true } },
     },
   })
 
-  return users.map((u) => ({
-    id: u.id,
-    name: u.name,
-    role: u.role,
-    avatarUrl: u.avatarUrl,
-    currentStatus: u.currentStatus,
-    projectCount: u._count.projects,
-    taskCount: u._count.tasks,
-    ...(isAdmin && { email: (u as { email?: string }).email }),
-  }))
+  return users.map((u) => {
+    const adminFields = isAdmin
+      ? (() => {
+          const au = u as typeof u & {
+            email?: string
+            personalEmail?: string | null
+            googleIntegration?: { email: string } | null
+          }
+          const { contactEmail, contactEmailSource } = resolveContactEmail(au)
+          return {
+            email: au.email,
+            // The DELIVERABLE address — use this as the `to` when emailing
+            // this person. `email` above is just their login identifier.
+            contactEmail,
+            contactEmailSource,
+          }
+        })()
+      : {}
+    return {
+      id: u.id,
+      name: u.name,
+      role: u.role,
+      avatarUrl: u.avatarUrl,
+      currentStatus: u.currentStatus,
+      projectCount: u._count.projects,
+      taskCount: u._count.tasks,
+      ...adminFields,
+    }
+  })
 }
 
 // ─── get_member ──────────────────────────────────────────────────────────────
@@ -85,7 +140,11 @@ export async function getMember(caller: ToolUser, userIdOrName: string) {
       role: true,
       avatarUrl: true,
       currentStatus: true,
-      ...(isAdmin && { email: true }),
+      ...(isAdmin && {
+        email: true,
+        personalEmail: true,
+        googleIntegration: { select: { email: true } },
+      }),
       projects: {
         select: {
           project: {
@@ -129,13 +188,25 @@ export async function getMember(caller: ToolUser, userIdOrName: string) {
     select: { date: true, workSummary: true },
   })
 
+  const adminContact = isAdmin
+    ? (() => {
+        const au = user as typeof user & {
+          email?: string
+          personalEmail?: string | null
+          googleIntegration?: { email: string } | null
+        }
+        const { contactEmail, contactEmailSource } = resolveContactEmail(au)
+        return { email: au.email, contactEmail, contactEmailSource }
+      })()
+    : {}
+
   return {
     id: user.id,
     name: user.name,
     role: user.role,
     avatarUrl: user.avatarUrl,
     currentStatus: user.currentStatus,
-    ...(isAdmin && { email: (user as { email?: string }).email }),
+    ...adminContact,
     projects: user.projects.map((p) => p.project),
     leadOf: user.projectsLed,
     counts: {
