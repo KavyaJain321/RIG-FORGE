@@ -86,7 +86,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
-            placeholder="operator@domain.gov"
+            placeholder="you@rigforge.com"
             autoComplete="email"
           />
 
@@ -119,9 +119,9 @@ export default function LoginPage() {
             disabled={isLoading}
             className="w-full mt-2"
             size="lg"
-            variant="gov-emphasis"
+            variant="primary"
           >
-            {isLoading ? 'AUTHENTICATING...' : 'AUTHENTICATE'}
+            {isLoading ? 'SIGNING IN...' : 'SIGN IN'}
           </Button>
         </form>
 

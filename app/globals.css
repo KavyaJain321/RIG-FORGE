@@ -180,7 +180,34 @@ body {
   background: rgba(0, 0, 0, 0.025);
 }
 
+/* ── Motion language ─────────────────────────────────────────────────────────
+   Easing vocabulary (reference, not CSS vars — Tailwind doesn't support them
+   easily in class-level cubic-bezier). Apply inline for one-off values.
+
+   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1)   — panels, drawers, modals
+   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1)    — hover states, color
+   --ease-crisp:  cubic-bezier(0, 0, 0.2, 1)       — dropdowns, tooltips
+
+   Timing scale:
+   - 80ms  — micro: button press, badge flash
+   - 150ms — fast:  hover color, border
+   - 220ms — panel: slide-in, drawer
+   - 350ms — modal: dialog entrance
+   - 500ms — page:  route transitions
+────────────────────────────────────────────────────────────────────────── */
+
 /* ── Animations ──────────────────────────────────────────────────────────── */
+
+/* Forgie chat panel slide-in — moved from inline <style> tag in ChatPanel.tsx.
+   Spring easing (cubic-bezier(0.16, 1, 0.3, 1)) feels physical and settled
+   vs the previous flat ease-out which felt mechanical. */
+@keyframes panel-slide-in {
+  from { transform: translateX(100%); opacity: 0.85; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.panel-slide-in {
+  animation: panel-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 
 @keyframes forge-pulse {
   0%, 100% { opacity: 1; }
@@ -244,7 +271,8 @@ body {
   }
 
   /* Forgie panel slide-in: show immediately */
-  .forge-slide-in {
+  .forge-slide-in,
+  .panel-slide-in {
     animation: none !important;
   }
 }

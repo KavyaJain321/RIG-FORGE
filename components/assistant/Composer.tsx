@@ -35,8 +35,8 @@ export default function Composer({
   }
 
   return (
-    <div className="border-t border-black/10 bg-white p-3">
-      <div className="flex items-end gap-2 bg-[#F8F8F4] border border-black/10 rounded-2xl px-3 py-2 focus-within:border-[#1A1A1A] transition-colors">
+    <div className="border-t border-black/8 bg-[#FAFAF8] p-3">
+      <div className="flex items-end gap-2 bg-white border border-black/10 rounded-2xl px-3 py-2 focus-within:border-black/30 transition-colors duration-150 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         <textarea
           ref={ref}
           value={value}
@@ -46,7 +46,7 @@ export default function Composer({
           placeholder={placeholder}
           rows={1}
           maxLength={4000}
-          className="flex-1 resize-none bg-transparent text-sm text-[#1A1A1A] placeholder:text-[#999999] focus:outline-none leading-relaxed"
+          className="flex-1 resize-none bg-transparent text-sm text-[#1A1A1A] placeholder:text-[#AAAAAA] focus:outline-none leading-relaxed"
           style={{ maxHeight: '160px' }}
         />
         <button
@@ -54,10 +54,10 @@ export default function Composer({
           onClick={onSubmit}
           disabled={disabled || !value.trim()}
           className={[
-            'shrink-0 flex items-center justify-center w-8 h-8 rounded-full transition-colors',
+            'shrink-0 flex items-center justify-center w-9 h-9 rounded-full transition-all duration-150',
             disabled || !value.trim()
-              ? 'bg-black/10 text-[#999999] cursor-not-allowed'
-              : 'bg-[#1A1A1A] text-white hover:bg-[#333]',
+              ? 'bg-black/6 text-[#AAAAAA] cursor-not-allowed'
+              : 'bg-[#1A1A1A] text-white hover:bg-[#2A2A2A] active:scale-95',
           ].join(' ')}
           aria-label="Send message"
         >
