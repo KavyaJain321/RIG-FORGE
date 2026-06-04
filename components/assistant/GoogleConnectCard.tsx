@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 interface Status {
@@ -19,8 +19,21 @@ interface Status {
  * Drop-in card for the Profile page. Shows current Google connection
  * status and a Connect / Disconnect button. Reads ?google=connected
  * etc. from the URL after the OAuth callback redirects back here.
+ *
+ * Default export wraps the inner component in <Suspense> because
+ * useSearchParams() requires a suspense boundary during prerendering
+ * (Next.js 14+ App Router rule). Fallback is `null` to match the
+ * existing "loading" state of the inner component.
  */
 export default function GoogleConnectCard() {
+  return (
+    <Suspense fallback={null}>
+      <GoogleConnectCardInner />
+    </Suspense>
+  )
+}
+
+function GoogleConnectCardInner() {
   const [status, setStatus] = useState<Status | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
