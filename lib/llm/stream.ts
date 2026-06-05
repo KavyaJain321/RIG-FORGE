@@ -34,7 +34,12 @@ import {
 } from './provider'
 
 const MAX_FALLBACK_ATTEMPTS = 10
-const MAX_TOOL_STEPS = 3
+// Raised from 3 → 6.
+// Complex requests like "schedule a meet with X and Y and email both" require:
+//   get_member(X) + get_member(Y) + propose_gcal_create_event
+//   + propose_gmail_send(X) + propose_gmail_send(Y) = 5 steps.
+// Capping at 3 caused the model to stall mid-chain and produce no text at all.
+const MAX_TOOL_STEPS = 6
 
 export interface StreamMetadata {
   provider: ProviderName
