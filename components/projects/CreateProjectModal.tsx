@@ -43,7 +43,7 @@ export default function CreateProjectModal({
   useEffect(() => {
     if (!isOpen) return
     setUsersLoading(true)
-    fetch('/api/users?role=EMPLOYEE&limit=100', { credentials: 'include' })
+    fetch('/api/users?limit=100', { credentials: 'include' })
       .then((r) => r.json())
       .then((json: ApiResponse<PaginatedResponse<MemberSummary>>) => {
         if (json.data) setAllUsers(json.data.items)
