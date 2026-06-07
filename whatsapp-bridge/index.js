@@ -1,60 +1,37 @@
 /**
  * Forgie WhatsApp Bridge
- *
- * Lightweight Node.js service that connects Forgie (RIG FORGE's AI assistant)
- * to WhatsApp using Baileys — an open-source WhatsApp Web implementation that
- * uses WebSockets directly (no Puppeteer/Chrome, ~80MB RAM, free-tier friendly).
- *
- * Session is persisted in Supabase (same DB as RIG FORGE) so it survives
- * Render restarts without needing a QR re-scan.
- *
- * REST API (all POST/GET routes require x-bridge-secret header except /health and /qr):
- *   GET  /health               — liveness check (used by UptimeRobot)
- *   GET  /qr                   — HTML page showing QR code to scan (no auth)
- *   GET  /status               — connection state + phone number
- *   POST /send                 — send a text message to a number or group
- *   POST /create-group         — create a new WhatsApp group
- *   GET  /groups               — list all groups the bot is in
- *
- * Incoming messages are forwarded to RIG FORGE via webhook.
+ * Lightweight Node.js service — Baileys (WebSocket, no Puppeteer), ~80MB RAM.
+ * Session persisted in Supabase so it survives Render restarts.
  */
 
 import express from 'express'
 import {
   default as makeWASocket,
-  useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   isJidGroup,
+  initAuthCreds,
+  BufferJSON,
 } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
 import QRCode from 'qrcode'
 import pino from 'pino'
 import pg from 'pg'
-import { existsSync, mkdirSync } from 'fs'
-import { writeFileSync, readFileSync } from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
 
 const { Pool } = pg
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// ─── Config ──────────────────────────────────────────────────────────────────
+// ─── Config ───────────────────────────────────────────────────────────────────
+const PORT               = process.env.PORT ?? 3001
+const BRIDGE_SECRET      = process.env.BRIDGE_SECRET
+const DATABASE_URL       = process.env.DATABASE_URL
+const RIGFORGE_URL       = process.env.RIGFORGE_URL
+const RIGFORGE_WA_SECRET = process.env.RIGFORGE_WA_SECRET
 
-const PORT          = process.env.PORT ?? 3001
-const BRIDGE_SECRET = process.env.BRIDGE_SECRET
-const DATABASE_URL  = process.env.DATABASE_URL
-const RIGFORGE_URL  = process.env.RIGFORGE_URL          // e.g. https://rig-forge.onrender.com
-const RIGFORGE_WA_SECRET = process.env.RIGFORGE_WA_SECRET  // shared secret for /api/whatsapp/incoming
+if (!BRIDGE_SECRET) { console.error('BRIDGE_SECRET required'); process.exit(1) }
+if (!DATABASE_URL)  { console.error('DATABASE_URL required');  process.exit(1) }
 
-if (!BRIDGE_SECRET)  { console.error('BRIDGE_SECRET env var required'); process.exit(1) }
-if (!DATABASE_URL)   { console.error('DATABASE_URL env var required'); process.exit(1) }
-
-// ─── Postgres (Supabase) — for session backup ─────────────────────────────────
-// We store the Baileys auth state as JSON rows so the session survives restarts.
-// Table is auto-created on first run.
-
+// ─── Postgres (Supabase) ──────────────────────────────────────────────────────
 const pool = new Pool({
   connectionString: DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -72,44 +49,40 @@ async function dbEnsureTable() {
 }
 
 async function dbGet(id) {
-  const { rows } = await pool.query(
-    'SELECT data FROM "WhatsappAuth" WHERE id = $1',
-    [id],
-  )
-  if (!rows[0]) return null
-  try { return JSON.parse(rows[0].data) } catch { return null }
+  try {
+    const { rows } = await pool.query('SELECT data FROM "WhatsappAuth" WHERE id = $1', [id])
+    if (!rows[0]) return null
+    return JSON.parse(rows[0].data)
+  } catch { return null }
 }
 
 async function dbSet(id, value) {
-  if (value === null || value === undefined) {
-    await pool.query('DELETE FROM "WhatsappAuth" WHERE id = $1', [id])
-  } else {
-    await pool.query(
-      `INSERT INTO "WhatsappAuth" (id, data, "updatedAt")
-       VALUES ($1, $2, NOW())
-       ON CONFLICT (id) DO UPDATE SET data = $2, "updatedAt" = NOW()`,
-      [id, JSON.stringify(value)],
-    )
+  try {
+    if (value === null || value === undefined) {
+      await pool.query('DELETE FROM "WhatsappAuth" WHERE id = $1', [id])
+    } else {
+      await pool.query(
+        `INSERT INTO "WhatsappAuth" (id, data, "updatedAt")
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (id) DO UPDATE SET data = $2, "updatedAt" = NOW()`,
+        [id, JSON.stringify(value)],
+      )
+    }
+  } catch (err) {
+    console.error('[db] write error:', err.message)
   }
 }
 
-// ─── Supabase-backed auth state ───────────────────────────────────────────────
-// Implements the Baileys AuthenticationState interface using Supabase rows.
-// Each credential or key is one row: id = 'creds' | 'key:{type}:{id}'
-
-const { BufferJSON } = await import('@whiskeysockets/baileys')
-
+// ─── Supabase-backed Baileys auth state ───────────────────────────────────────
 async function useSupabaseAuthState() {
   await dbEnsureTable()
 
-  // Load or initialise creds
-  let creds = await dbGet('creds')
-  if (!creds) {
-    const { initAuthCreds } = await import('@whiskeysockets/baileys')
-    creds = initAuthCreds()
-  }
+  // Load creds from DB or initialise fresh
+  const rawCreds = await dbGet('creds')
+  let creds = rawCreds
+    ? JSON.parse(JSON.stringify(rawCreds), BufferJSON.reviver)
+    : initAuthCreds()
 
-  // Persist creds on every update
   async function saveCreds() {
     await dbSet('creds', JSON.parse(JSON.stringify(creds, BufferJSON.replacer)))
   }
@@ -120,25 +93,24 @@ async function useSupabaseAuthState() {
       await Promise.all(
         ids.map(async (id) => {
           const raw = await dbGet(`key:${type}:${id}`)
-          result[id] = raw ? JSON.parse(JSON.stringify(raw), BufferJSON.reviver) : null
+          result[id] = raw
+            ? JSON.parse(JSON.stringify(raw), BufferJSON.reviver)
+            : null
         }),
       )
       return result
     },
-
     async set(data) {
-      const tasks = []
-      for (const [type, typeData] of Object.entries(data)) {
-        for (const [id, value] of Object.entries(typeData)) {
-          const dbId = `key:${type}:${id}`
-          if (value) {
-            tasks.push(dbSet(dbId, JSON.parse(JSON.stringify(value, BufferJSON.replacer))))
-          } else {
-            tasks.push(dbSet(dbId, null))
-          }
-        }
-      }
-      await Promise.all(tasks)
+      await Promise.all(
+        Object.entries(data).flatMap(([type, typeData]) =>
+          Object.entries(typeData).map(([id, value]) =>
+            dbSet(
+              `key:${type}:${id}`,
+              value ? JSON.parse(JSON.stringify(value, BufferJSON.replacer)) : null,
+            ),
+          ),
+        ),
+      )
     },
   }
 
@@ -146,27 +118,36 @@ async function useSupabaseAuthState() {
 }
 
 // ─── App state ────────────────────────────────────────────────────────────────
-
-let sock = null
-let qrData = null      // latest QR string (null when connected)
-let isReady = false    // true when WhatsApp is connected and ready
+let sock         = null
+let qrData       = null   // latest QR string
+let isReady      = false  // fully connected
+let isScanning   = false  // QR was scanned, waiting for auth to complete
+let startingUp   = true   // still initialising Baileys
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
-
 function requireSecret(req, res, next) {
   const secret = req.headers['x-bridge-secret'] ?? req.query.secret
-  if (!secret || secret !== BRIDGE_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
+  if (!secret || secret !== BRIDGE_SECRET) return res.status(401).json({ error: 'Unauthorized' })
   next()
 }
 
 // ─── WhatsApp client ──────────────────────────────────────────────────────────
-
-const logger = pino({ level: 'warn' })
+const logger = pino({ level: 'silent' }) // suppress Baileys internal logs
 
 async function startWA() {
-  const { version } = await fetchLatestBaileysVersion()
+  startingUp = true
+  isReady    = false
+  isScanning = false
+  qrData     = null
+
+  let version
+  try {
+    const result = await fetchLatestBaileysVersion()
+    version = result.version
+  } catch {
+    version = [2, 3000, 1023456789]
+  }
+
   const { state, saveCreds } = await useSupabaseAuthState()
 
   sock = makeWASocket({
@@ -176,67 +157,69 @@ async function startWA() {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
-    printQRInTerminal: true,   // also print in Render logs as fallback
     browser: ['Forgie', 'Chrome', '120.0.0'],
     markOnlineOnConnect: false,
     syncFullHistory: false,
+    connectTimeoutMs: 60_000,  // give it 60s to connect after QR scan
+    defaultQueryTimeoutMs: 30_000,
   })
 
-  // Persist credentials on every update
   sock.ev.on('creds.update', saveCreds)
 
-  // QR code generated — store for the /qr endpoint
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update
 
     if (qr) {
-      qrData = qr
-      isReady = false
-      console.log('[bridge] QR ready — open /qr in a browser to scan')
+      // New QR generated (valid for ~60s, Baileys auto-regenerates)
+      qrData     = qr
+      isReady    = false
+      isScanning = false
+      startingUp = false
+      console.log('[bridge] QR ready — open /qr to scan')
     }
 
-    if (connection === 'close') {
-      isReady = false
-      qrData = null
-      const shouldReconnect =
-        new Boom(lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut
-
-      console.log('[bridge] Connection closed —', lastDisconnect?.error, '— reconnect:', shouldReconnect)
-
-      if (shouldReconnect) {
-        setTimeout(startWA, 5000)
-      } else {
-        console.log('[bridge] Logged out. Delete WhatsappAuth rows and restart to re-scan.')
+    if (connection === 'connecting') {
+      // QR was scanned — now authenticating
+      if (!isReady && !startingUp) {
+        isScanning = true
+        qrData     = null
+        console.log('[bridge] QR scanned — authenticating...')
       }
+      startingUp = false
     }
 
     if (connection === 'open') {
-      isReady = true
-      qrData = null
-      console.log('[bridge] ✅ WhatsApp connected as', sock.user?.id)
+      isReady    = true
+      isScanning = false
+      qrData     = null
+      startingUp = false
+      console.log('[bridge] ✅ Connected as', sock.user?.id?.split('@')[0])
+    }
+
+    if (connection === 'close') {
+      isReady    = false
+      isScanning = false
+      qrData     = null
+      const code = new Boom(lastDisconnect?.error)?.output?.statusCode
+      const shouldReconnect = code !== DisconnectReason.loggedOut
+      console.log('[bridge] Disconnected (code', code, ') — reconnect:', shouldReconnect)
+      if (shouldReconnect) setTimeout(startWA, 5000)
+      else console.log('[bridge] Logged out — delete WhatsappAuth rows to reset.')
     }
   })
 
   // Forward incoming messages to RIG FORGE
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return
-    if (!RIGFORGE_URL || !RIGFORGE_WA_SECRET) return
-
+    if (type !== 'notify' || !RIGFORGE_URL || !RIGFORGE_WA_SECRET) return
     for (const msg of messages) {
-      // Skip our own messages
       if (msg.key.fromMe) continue
-
       const body =
-        msg.message?.conversation ||
-        msg.message?.extendedTextMessage?.text ||
-        ''
-      if (!body) continue
-
-      const from      = msg.key.remoteJid ?? ''
-      const isGroup   = isJidGroup(from)
-      const pushName  = msg.pushName ?? ''
-      const sender    = isGroup ? (msg.key.participant ?? '') : from
-
+        msg.message?.conversation ??
+        msg.message?.extendedTextMessage?.text ?? ''
+      if (!body.trim()) continue
+      const from    = msg.key.remoteJid ?? ''
+      const isGroup = isJidGroup(from)
+      const sender  = isGroup ? (msg.key.participant ?? '') : from
       try {
         await fetch(`${RIGFORGE_URL}/api/whatsapp/incoming`, {
           method: 'POST',
@@ -245,160 +228,146 @@ async function startWA() {
             'x-wa-secret': RIGFORGE_WA_SECRET,
           },
           body: JSON.stringify({
-            from: sender,          // sender's JID (phone@c.us)
-            chatJid: from,         // chat JID (could be group@g.us)
-            body,
-            isGroup,
-            pushName,
+            from: sender, chatJid: from, body, isGroup,
+            pushName: msg.pushName ?? '',
             timestamp: msg.messageTimestamp,
           }),
         })
       } catch (err) {
-        console.error('[bridge] Failed to forward message to RIG FORGE:', err.message)
+        console.error('[bridge] Forward error:', err.message)
       }
     }
   })
+
+  await sock.waitForConnectionUpdate(() => false).catch(() => {})
 }
 
-// ─── Express server ───────────────────────────────────────────────────────────
-
+// ─── Express ──────────────────────────────────────────────────────────────────
 const app = express()
 app.use(express.json())
 
-// Health — used by UptimeRobot
-app.get('/health', (_req, res) => {
-  res.json({ ok: true, ready: isReady })
-})
+// Health — UptimeRobot target
+app.get('/health', (_req, res) => res.json({ ok: true, ready: isReady }))
 
-// QR code page — no auth, just open in a browser tab
+// QR page — no auth, just open in browser
 app.get('/qr', async (_req, res) => {
   if (isReady) {
-    return res.send(`
-      <!DOCTYPE html><html>
-      <head><title>Forgie WA</title></head>
-      <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#111;color:#fff;font-family:sans-serif">
-        <h2>✅ Forgie is connected to WhatsApp!</h2>
-        <p style="color:#888">Phone: ${sock?.user?.id?.split(':')[0] ?? 'unknown'}</p>
-      </body></html>
-    `)
+    return res.send(page('✅ Connected!',
+      `<h1 style="color:#4ade80">✅ Forgie is connected to WhatsApp</h1>
+       <p>Phone: <b>${sock?.user?.id?.split(':')[0] ?? 'unknown'}</b></p>
+       <p style="color:#666">You can close this tab.</p>`))
+  }
+
+  if (isScanning) {
+    return res.send(page('🔄 Connecting...', `
+      <h1>🔄 QR scanned — connecting...</h1>
+      <p>This can take up to 30 seconds. Page auto-refreshes.</p>
+      <div class="spinner"></div>`,
+      3)) // fast refresh while connecting
+  }
+
+  if (startingUp && !qrData) {
+    return res.send(page('⏳ Starting up...', `
+      <h1>⏳ Bridge is starting up...</h1>
+      <p>Baileys is initialising — QR will appear in ~10 seconds.</p>`,
+      3))
   }
 
   if (!qrData) {
-    return res.send(`
-      <!DOCTYPE html><html>
-      <head><title>Forgie WA QR</title><meta http-equiv="refresh" content="5"></head>
-      <body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#111;color:#fff;font-family:sans-serif">
-        <h2>⏳ Waiting for QR...</h2>
-        <p style="color:#888">Page auto-refreshes every 5s</p>
-      </body></html>
-    `)
+    return res.send(page('⏳ Waiting for QR...', `
+      <h1>⏳ Generating QR code...</h1>
+      <p>Please wait a few seconds.</p>`,
+      3))
   }
 
-  const qrImage = await QRCode.toDataURL(qrData)
-  res.send(`
-    <!DOCTYPE html><html>
-    <head>
-      <title>Forgie WA QR</title>
-      <meta http-equiv="refresh" content="30">
-      <style>
-        body{display:flex;flex-direction:column;align-items:center;justify-content:center;
-             min-height:100vh;background:#111;color:#fff;font-family:sans-serif;text-align:center}
-        img{border:8px solid white;border-radius:12px;margin:24px 0}
-        p{color:#aaa;margin:8px 0}
-      </style>
-    </head>
-    <body>
-      <h1>🤖 Scan to connect Forgie</h1>
-      <img src="${qrImage}" width="280" height="280" />
-      <p>Open WhatsApp on the Forgie phone</p>
-      <p>→ <b>Settings → Linked Devices → Link a Device</b></p>
-      <p style="color:#666;font-size:12px;margin-top:16px">QR expires in ~60s — page auto-refreshes every 30s</p>
-    </body>
-    </html>
-  `)
+  const qrImage = await QRCode.toDataURL(qrData, { width: 300, margin: 2 })
+  return res.send(page('📱 Scan QR', `
+    <h1>📱 Scan to connect Forgie</h1>
+    <img src="${qrImage}" width="300" height="300" style="border:8px solid white;border-radius:12px;margin:24px 0"/>
+    <div>
+      <p><b>On the Forgie WhatsApp phone:</b></p>
+      <p>Settings → Linked Devices → Link a Device → Scan this code</p>
+    </div>
+    <p style="color:#666;font-size:13px;margin-top:20px">
+      QR valid for ~60s — page auto-refreshes with a new one if it expires.<br>
+      After scanning, wait up to 30 seconds for the connection to complete.
+    </p>`,
+    20)) // 20s refresh — QR valid for 60s so 3 refreshes before it expires
 })
 
 // Status
-app.get('/status', requireSecret, (_req, res) => {
-  res.json({
-    ready: isReady,
-    hasQR: !!qrData,
-    phone: sock?.user?.id?.split(':')[0] ?? null,
-  })
-})
+app.get('/status', requireSecret, (_req, res) => res.json({
+  ready: isReady, scanning: isScanning, startingUp,
+  hasQR: !!qrData, phone: sock?.user?.id?.split(':')[0] ?? null,
+}))
 
-// Send a message
-// Body: { to: "+91XXXXXXXXXX" | "XXXXXXXXXX@g.us", message: "text" }
+// Send message — { to: "+91XXXXXXXXXX" | "XXXXXXXXXX@g.us", message: "..." }
 app.post('/send', requireSecret, async (req, res) => {
   if (!isReady) return res.status(503).json({ error: 'WhatsApp not connected' })
-
   const { to, message } = req.body
   if (!to || !message) return res.status(400).json({ error: '"to" and "message" required' })
-
   try {
-    // Normalise number → JID
-    // Already a JID (group or contact): use as-is
-    // Raw number like +919876543210: strip + and add @c.us
     const jid = to.includes('@') ? to : `${to.replace(/\D/g, '')}@c.us`
     await sock.sendMessage(jid, { text: message })
     res.json({ ok: true, to: jid })
   } catch (err) {
-    console.error('[bridge] Send error:', err)
+    console.error('[bridge] Send error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
 
-// Create a WhatsApp group
-// Body: { name: "Group name", participants: ["+91...", "+91..."] }
+// Create group — { name: "...", participants: ["+91...", ...] }
 app.post('/create-group', requireSecret, async (req, res) => {
   if (!isReady) return res.status(503).json({ error: 'WhatsApp not connected' })
-
   const { name, participants } = req.body
-  if (!name || !Array.isArray(participants) || participants.length === 0) {
-    return res.status(400).json({ error: '"name" and "participants" array required' })
-  }
-
+  if (!name || !Array.isArray(participants) || !participants.length)
+    return res.status(400).json({ error: '"name" and "participants" required' })
   try {
-    const jids = participants.map((p) =>
-      p.includes('@') ? p : `${p.replace(/\D/g, '')}@c.us`,
-    )
+    const jids = participants.map(p => p.includes('@') ? p : `${p.replace(/\D/g, '')}@c.us`)
     const result = await sock.groupCreate(name, jids)
     res.json({ ok: true, groupId: result.id, name })
   } catch (err) {
-    console.error('[bridge] Create group error:', err)
+    console.error('[bridge] Create group error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
 
-// List all groups the bot is in
+// List groups
 app.get('/groups', requireSecret, async (_req, res) => {
   if (!isReady) return res.status(503).json({ error: 'WhatsApp not connected' })
-
   try {
-    // Baileys doesn't have a direct "list groups" API — we get chats and filter
-    // Note: this may return an incomplete list if chats haven't been loaded yet.
-    // For a fresh session, ask users to send a message first to populate chats.
     const chats = await sock.groupFetchAllParticipating()
     const groups = Object.entries(chats).map(([jid, meta]) => ({
-      id: jid,
-      name: meta.subject,
-      participants: meta.participants?.length ?? 0,
+      id: jid, name: meta.subject, participants: meta.participants?.length ?? 0,
     }))
     res.json({ groups })
   } catch (err) {
-    console.error('[bridge] List groups error:', err)
     res.status(500).json({ error: err.message })
   }
 })
 
+// ─── HTML page helper ─────────────────────────────────────────────────────────
+function page(title, body, refreshSec = 20) {
+  return `<!DOCTYPE html><html>
+  <head>
+    <title>Forgie WA — ${title}</title>
+    <meta http-equiv="refresh" content="${refreshSec}">
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{display:flex;flex-direction:column;align-items:center;justify-content:center;
+           min-height:100vh;background:#0d0d0d;color:#fff;font-family:system-ui,sans-serif;
+           text-align:center;padding:24px}
+      h1{font-size:1.6rem;margin-bottom:12px}
+      p{color:#aaa;line-height:1.6;margin:6px 0}
+      b{color:#fff}
+      .spinner{width:40px;height:40px;border:4px solid #333;border-top-color:#4ade80;
+               border-radius:50%;animation:spin 0.8s linear infinite;margin:24px auto}
+      @keyframes spin{to{transform:rotate(360deg)}}
+    </style>
+  </head>
+  <body>${body}</body></html>`
+}
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
-
-app.listen(PORT, () => {
-  console.log(`[bridge] Forgie WhatsApp Bridge on port ${PORT}`)
-  console.log(`[bridge] QR page: http://localhost:${PORT}/qr`)
-})
-
-startWA().catch((err) => {
-  console.error('[bridge] Fatal:', err)
-  process.exit(1)
-})
+app.listen(PORT, () => console.log(`[bridge] Running on port ${PORT}`))
+startWA().catch(err => { console.error('[bridge] Fatal:', err); process.exit(1) })
