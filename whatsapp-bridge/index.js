@@ -1,7 +1,6 @@
 /**
- * Forgie WhatsApp Bridge
- * Lightweight Node.js service — Baileys (WebSocket, no Puppeteer), ~80MB RAM.
- * Session persisted in Supabase so it survives Render restarts.
+ * Forgie WhatsApp Bridge — Baileys + Supabase-backed session.
+ * In-memory auth cache with async DB persistence (avoids handshake timeouts).
  */
 
 import express from 'express'
@@ -31,7 +30,7 @@ const RIGFORGE_WA_SECRET = process.env.RIGFORGE_WA_SECRET
 if (!BRIDGE_SECRET) { console.error('BRIDGE_SECRET required'); process.exit(1) }
 if (!DATABASE_URL)  { console.error('DATABASE_URL required');  process.exit(1) }
 
-// ─── Postgres (Supabase) ──────────────────────────────────────────────────────
+// ─── Postgres (Supabase) — for persistence only ───────────────────────────────
 const pool = new Pool({
   connectionString: DATABASE_URL,
   ssl: { rejectUnauthorized: false },
@@ -48,69 +47,110 @@ async function dbEnsureTable() {
   `)
 }
 
-async function dbGet(id) {
-  try {
-    const { rows } = await pool.query('SELECT data FROM "WhatsappAuth" WHERE id = $1', [id])
-    if (!rows[0]) return null
-    return JSON.parse(rows[0].data)
-  } catch { return null }
+async function dbLoadAll() {
+  const { rows } = await pool.query('SELECT id, data FROM "WhatsappAuth"')
+  const map = new Map()
+  for (const r of rows) {
+    try { map.set(r.id, JSON.parse(r.data)) } catch {}
+  }
+  return map
 }
 
-async function dbSet(id, value) {
-  try {
-    if (value === null || value === undefined) {
-      await pool.query('DELETE FROM "WhatsappAuth" WHERE id = $1', [id])
-    } else {
-      await pool.query(
-        `INSERT INTO "WhatsappAuth" (id, data, "updatedAt")
-         VALUES ($1, $2, NOW())
-         ON CONFLICT (id) DO UPDATE SET data = $2, "updatedAt" = NOW()`,
-        [id, JSON.stringify(value)],
-      )
-    }
-  } catch (err) {
-    console.error('[db] write error:', err.message)
+async function dbWrite(id, value) {
+  if (value === null || value === undefined) {
+    await pool.query('DELETE FROM "WhatsappAuth" WHERE id = $1', [id])
+  } else {
+    await pool.query(
+      `INSERT INTO "WhatsappAuth" (id, data, "updatedAt")
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (id) DO UPDATE SET data = $2, "updatedAt" = NOW()`,
+      [id, JSON.stringify(value)],
+    )
   }
 }
 
-// ─── Supabase-backed Baileys auth state ───────────────────────────────────────
-async function useSupabaseAuthState() {
-  await dbEnsureTable()
+// ─── In-memory auth state with async persistence ──────────────────────────────
+// CRITICAL: Baileys's signal protocol makes many rapid key reads/writes during
+// the QR-scan auth handshake. If every operation hits Supabase synchronously,
+// each round-trip (50-200ms) accumulates and WhatsApp's auth times out before
+// we can complete the handshake. Solution: keep everything in memory, persist
+// to DB in the background.
 
-  // Load creds from DB or initialise fresh
-  const rawCreds = await dbGet('creds')
-  let creds = rawCreds
+const memCache = new Map()   // id → parsed value
+const dirty    = new Set()   // ids that need flushing
+let flushInFlight = false
+
+async function loadCacheFromDB() {
+  const all = await dbLoadAll()
+  memCache.clear()
+  for (const [id, value] of all) memCache.set(id, value)
+  console.log(`[bridge] loaded ${memCache.size} auth rows from Supabase`)
+}
+
+async function flushDirty() {
+  if (flushInFlight || dirty.size === 0) return
+  flushInFlight = true
+  const ids = Array.from(dirty)
+  dirty.clear()
+  try {
+    await Promise.all(ids.map(id => dbWrite(id, memCache.has(id) ? memCache.get(id) : null)))
+  } catch (err) {
+    console.error('[bridge] flush error:', err.message)
+    for (const id of ids) dirty.add(id) // retry next tick
+  } finally {
+    flushInFlight = false
+  }
+}
+
+setInterval(flushDirty, 2_000)
+
+function memGet(id) {
+  return memCache.get(id) ?? null
+}
+
+function memSet(id, value) {
+  if (value === null || value === undefined) {
+    memCache.delete(id)
+  } else {
+    memCache.set(id, value)
+  }
+  dirty.add(id)
+}
+
+async function useInMemoryAuthState() {
+  await dbEnsureTable()
+  await loadCacheFromDB()
+
+  // Load or initialise creds
+  const rawCreds = memGet('creds')
+  const creds = rawCreds
     ? JSON.parse(JSON.stringify(rawCreds), BufferJSON.reviver)
     : initAuthCreds()
 
   async function saveCreds() {
-    await dbSet('creds', JSON.parse(JSON.stringify(creds, BufferJSON.replacer)))
+    memSet('creds', JSON.parse(JSON.stringify(creds, BufferJSON.replacer)))
   }
 
   const keys = {
     async get(type, ids) {
       const result = {}
-      await Promise.all(
-        ids.map(async (id) => {
-          const raw = await dbGet(`key:${type}:${id}`)
-          result[id] = raw
-            ? JSON.parse(JSON.stringify(raw), BufferJSON.reviver)
-            : null
-        }),
-      )
+      for (const id of ids) {
+        const raw = memGet(`key:${type}:${id}`)
+        result[id] = raw
+          ? JSON.parse(JSON.stringify(raw), BufferJSON.reviver)
+          : null
+      }
       return result
     },
     async set(data) {
-      await Promise.all(
-        Object.entries(data).flatMap(([type, typeData]) =>
-          Object.entries(typeData).map(([id, value]) =>
-            dbSet(
-              `key:${type}:${id}`,
-              value ? JSON.parse(JSON.stringify(value, BufferJSON.replacer)) : null,
-            ),
-          ),
-        ),
-      )
+      for (const [type, typeData] of Object.entries(data)) {
+        for (const [id, value] of Object.entries(typeData)) {
+          memSet(
+            `key:${type}:${id}`,
+            value ? JSON.parse(JSON.stringify(value, BufferJSON.replacer)) : null,
+          )
+        }
+      }
     },
   }
 
@@ -119,10 +159,18 @@ async function useSupabaseAuthState() {
 
 // ─── App state ────────────────────────────────────────────────────────────────
 let sock         = null
-let qrData       = null   // latest QR string
-let isReady      = false  // fully connected
-let isScanning   = false  // QR was scanned, waiting for auth to complete
-let startingUp   = true   // still initialising Baileys
+let qrData       = null
+let isReady      = false
+let isScanning   = false
+let startingUp   = true
+const events     = []   // ring buffer of recent connection events for /debug
+
+function logEvent(msg) {
+  const stamp = new Date().toISOString()
+  console.log(`[bridge] ${stamp} ${msg}`)
+  events.push({ at: stamp, msg })
+  if (events.length > 50) events.shift()
+}
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 function requireSecret(req, res, next) {
@@ -132,23 +180,26 @@ function requireSecret(req, res, next) {
 }
 
 // ─── WhatsApp client ──────────────────────────────────────────────────────────
-const logger = pino({ level: 'silent' }) // suppress Baileys internal logs
+const logger = pino({ level: 'silent' })
 
 async function startWA() {
   startingUp = true
   isReady    = false
   isScanning = false
   qrData     = null
+  logEvent('startWA() — initialising')
 
   let version
   try {
     const result = await fetchLatestBaileysVersion()
     version = result.version
+    logEvent(`Baileys version: ${version.join('.')}`)
   } catch {
     version = [2, 3000, 1023456789]
+    logEvent('Using fallback Baileys version')
   }
 
-  const { state, saveCreds } = await useSupabaseAuthState()
+  const { state, saveCreds } = await useInMemoryAuthState()
 
   sock = makeWASocket({
     version,
@@ -160,8 +211,9 @@ async function startWA() {
     browser: ['Forgie', 'Chrome', '120.0.0'],
     markOnlineOnConnect: false,
     syncFullHistory: false,
-    connectTimeoutMs: 60_000,  // give it 60s to connect after QR scan
-    defaultQueryTimeoutMs: 30_000,
+    connectTimeoutMs: 60_000,
+    defaultQueryTimeoutMs: 60_000,
+    keepAliveIntervalMs: 25_000,
   })
 
   sock.ev.on('creds.update', saveCreds)
@@ -170,26 +222,22 @@ async function startWA() {
     const { connection, lastDisconnect, qr } = update
 
     if (qr) {
-      // New QR generated (valid for ~60s, Baileys auto-regenerates)
       qrData     = qr
       isReady    = false
       isScanning = false
       startingUp = false
-      console.log('[bridge] QR ready — open /qr to scan')
+      logEvent('QR ready')
     }
 
     if (connection === 'connecting') {
-      // 'connecting' fires both on initial startup AND after a QR is scanned.
-      // We distinguish: if we previously had a QR (qrData was set) and it's
-      // now being cleared, that means the QR was used → scanning state.
-      // Otherwise it's just the initial connect — stay in startingUp.
       if (qrData !== null) {
         isScanning = true
         qrData     = null
         startingUp = false
-        console.log('[bridge] QR scanned — authenticating...')
+        logEvent('QR scanned — authenticating')
+      } else if (!isReady) {
+        logEvent('connecting (initial)')
       }
-      // else: still starting up, leave startingUp = true
     }
 
     if (connection === 'open') {
@@ -197,7 +245,9 @@ async function startWA() {
       isScanning = false
       qrData     = null
       startingUp = false
-      console.log('[bridge] ✅ Connected as', sock.user?.id?.split('@')[0])
+      // Ensure latest creds are flushed immediately on successful auth.
+      await flushDirty()
+      logEvent(`✅ Connected as ${sock.user?.id?.split('@')[0] ?? '?'}`)
     }
 
     if (connection === 'close') {
@@ -205,10 +255,11 @@ async function startWA() {
       isScanning = false
       qrData     = null
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode
+      const reason = lastDisconnect?.error?.message ?? 'unknown'
       const shouldReconnect = code !== DisconnectReason.loggedOut
-      console.log('[bridge] Disconnected (code', code, ') — reconnect:', shouldReconnect)
+      logEvent(`✗ closed code=${code} reason="${reason}" reconnect=${shouldReconnect}`)
       if (shouldReconnect) setTimeout(startWA, 5000)
-      else console.log('[bridge] Logged out — delete WhatsappAuth rows to reset.')
+      else logEvent('Logged out — hit /reset to clear state')
     }
   })
 
@@ -238,88 +289,69 @@ async function startWA() {
           }),
         })
       } catch (err) {
-        console.error('[bridge] Forward error:', err.message)
+        logEvent(`Forward error: ${err.message}`)
       }
     }
   })
-
-  // Stuck-state watchdog: if we've had stored creds but never get a QR
-  // and never connect within 25s, the saved session is bad — wipe it
-  // and force a fresh start. Prevents the "Generating QR..." dead state.
-  setTimeout(async () => {
-    if (!isReady && !qrData && !isScanning) {
-      console.log('[bridge] Stuck after 25s — wiping auth and restarting')
-      try { await pool.query('DELETE FROM "WhatsappAuth"') } catch {}
-      try { sock?.end?.(new Error('stuck')) } catch {}
-      setTimeout(() => startWA().catch(() => {}), 1000)
-    }
-  }, 25_000)
-
-  await sock.waitForConnectionUpdate(() => false).catch(() => {})
 }
 
 // ─── Express ──────────────────────────────────────────────────────────────────
 const app = express()
 app.use(express.json())
 
-// Health — UptimeRobot target
 app.get('/health', (_req, res) => res.json({ ok: true, ready: isReady }))
 
-// Reset — nukes the auth state and restarts. Use when stuck after a half-
-// completed scan: Baileys saves partial creds, tries to reconnect with them
-// on next start, never generates a fresh QR. This wipes and starts over.
-// Hit it from a browser: /reset?secret=<BRIDGE_SECRET>
+// Debug — last events
+app.get('/debug', requireSecret, (_req, res) => res.json({
+  ready: isReady, scanning: isScanning, startingUp,
+  hasQR: !!qrData, cacheSize: memCache.size, dirtyCount: dirty.size,
+  phone: sock?.user?.id?.split(':')[0] ?? null,
+  events: events.slice(-30),
+}))
+
+// Reset — wipe auth + restart
 app.get('/reset', requireSecret, async (_req, res) => {
-  console.log('[bridge] /reset triggered — wiping auth state')
+  logEvent('/reset triggered — wiping auth')
   try {
     await pool.query('DELETE FROM "WhatsappAuth"')
-    console.log('[bridge] auth cleared — closing socket and restarting')
+    memCache.clear()
+    dirty.clear()
     try { sock?.end?.(new Error('reset')) } catch {}
-    sock       = null
-    qrData     = null
-    isReady    = false
-    isScanning = false
-    startingUp = true
-    setTimeout(() => startWA().catch(err => console.error('[bridge] restart err:', err)), 500)
+    sock = null
+    setTimeout(() => startWA().catch(err => logEvent(`restart err: ${err.message}`)), 500)
     res.send(page('🔄 Reset', `
       <h1>🔄 Auth wiped — restarting...</h1>
-      <p>Open <a href="/qr" style="color:#4ade80">/qr</a> in ~10 seconds for a fresh QR code.</p>`,
-      10))
+      <p>Open <a href="/qr" style="color:#4ade80">/qr</a> in ~10 seconds.</p>`, 10))
   } catch (err) {
-    console.error('[bridge] reset error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
 
-// QR page — no auth, just open in browser
 app.get('/qr', async (_req, res) => {
   if (isReady) {
-    return res.send(page('✅ Connected!',
+    return res.send(page('✅ Connected',
       `<h1 style="color:#4ade80">✅ Forgie is connected to WhatsApp</h1>
        <p>Phone: <b>${sock?.user?.id?.split(':')[0] ?? 'unknown'}</b></p>
        <p style="color:#666">You can close this tab.</p>`))
   }
 
   if (isScanning) {
-    return res.send(page('🔄 Connecting...', `
-      <h1>🔄 QR scanned — connecting...</h1>
-      <p>This can take up to 30 seconds. Page auto-refreshes.</p>
-      <div class="spinner"></div>`,
-      3)) // fast refresh while connecting
+    return res.send(page('🔄 Connecting...',
+      `<h1>🔄 QR scanned — connecting...</h1>
+       <p>Authenticating with WhatsApp servers. This can take up to 60 seconds.</p>
+       <div class="spinner"></div>`, 3))
   }
 
   if (startingUp && !qrData) {
-    return res.send(page('⏳ Starting up...', `
-      <h1>⏳ Bridge is starting up...</h1>
-      <p>Baileys is initialising — QR will appear in ~10 seconds.</p>`,
-      3))
+    return res.send(page('⏳ Starting up...',
+      `<h1>⏳ Bridge starting up...</h1>
+       <p>QR will appear in ~10 seconds.</p>`, 3))
   }
 
   if (!qrData) {
-    return res.send(page('⏳ Waiting for QR...', `
-      <h1>⏳ Generating QR code...</h1>
-      <p>Please wait a few seconds.</p>`,
-      3))
+    return res.send(page('⏳ Generating QR...',
+      `<h1>⏳ Generating QR code...</h1>
+       <p>Please wait a few seconds.</p>`, 3))
   }
 
   const qrImage = await QRCode.toDataURL(qrData, { width: 300, margin: 2 })
@@ -331,19 +363,16 @@ app.get('/qr', async (_req, res) => {
       <p>Settings → Linked Devices → Link a Device → Scan this code</p>
     </div>
     <p style="color:#666;font-size:13px;margin-top:20px">
-      QR valid for ~60s — page auto-refreshes with a new one if it expires.<br>
-      After scanning, wait up to 30 seconds for the connection to complete.
-    </p>`,
-    20)) // 20s refresh — QR valid for 60s so 3 refreshes before it expires
+      QR valid ~60s — page auto-refreshes with a new one if it expires.<br>
+      After scanning, wait up to 60 seconds for connection to complete.
+    </p>`, 20))
 })
 
-// Status
 app.get('/status', requireSecret, (_req, res) => res.json({
   ready: isReady, scanning: isScanning, startingUp,
   hasQR: !!qrData, phone: sock?.user?.id?.split(':')[0] ?? null,
 }))
 
-// Send message — { to: "+91XXXXXXXXXX" | "XXXXXXXXXX@g.us", message: "..." }
 app.post('/send', requireSecret, async (req, res) => {
   if (!isReady) return res.status(503).json({ error: 'WhatsApp not connected' })
   const { to, message } = req.body
@@ -353,12 +382,10 @@ app.post('/send', requireSecret, async (req, res) => {
     await sock.sendMessage(jid, { text: message })
     res.json({ ok: true, to: jid })
   } catch (err) {
-    console.error('[bridge] Send error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
 
-// Create group — { name: "...", participants: ["+91...", ...] }
 app.post('/create-group', requireSecret, async (req, res) => {
   if (!isReady) return res.status(503).json({ error: 'WhatsApp not connected' })
   const { name, participants } = req.body
@@ -369,12 +396,10 @@ app.post('/create-group', requireSecret, async (req, res) => {
     const result = await sock.groupCreate(name, jids)
     res.json({ ok: true, groupId: result.id, name })
   } catch (err) {
-    console.error('[bridge] Create group error:', err.message)
     res.status(500).json({ error: err.message })
   }
 })
 
-// List groups
 app.get('/groups', requireSecret, async (_req, res) => {
   if (!isReady) return res.status(503).json({ error: 'WhatsApp not connected' })
   try {
@@ -388,10 +413,9 @@ app.get('/groups', requireSecret, async (_req, res) => {
   }
 })
 
-// ─── HTML page helper ─────────────────────────────────────────────────────────
+// HTML page helper
 function page(title, body, refreshSec = 20) {
-  return `<!DOCTYPE html><html>
-  <head>
+  return `<!DOCTYPE html><html><head>
     <title>Forgie WA — ${title}</title>
     <meta http-equiv="refresh" content="${refreshSec}">
     <style>
@@ -406,10 +430,8 @@ function page(title, body, refreshSec = 20) {
                border-radius:50%;animation:spin 0.8s linear infinite;margin:24px auto}
       @keyframes spin{to{transform:rotate(360deg)}}
     </style>
-  </head>
-  <body>${body}</body></html>`
+  </head><body>${body}</body></html>`
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => console.log(`[bridge] Running on port ${PORT}`))
+app.listen(PORT, () => console.log(`[bridge] listening on ${PORT}`))
 startWA().catch(err => { console.error('[bridge] Fatal:', err); process.exit(1) })
