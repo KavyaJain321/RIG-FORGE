@@ -44,3 +44,8 @@ rig-team-google-test-users*.xlsx
 # Ad-hoc throwaway scripts that may hardcode passwords — keep out of git
 reset-test-users.mjs
 scripts/_*.mjs
+
+# WhatsApp bridge — auth files (contain session tokens, never commit)
+whatsapp-bridge/auth_info_multi/
+whatsapp-bridge/baileys_store.json
+whatsapp-bridge/.env

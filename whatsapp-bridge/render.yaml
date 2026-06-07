@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: forgie-whatsapp-bridge
+    runtime: node
+    plan: free
+    rootDir: whatsapp-bridge
+    buildCommand: npm install
+    startCommand: node index.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      # Set these in the Render dashboard (encrypted):
+      # BRIDGE_SECRET      — random secret shared with RIG FORGE
+      # DATABASE_URL       — same Supabase URL as RIG FORGE main app
+      # RIGFORGE_URL       — https://rig-forge.onrender.com
+      # RIGFORGE_WA_SECRET — secret for /api/whatsapp/incoming webhook
