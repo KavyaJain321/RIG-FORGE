@@ -179,13 +179,17 @@ async function startWA() {
     }
 
     if (connection === 'connecting') {
-      // QR was scanned — now authenticating
-      if (!isReady && !startingUp) {
+      // 'connecting' fires both on initial startup AND after a QR is scanned.
+      // We distinguish: if we previously had a QR (qrData was set) and it's
+      // now being cleared, that means the QR was used → scanning state.
+      // Otherwise it's just the initial connect — stay in startingUp.
+      if (qrData !== null) {
         isScanning = true
         qrData     = null
+        startingUp = false
         console.log('[bridge] QR scanned — authenticating...')
       }
-      startingUp = false
+      // else: still starting up, leave startingUp = true
     }
 
     if (connection === 'open') {
@@ -239,6 +243,18 @@ async function startWA() {
     }
   })
 
+  // Stuck-state watchdog: if we've had stored creds but never get a QR
+  // and never connect within 25s, the saved session is bad — wipe it
+  // and force a fresh start. Prevents the "Generating QR..." dead state.
+  setTimeout(async () => {
+    if (!isReady && !qrData && !isScanning) {
+      console.log('[bridge] Stuck after 25s — wiping auth and restarting')
+      try { await pool.query('DELETE FROM "WhatsappAuth"') } catch {}
+      try { sock?.end?.(new Error('stuck')) } catch {}
+      setTimeout(() => startWA().catch(() => {}), 1000)
+    }
+  }, 25_000)
+
   await sock.waitForConnectionUpdate(() => false).catch(() => {})
 }
 
@@ -248,6 +264,32 @@ app.use(express.json())
 
 // Health — UptimeRobot target
 app.get('/health', (_req, res) => res.json({ ok: true, ready: isReady }))
+
+// Reset — nukes the auth state and restarts. Use when stuck after a half-
+// completed scan: Baileys saves partial creds, tries to reconnect with them
+// on next start, never generates a fresh QR. This wipes and starts over.
+// Hit it from a browser: /reset?secret=<BRIDGE_SECRET>
+app.get('/reset', requireSecret, async (_req, res) => {
+  console.log('[bridge] /reset triggered — wiping auth state')
+  try {
+    await pool.query('DELETE FROM "WhatsappAuth"')
+    console.log('[bridge] auth cleared — closing socket and restarting')
+    try { sock?.end?.(new Error('reset')) } catch {}
+    sock       = null
+    qrData     = null
+    isReady    = false
+    isScanning = false
+    startingUp = true
+    setTimeout(() => startWA().catch(err => console.error('[bridge] restart err:', err)), 500)
+    res.send(page('🔄 Reset', `
+      <h1>🔄 Auth wiped — restarting...</h1>
+      <p>Open <a href="/qr" style="color:#4ade80">/qr</a> in ~10 seconds for a fresh QR code.</p>`,
+      10))
+  } catch (err) {
+    console.error('[bridge] reset error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
 
 // QR page — no auth, just open in browser
 app.get('/qr', async (_req, res) => {
