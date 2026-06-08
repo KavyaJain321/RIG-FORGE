@@ -28,9 +28,38 @@ interface DailyLogEntry {
 
 export interface ProfileResponse {
   user: AuthUser
+  whatsappNumber: string | null
   projects: ProjectEntry[]
   activityThisWeek: ActivityEntry[]
   dailyLogsThisWeek: DailyLogEntry[]
+}
+
+// Accepts loose input (with spaces / dashes / parens, optional + prefix,
+// or a bare 10-digit Indian number) and returns canonical E.164 like
+// "+919876543210". Throws on garbage. Empty string → null.
+function normalizeWhatsappNumber(input: string): string | null {
+  const trimmed = input.trim()
+  if (!trimmed) return null
+
+  const hasPlus = trimmed.startsWith('+')
+  const digits = trimmed.replace(/\D/g, '')
+
+  if (!digits) {
+    throw new Error('WhatsApp number must contain digits')
+  }
+
+  // Bare 10 digits → assume India (matches the bridge's normaliseRecipient).
+  if (!hasPlus && digits.length === 10) return `+91${digits}`
+
+  // 12 digits starting with 91 → India, just add the +.
+  if (!hasPlus && digits.length === 12 && digits.startsWith('91')) return `+${digits}`
+
+  // E.164 allows 7–15 digits after the +.
+  if (digits.length >= 10 && digits.length <= 15) return `+${digits}`
+
+  throw new Error(
+    'Use E.164 format (e.g. +919876543210) or a 10-digit Indian number',
+  )
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -63,8 +92,16 @@ export async function PATCH(request: NextRequest) {
     const claims = verifyToken(token)
     if (!claims) return errorResponse('Invalid or expired token', 401)
 
-    const body = await request.json() as { name?: string; avatarUrl?: string }
-    const updateData: { name?: string; avatarUrl?: string } = {}
+    const body = (await request.json()) as {
+      name?: string
+      avatarUrl?: string
+      whatsappNumber?: string | null
+    }
+    const updateData: {
+      name?: string
+      avatarUrl?: string
+      whatsappNumber?: string | null
+    } = {}
 
     if (body.name !== undefined) {
       const name = String(body.name).trim()
@@ -73,6 +110,19 @@ export async function PATCH(request: NextRequest) {
     }
     if (body.avatarUrl !== undefined) {
       updateData.avatarUrl = body.avatarUrl ?? undefined
+    }
+    if (body.whatsappNumber !== undefined) {
+      // null or empty string both clear the field
+      if (body.whatsappNumber === null || body.whatsappNumber === '') {
+        updateData.whatsappNumber = null
+      } else {
+        try {
+          updateData.whatsappNumber = normalizeWhatsappNumber(String(body.whatsappNumber))
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Invalid WhatsApp number'
+          return errorResponse(message, 400)
+        }
+      }
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -140,6 +190,7 @@ export async function GET(request: NextRequest) {
           isOnboarding: true,
           mustChangePassword: true,
           createdAt: true,
+          whatsappNumber: true,
         },
       }),
       prisma.projectMember.findMany({
@@ -204,6 +255,7 @@ export async function GET(request: NextRequest) {
 
     const response: ProfileResponse = {
       user,
+      whatsappNumber: userRecord.whatsappNumber ?? null,
       projects,
       activityThisWeek,
       dailyLogsThisWeek,
