@@ -316,9 +316,19 @@ enum AssistantMessageRole {
   TOOL
 }
 
+// Where a Forgie conversation originated. WEB is the in-app chat; WHATSAPP
+// is the inbound WA flow handled by /api/whatsapp/incoming. Used to keep
+// WA conversations separate from web ones in the history sidebar and to
+// gate behaviour (e.g. WA replies are short-form, no proposal cards).
+enum AssistantChannel {
+  WEB
+  WHATSAPP
+}
+
 model AssistantConversation {
   id        String   @id @default(cuid())
   userId    String
+  channel   AssistantChannel @default(WEB)
   title     String?  // auto-summarized after first exchange, null until then
   isPinned  Boolean  @default(false)
   isArchived Boolean @default(false)
@@ -331,6 +341,7 @@ model AssistantConversation {
 
   @@index([userId])
   @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, channel])
 }
 
 model AssistantMessage {
