@@ -761,6 +761,64 @@ function buildWhatsappTools(): ToolSet {
         args: input,
       }),
     }),
+
+    propose_wa_remove_participants: tool({
+      description: [
+        'Propose removing one or more participants from a WhatsApp group.',
+        'NOT REMOVED until the user taps Confirm. Forgie must be an admin',
+        'of that group for the removal to actually succeed; if Forgie',
+        'isn\'t admin, the operation will fail at the bridge with a 403',
+        'and the user will see the failure.',
+        '',
+        'RESOLUTION RULES — read carefully:',
+        '  1. groupJid MUST end with "@g.us". Get it from wa_list_groups',
+        '     by matching the group name the user mentioned. DO NOT invent.',
+        '  2. participants: for each teammate the user names, call',
+        '     get_member(name) and use the returned whatsappNumber. If any',
+        '     whatsappNumber is null, list who is missing and ASK the user',
+        '     before proposing — do NOT silently skip them.',
+        '  3. If the user supplies a literal phone number, pass it through.',
+        '',
+        'Because this is destructive and affects other people, your text',
+        'reply BEFORE the card should restate exactly who will be removed',
+        'from which group, so the user can sanity-check before confirming.',
+      ].join('\n'),
+      inputSchema: z.object({
+        groupJid: z.string().min(1).describe('Group JID ending in @g.us'),
+        participants: z.array(z.string().min(3)).min(1)
+          .describe('One or more E.164 numbers / 10-digit Indian numbers / JIDs'),
+      }),
+      execute: async (input) => ({
+        proposed: true,
+        action: 'wa_remove_participants',
+        args: input,
+      }),
+    }),
+
+    propose_wa_leave_group: tool({
+      description: [
+        'Propose having Forgie LEAVE a WhatsApp group. NOT LEFT until the',
+        'user taps Confirm.',
+        '',
+        'IMPORTANT — WhatsApp has no "delete group" action. The closest',
+        'equivalent is Forgie leaving: the group will continue to exist',
+        'for remaining members, but Forgie will no longer be in it and',
+        'admins won\'t be able to send to it via Forgie anymore. If the',
+        'user says "delete the X group", interpret it as "leave" and SAY',
+        'SO in your text reply BEFORE the card, so they know what they\'re',
+        'really about to do.',
+        '',
+        'groupJid resolution: look up via wa_list_groups by name. Never invent.',
+      ].join('\n'),
+      inputSchema: z.object({
+        groupJid: z.string().min(1).describe('Group JID ending in @g.us'),
+      }),
+      execute: async (input) => ({
+        proposed: true,
+        action: 'wa_leave_group',
+        args: input,
+      }),
+    }),
   }
 }
 
@@ -879,6 +937,21 @@ Workflow for "make a WhatsApp group with <names>":
 Workflow for "post in the <X> group on WhatsApp":
 1. wa_list_groups → find the group JID by name.
 2. propose_wa_send_message with to=<group JID>.
+
+Workflow for "remove <name> from the <X> group":
+1. wa_list_groups → find the X group's JID.
+2. get_member(<name>) → take their whatsappNumber. If null, STOP and
+   tell the user — do not propose with a missing/guessed number.
+3. propose_wa_remove_participants(groupJid, [whatsappNumber]).
+4. Forgie must already be a group admin for the remove to succeed; if
+   not, the action will fail at execute time with a clear error.
+
+Workflow for "delete / leave the <X> group" (these are the same thing
+in WhatsApp — there is NO real delete; you can only leave):
+1. wa_list_groups → find the X group's JID.
+2. In your text reply, restate: "WhatsApp has no delete — I'll leave
+   the group instead, it'll keep existing for the other members."
+3. propose_wa_leave_group(groupJid).
 
 If the user asks "is WhatsApp connected?" — call wa_bridge_status.
 

@@ -433,6 +433,53 @@ app.get('/groups', requireSecret, async (_req, res) => {
   }
 })
 
+// Remove one or more participants from a group. Forgie must be an admin
+// of the group for this to actually work — WhatsApp returns 403 otherwise.
+// Body: { groupJid: "...@g.us", participants: ["91XXXXXXXXXX", ...] }
+app.post('/remove-participants', requireSecret, async (req, res) => {
+  if (!isReady) return res.status(503).json({ error: 'WhatsApp not connected' })
+  const { groupJid, participants } = req.body
+  if (typeof groupJid !== 'string' || !groupJid.endsWith('@g.us')) {
+    return res.status(400).json({ error: '"groupJid" must be a group JID ending in @g.us' })
+  }
+  if (!Array.isArray(participants) || participants.length === 0) {
+    return res.status(400).json({ error: '"participants" must be a non-empty array' })
+  }
+  try {
+    const jids = participants.map((p) =>
+      typeof p === 'string' && p.includes('@')
+        ? p
+        : `${String(p).replace(/\D/g, '')}@s.whatsapp.net`,
+    )
+    const result = await sock.groupParticipantsUpdate(groupJid, jids, 'remove')
+    // Baileys returns an array of { jid, status }. Surface failures so the
+    // caller can tell which numbers actually got removed.
+    const removed = result.filter((r) => r.status === '200').map((r) => r.jid)
+    const failed  = result.filter((r) => r.status !== '200').map((r) => ({ jid: r.jid, status: r.status }))
+    res.json({ ok: true, groupJid, removed, failed })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Leave a group. WhatsApp has no "delete group" — leaving is the closest
+// equivalent. Group continues to exist for remaining members. If Forgie
+// is the only admin, others may be promoted automatically.
+// Body: { groupJid: "...@g.us" }
+app.post('/leave-group', requireSecret, async (req, res) => {
+  if (!isReady) return res.status(503).json({ error: 'WhatsApp not connected' })
+  const { groupJid } = req.body
+  if (typeof groupJid !== 'string' || !groupJid.endsWith('@g.us')) {
+    return res.status(400).json({ error: '"groupJid" must be a group JID ending in @g.us' })
+  }
+  try {
+    await sock.groupLeave(groupJid)
+    res.json({ ok: true, groupJid, left: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // HTML page helper. Instead of meta-refresh (which had a multi-second blind
 // window after the user scanned the QR), pages poll the public /state endpoint
 // and reload the instant the state key changes. Pass `snapshot` so the client

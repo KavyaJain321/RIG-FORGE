@@ -19,6 +19,8 @@ import {
   sendWhatsappMessage,
   createWhatsappGroup,
   listWhatsappGroups,
+  removeWhatsappParticipants,
+  leaveWhatsappGroup,
 } from '@/lib/whatsapp/bridge'
 
 export { isWhatsAppEnabled }
@@ -70,4 +72,21 @@ export interface CreateGroupArgs {
 
 export async function createGroup(args: CreateGroupArgs) {
   return createWhatsappGroup(args)
+}
+
+export interface RemoveParticipantsArgs {
+  groupJid: string         // must end with @g.us
+  participants: string[]   // E.164 digits or JIDs
+}
+
+export async function removeParticipants(args: RemoveParticipantsArgs) {
+  return removeWhatsappParticipants(args)
+}
+
+export interface LeaveGroupArgs {
+  groupJid: string
+}
+
+export async function leaveGroup(args: LeaveGroupArgs) {
+  return leaveWhatsappGroup(args)
 }

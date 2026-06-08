@@ -79,3 +79,26 @@ export async function listWhatsappGroups() {
     groups: Array<{ id: string; name: string; participants: number }>
   }>
 }
+
+export async function removeWhatsappParticipants(args: {
+  groupJid: string
+  participants: string[]
+}) {
+  return bridge('POST', '/remove-participants', {
+    groupJid: args.groupJid,
+    participants: args.participants.map(normaliseRecipient),
+  }) as Promise<{
+    ok: boolean
+    groupJid: string
+    removed: string[]
+    failed: Array<{ jid: string; status: string }>
+  }>
+}
+
+// Forgie has no real "delete group" — leaving is the closest WhatsApp
+// equivalent (the group continues to exist for remaining members).
+export async function leaveWhatsappGroup(args: { groupJid: string }) {
+  return bridge('POST', '/leave-group', {
+    groupJid: args.groupJid,
+  }) as Promise<{ ok: boolean; groupJid: string; left: boolean }>
+}

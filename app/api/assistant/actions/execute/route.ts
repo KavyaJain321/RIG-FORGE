@@ -42,6 +42,8 @@ import {
 import {
   sendMessage as waSendMessage,
   createGroup as waCreateGroup,
+  removeParticipants as waRemoveParticipants,
+  leaveGroup as waLeaveGroup,
   isWhatsAppEnabled,
 } from '@/lib/assistant/tools/whatsapp'
 
@@ -147,6 +149,19 @@ const WaCreateGroupArgs = z.object({
   participants: z.array(z.string().min(3)).min(1),
 })
 
+const WaRemoveParticipantsArgs = z.object({
+  groupJid: z.string().min(1).refine((s) => s.endsWith('@g.us'), {
+    message: 'groupJid must end with @g.us',
+  }),
+  participants: z.array(z.string().min(3)).min(1),
+})
+
+const WaLeaveGroupArgs = z.object({
+  groupJid: z.string().min(1).refine((s) => s.endsWith('@g.us'), {
+    message: 'groupJid must end with @g.us',
+  }),
+})
+
 const Body = z.object({
   conversationId: z.string().min(1).nullable().optional(),
   action: z.enum([
@@ -165,6 +180,8 @@ const Body = z.object({
     'set_project_lead',
     'wa_send_message',
     'wa_create_group',
+    'wa_remove_participants',
+    'wa_leave_group',
   ]),
   args: z.record(z.string(), z.unknown()),
 })
@@ -365,6 +382,34 @@ export async function POST(request: NextRequest) {
           throw new Error(`Invalid args for wa_create_group: ${a.error.issues[0]?.message ?? 'malformed'}`)
         }
         result = await waCreateGroup(a.data)
+        break
+      }
+      case 'wa_remove_participants': {
+        if (!isWhatsAppEnabled()) {
+          throw new Error('WhatsApp bridge is not configured on this server.')
+        }
+        if (!isAdminRole(caller.role)) {
+          throw new Error('Only admins can remove WhatsApp participants from Forgie.')
+        }
+        const a = WaRemoveParticipantsArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for wa_remove_participants: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await waRemoveParticipants(a.data)
+        break
+      }
+      case 'wa_leave_group': {
+        if (!isWhatsAppEnabled()) {
+          throw new Error('WhatsApp bridge is not configured on this server.')
+        }
+        if (!isAdminRole(caller.role)) {
+          throw new Error('Only admins can have Forgie leave WhatsApp groups.')
+        }
+        const a = WaLeaveGroupArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for wa_leave_group: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await waLeaveGroup(a.data)
         break
       }
     }
