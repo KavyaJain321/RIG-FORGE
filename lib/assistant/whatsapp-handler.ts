@@ -1,0 +1,284 @@
+/**
+ * Forgie WhatsApp inbound handler (P11.4).
+ *
+ * Receives a parsed incoming-message payload from the bridge and:
+ *   1. Resolves the sender to a User by matching whatsappNumber.
+ *   2. Decides whether to reply (DMs always; groups only when "forgie"
+ *      appears in the message).
+ *   3. Gets or creates a dedicated WHATSAPP-channel AssistantConversation
+ *      for that user so Forgie remembers context across WA messages.
+ *   4. Runs the same generate() pipeline as the web flow, but with:
+ *        - read-only tools (no propose_*, no Confirm UI in WhatsApp)
+ *        - a WhatsApp-formatting addendum on the system prompt
+ *   5. Sends the LLM's reply back over the bridge, with an
+ *      "AI-generated" disclaimer footer appended.
+ *
+ * Auth model: only users with a matching whatsappNumber in the DB get
+ * replies. Unknown senders are logged and silently ignored — we don't
+ * want random numbers triggering LLM spend.
+ */
+
+import type { Role, AssistantChannel } from '@prisma/client'
+import type { ModelMessage, ToolSet } from 'ai'
+
+import { prisma } from '@/lib/db'
+import { generate } from '@/lib/llm/generate'
+
+import { buildForgieContext, renderContextBlock } from './context'
+import { buildSystemPrompt } from './prompts'
+import { buildAllToolsAsync, TOOL_USE_GUIDANCE } from './ai-sdk-tools'
+import { checkRateLimit, recordUsage } from './rate-limit'
+import { sendWhatsappMessage } from '@/lib/whatsapp/bridge'
+
+const MAX_HISTORY_MESSAGES = 10
+
+// Italics in WhatsApp use _underscores_. Two newlines separates it from
+// the model's reply so it reads like a footer, not the last sentence.
+export const WA_DISCLAIMER =
+  '\n\n_This is an AI-generated reply and may contain mistakes — verify anything important._'
+
+// Appended to the system prompt so the model knows it's writing for
+// WhatsApp instead of the web chat UI.
+const WA_REPLY_GUIDANCE = `# WhatsApp reply format
+
+You are replying via WhatsApp, not the web app. Constraints:
+- Keep replies SHORT — 1-3 sentences whenever possible. People are on phones.
+- No markdown headers, no bullet lists, no code fences. Plain prose only.
+- Bold: *single asterisks*. Italic: _underscores_. Nothing else renders.
+- Don't write "Confirm to proceed" prompts — there is no Confirm UI here.
+- DO NOT call propose_* tools. If the user asks to create/edit/schedule
+  anything, tell them to do it in the web app at /dashboard. You can
+  still use READ tools (list_tasks, get_member, etc.) to answer questions.
+- An "AI-generated reply" disclaimer is auto-appended to your message —
+  don't add one yourself.`
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export interface IncomingWaMessage {
+  from: string        // sender JID — e.g. "919876543210@c.us"
+  chatJid: string     // chat JID — same as `from` for DMs, group JID for groups
+  body: string
+  isGroup: boolean
+  pushName: string
+  timestamp: number
+}
+
+export interface HandleResult {
+  processed: boolean       // did we send a reply?
+  reason: string           // 'replied' | 'unknown-sender' | 'group-not-mentioned' | 'rate-limited' | 'empty-body' | 'send-failed' | ...
+  conversationId?: string
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Bridge sends JIDs like "919876543210@c.us" — extract digits, return
+// E.164 form ("+919876543210") to match how whatsappNumber is stored.
+function jidToE164(jid: string): string | null {
+  const digits = jid.split('@')[0]?.replace(/\D/g, '') ?? ''
+  if (!digits || digits.length < 10) return null
+  return '+' + digits
+}
+
+// In a group, the message often contains "@<number>" tokens. Strip those
+// so the LLM doesn't see noise. Also trim the literal word "forgie" if it
+// leads the message — feels more natural to the model.
+function cleanGroupBody(body: string): string {
+  let s = body.replace(/@\d{10,15}/g, ' ').trim()
+  s = s.replace(/^forgie[\s,:!]+/i, '').trim()
+  return s || body  // never return empty
+}
+
+// READ-only filter for the WA tool set. We strip every propose_* tool
+// (write actions) because there's no Confirm card UI in WhatsApp.
+function readOnly(tools: ToolSet): ToolSet {
+  const out: ToolSet = {}
+  for (const [name, t] of Object.entries(tools)) {
+    if (!name.startsWith('propose_')) out[name] = t
+  }
+  return out
+}
+
+// ─── Main handler ────────────────────────────────────────────────────────────
+
+export async function handleIncomingWhatsapp(
+  msg: IncomingWaMessage,
+): Promise<HandleResult> {
+  const e164 = jidToE164(msg.from)
+  if (!e164) return { processed: false, reason: 'bad-jid' }
+
+  // Step 1 — find the User by whatsappNumber. Exact match because we
+  // normalised at write-time (Profile UI and the seed script both store
+  // canonical "+<digits>"). Falls back to `endsWith` only if exact misses,
+  // to catch any legacy rows entered before the normaliser shipped.
+  let user = await prisma.user.findFirst({
+    where: { isActive: true, whatsappNumber: e164 },
+    select: { id: true, name: true, role: true },
+  })
+  if (!user) {
+    // Some pre-seed rows may store the bare digits. One more attempt.
+    const digits = e164.slice(1)
+    user = await prisma.user.findFirst({
+      where: {
+        isActive: true,
+        OR: [
+          { whatsappNumber: digits },
+          { whatsappNumber: { endsWith: digits } },
+        ],
+      },
+      select: { id: true, name: true, role: true },
+    })
+  }
+  if (!user) {
+    console.log(`[wa-handler] unknown sender ${e164} ("${msg.pushName}") — ignoring`)
+    return { processed: false, reason: 'unknown-sender' }
+  }
+
+  // Step 2 — group gating. Only reply when the user actually addresses
+  // Forgie ("forgie" appears anywhere, case-insensitive) — otherwise
+  // we'd reply to every group message ever sent.
+  if (msg.isGroup && !/forgie/i.test(msg.body)) {
+    return { processed: false, reason: 'group-not-mentioned' }
+  }
+
+  const userBody = msg.isGroup ? cleanGroupBody(msg.body) : msg.body.trim()
+  if (!userBody) return { processed: false, reason: 'empty-body' }
+
+  // Step 3 — rate limit (shared per-user budget with the web chat).
+  const rl = await checkRateLimit(user.id)
+  if (!rl.allowed) {
+    await safeSend(
+      msg.chatJid,
+      `Hitting my rate limit — try again in ~${rl.resetInMinutes} min.${WA_DISCLAIMER}`,
+    )
+    return { processed: true, reason: 'rate-limited' }
+  }
+
+  // Step 4 — get or create the WA conversation for this user.
+  let conversation = await prisma.assistantConversation.findFirst({
+    where: {
+      userId: user.id,
+      channel: 'WHATSAPP' as AssistantChannel,
+      isArchived: false,
+    },
+    orderBy: { updatedAt: 'desc' },
+    select: { id: true },
+  })
+  if (!conversation) {
+    conversation = await prisma.assistantConversation.create({
+      data: {
+        userId: user.id,
+        channel: 'WHATSAPP' as AssistantChannel,
+        title: msg.isGroup
+          ? `WhatsApp group — ${user.name}`
+          : `WhatsApp — ${user.name}`,
+      },
+      select: { id: true },
+    })
+  }
+
+  // Step 5 — persist the incoming user message.
+  await prisma.assistantMessage.create({
+    data: {
+      conversationId: conversation.id,
+      role: 'USER',
+      content: userBody,
+    },
+  })
+
+  // Step 6 — build context + system prompt + tools.
+  const context = await buildForgieContext({
+    userId: user.id,
+    userName: user.name,
+    userRole: user.role,
+  })
+
+  const systemPrompt = [
+    buildSystemPrompt({ id: user.id, name: user.name, role: user.role as Role }),
+    '',
+    renderContextBlock(context),
+    '',
+    TOOL_USE_GUIDANCE,
+    '',
+    WA_REPLY_GUIDANCE,
+  ].join('\n')
+
+  const allTools = await buildAllToolsAsync({ userId: user.id, role: user.role })
+  const tools = readOnly(allTools)
+
+  // Step 7 — load the last few exchanges so Forgie has memory.
+  const history = await prisma.assistantMessage.findMany({
+    where: {
+      conversationId: conversation.id,
+      role: { in: ['USER', 'ASSISTANT'] },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: MAX_HISTORY_MESSAGES,
+    select: { role: true, content: true },
+  })
+  const ordered = history.reverse()
+
+  const messages: ModelMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...ordered.map((m) => ({
+      role: (m.role === 'USER' ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: m.content,
+    })),
+  ]
+
+  // Step 8 — call the LLM.
+  const result = await generate(messages, { tools })
+
+  // Step 9 — persist the assistant message + usage. Bookkeeping mistakes
+  // shouldn't block the reply going out, so .catch() each one.
+  await prisma.assistantMessage
+    .create({
+      data: {
+        conversationId: conversation.id,
+        role: 'ASSISTANT',
+        content: result.text,
+        provider: result.provider ?? undefined,
+        model: result.model ?? undefined,
+        inputTokens: result.inputTokens ?? undefined,
+        outputTokens: result.outputTokens ?? undefined,
+        latencyMs: result.latencyMs,
+        ...(result.toolCalls.length && {
+          toolCalls: JSON.parse(JSON.stringify(result.toolCalls)),
+        }),
+      },
+    })
+    .catch((e) => console.error('[wa-handler] save assistant msg failed:', e))
+
+  await prisma.assistantConversation
+    .update({
+      where: { id: conversation.id },
+      data: { updatedAt: new Date() },
+    })
+    .catch(() => {})
+
+  if (result.provider && (result.inputTokens || result.outputTokens)) {
+    await recordUsage({
+      userId: user.id,
+      provider: result.provider,
+      inputTokens: result.inputTokens ?? 0,
+      outputTokens: result.outputTokens ?? 0,
+    }).catch(() => {})
+  }
+
+  // Step 10 — send the reply over the bridge, with disclaimer.
+  const replyBody = (result.text.trim() || "I didn't catch that — try again?") + WA_DISCLAIMER
+  const sent = await safeSend(msg.chatJid, replyBody)
+  if (!sent) return { processed: false, reason: 'send-failed', conversationId: conversation.id }
+
+  return { processed: true, reason: 'replied', conversationId: conversation.id }
+}
+
+// Wrap bridge send so a transient failure doesn't take down the handler.
+async function safeSend(to: string, message: string): Promise<boolean> {
+  try {
+    await sendWhatsappMessage({ to, message })
+    return true
+  } catch (err) {
+    console.error('[wa-handler] bridge send failed:', err instanceof Error ? err.message : err)
+    return false
+  }
+}
