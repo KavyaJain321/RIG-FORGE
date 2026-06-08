@@ -78,6 +78,7 @@ model User {
   name          String
   email         String     @unique      // RIG login identifier (e.g. name@rigforge.com) — NOT a real mailbox
   personalEmail String?                 // deliverable Gmail (manual bootstrap). Authoritative source is the connected GoogleIntegration.email when present.
+  whatsappNumber String?                // WhatsApp number in E.164 format (+91XXXXXXXXXX). Used by Forgie's WA tools.
   passwordHash  String
   role          Role
   avatarUrl          String?
@@ -451,6 +452,15 @@ model GoogleIntegration {
   lastUsedAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Baileys auth state for the WhatsApp bridge.
+// Owned by /whatsapp-bridge — Prisma only needs to know about it so it
+// doesn't try to drop the table on `db push`.
+model WhatsappAuth {
+  id        String   @id
+  data      String
+  updatedAt DateTime @default(now()) @db.Timestamp(6)
 }
 
 // AI-generated daily team standup. One per day. Shown on the
