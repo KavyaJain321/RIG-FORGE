@@ -166,6 +166,23 @@ let isScanning   = false
 let startingUp   = true
 const events     = []   // ring buffer of recent connection events for /debug
 
+// LRU of recently-seen message IDs so we don't double-process a message
+// that Baileys re-fires (e.g. once as 'notify' during real-time, then again
+// as 'append' during a server-replay after a brief reconnect). Bounded so
+// long-running processes don't grow unbounded.
+const SEEN_LRU_CAP = 500
+const seenIds = new Map()  // id → ts (insertion order = LRU)
+function markSeen(id) {
+  if (!id) return false
+  if (seenIds.has(id)) return true  // already processed
+  seenIds.set(id, Date.now())
+  if (seenIds.size > SEEN_LRU_CAP) {
+    const firstKey = seenIds.keys().next().value
+    seenIds.delete(firstKey)
+  }
+  return false
+}
+
 function logEvent(msg) {
   const stamp = new Date().toISOString()
   console.log(`[bridge] ${stamp} ${msg}`)
@@ -265,20 +282,40 @@ async function startWA() {
     }
   })
 
-  // Forward incoming messages to RIG FORGE
+  // Forward incoming messages to RIG FORGE.
+  //
+  // We accept BOTH 'notify' (real-time) and 'append' (server-side replay after
+  // a brief reconnect — see https://github.com/WhiskeySockets/Baileys for the
+  // distinction). Without 'append', any message that arrives during a stale
+  // recovery window silently never reaches the main app's webhook.
+  //
+  // Dedupe by message id so the same message firing twice (once notify,
+  // once append) doesn't trigger two replies.
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify' || !RIGFORGE_URL || !RIGFORGE_WA_SECRET) return
+    if (!RIGFORGE_URL || !RIGFORGE_WA_SECRET) {
+      logEvent(`upsert skipped: webhook not configured (type=${type})`)
+      return
+    }
+    if (type !== 'notify' && type !== 'append') {
+      // Other types (e.g. 'replace') aren't user-visible new content.
+      return
+    }
+    logEvent(`upsert type=${type} count=${messages?.length ?? 0}`)
     for (const msg of messages) {
       if (msg.key.fromMe) continue
       const body =
         msg.message?.conversation ??
         msg.message?.extendedTextMessage?.text ?? ''
       if (!body.trim()) continue
+      if (markSeen(msg.key.id)) {
+        logEvent(`dedup: skip already-seen id=${msg.key.id}`)
+        continue
+      }
       const from    = msg.key.remoteJid ?? ''
       const isGroup = isJidGroup(from)
       const sender  = isGroup ? (msg.key.participant ?? '') : from
       try {
-        await fetch(`${RIGFORGE_URL}/api/whatsapp/incoming`, {
+        const res = await fetch(`${RIGFORGE_URL}/api/whatsapp/incoming`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -290,8 +327,13 @@ async function startWA() {
             timestamp: msg.messageTimestamp,
           }),
         })
+        if (!res.ok) {
+          logEvent(`Forward HTTP ${res.status} for id=${msg.key.id} from=${sender}`)
+        } else {
+          logEvent(`Forwarded id=${msg.key.id} from=${sender} (${isGroup ? 'group' : 'dm'})`)
+        }
       } catch (err) {
-        logEvent(`Forward error: ${err.message}`)
+        logEvent(`Forward error for id=${msg.key.id}: ${err.message}`)
       }
     }
   })
