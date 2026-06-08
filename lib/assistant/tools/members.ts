@@ -82,6 +82,7 @@ export async function listMembers(caller: ToolUser, args: ListMembersArgs = {}) 
         email: true,
         createdAt: true,
         personalEmail: true,
+        whatsappNumber: true,
         googleIntegration: { select: { email: true } },
       }),
       _count: { select: { projects: true, tasks: true } },
@@ -94,6 +95,7 @@ export async function listMembers(caller: ToolUser, args: ListMembersArgs = {}) 
           const au = u as typeof u & {
             email?: string
             personalEmail?: string | null
+            whatsappNumber?: string | null
             googleIntegration?: { email: string } | null
           }
           const { contactEmail, contactEmailSource } = resolveContactEmail(au)
@@ -103,6 +105,7 @@ export async function listMembers(caller: ToolUser, args: ListMembersArgs = {}) 
             // this person. `email` above is just their login identifier.
             contactEmail,
             contactEmailSource,
+            whatsappNumber: au.whatsappNumber ?? null,
           }
         })()
       : {}
@@ -143,6 +146,7 @@ export async function getMember(caller: ToolUser, userIdOrName: string) {
       ...(isAdmin && {
         email: true,
         personalEmail: true,
+        whatsappNumber: true,
         googleIntegration: { select: { email: true } },
       }),
       projects: {
@@ -193,10 +197,16 @@ export async function getMember(caller: ToolUser, userIdOrName: string) {
         const au = user as typeof user & {
           email?: string
           personalEmail?: string | null
+          whatsappNumber?: string | null
           googleIntegration?: { email: string } | null
         }
         const { contactEmail, contactEmailSource } = resolveContactEmail(au)
-        return { email: au.email, contactEmail, contactEmailSource }
+        return {
+          email: au.email,
+          contactEmail,
+          contactEmailSource,
+          whatsappNumber: au.whatsappNumber ?? null,
+        }
       })()
     : {}
 

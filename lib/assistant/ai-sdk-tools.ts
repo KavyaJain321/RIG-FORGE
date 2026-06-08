@@ -22,6 +22,8 @@ import * as github from './tools/github'
 import * as gcal from './tools/gcal'
 import * as gmail from './tools/gmail'
 import * as gdrive from './tools/gdrive'
+import * as whatsapp from './tools/whatsapp'
+import { isAdminRole } from '@/lib/auth'
 import type { ToolUser } from './tools/projects'
 
 // ─── Read tools — safe to auto-execute ───────────────────────────────────────
@@ -377,7 +379,11 @@ export function buildProposeTools(): ToolSet {
 // a per-user DB check. Use buildAllToolsAsync from the message route to
 // get the full set.
 export function buildAllTools(caller: ToolUser): ToolSet {
-  return { ...buildReadTools(caller), ...buildProposeTools() }
+  const base: ToolSet = { ...buildReadTools(caller), ...buildProposeTools() }
+  if (whatsapp.isWhatsAppEnabled() && isAdminRole(caller.role)) {
+    Object.assign(base, buildWhatsappTools())
+  }
+  return base
 }
 
 // Async variant: also conditionally includes the per-user Google tools
@@ -398,6 +404,13 @@ export async function buildAllToolsAsync(caller: ToolUser): Promise<ToolSet> {
   if (hasGcal) Object.assign(base, buildGcalTools(caller))
   if (hasGmail) Object.assign(base, buildGmailTools(caller))
   if (hasDrive) Object.assign(base, buildGdriveTools(caller))
+
+  // WhatsApp tools are admin-only: the bridge sends from a single org-wide
+  // account, so any send/create-group goes out as the org. Hide them from
+  // employees so they can't DM customers as "Forgie".
+  if (whatsapp.isWhatsAppEnabled() && isAdminRole(caller.role)) {
+    Object.assign(base, buildWhatsappTools())
+  }
 
   return base
 }
@@ -666,6 +679,91 @@ function buildGdriveTools(caller: ToolUser): ToolSet {
   }
 }
 
+// ─── WhatsApp tools (admin-only, requires bridge env vars) ───────────────────
+
+function buildWhatsappTools(): ToolSet {
+  return {
+    wa_bridge_status: tool({
+      description: [
+        'Check whether the Forgie WhatsApp bridge is online and authenticated.',
+        'Returns { ready, scanning, startingUp, hasQR, phone, error? }. Use this',
+        'when the user asks "is WhatsApp connected?" or before proposing a send',
+        'if you have any doubt the bridge is up. If ready=false, tell the user',
+        'they need to scan the QR at the bridge /qr page first.',
+      ].join(' '),
+      inputSchema: z.object({}),
+      execute: async () => whatsapp.getStatus(),
+    }),
+
+    wa_list_groups: tool({
+      description: [
+        'List WhatsApp groups Forgie is a member of. Returns id (JID), name,',
+        'participants count. Use when the user wants to send to a group by name',
+        '("post in the Backend Squad group") — look up the JID here, then pass',
+        'it as `to` to propose_wa_send_message.',
+      ].join(' '),
+      inputSchema: z.object({}),
+      execute: async () => whatsapp.listGroups(),
+    }),
+
+    propose_wa_send_message: tool({
+      description: [
+        'Propose sending a WhatsApp text message. NOT SENT until the user taps',
+        'Confirm. Bridge sends from the org-wide Forgie WhatsApp account.',
+        '',
+        'RECIPIENT RESOLUTION — read carefully:',
+        '`to` must be ONE of:',
+        '  • A teammate\'s whatsappNumber (E.164, e.g. "+919876543210") —',
+        '    look it up by calling get_member with the name FIRST. If the',
+        '    returned whatsappNumber is null, DO NOT send; tell the user',
+        '    there\'s no WhatsApp number on file for that teammate.',
+        '  • A group JID (ends with "@g.us") — get this from wa_list_groups,',
+        '    do NOT invent.',
+        '  • A literal E.164 number the user supplied directly.',
+        '',
+        'NEVER guess a number. 10-digit Indian numbers without country code are',
+        'auto-prefixed with +91 by the bridge — that\'s fine; just pass them through.',
+        '',
+        'Message tone: WhatsApp messages from Forgie should be short and',
+        'conversational (1-3 sentences). No formal email structure.',
+        'Sign off as "— Forgie 🤖" only if the message is more than one line.',
+      ].join('\n'),
+      inputSchema: z.object({
+        to: z.string().min(3).describe('E.164 number, group JID, or 10-digit Indian number'),
+        message: z.string().min(1).max(4000).describe('Message body (plain text)'),
+      }),
+      execute: async (input) => ({
+        proposed: true,
+        action: 'wa_send_message',
+        args: input,
+      }),
+    }),
+
+    propose_wa_create_group: tool({
+      description: [
+        'Propose creating a new WhatsApp group. NOT CREATED until the user',
+        'confirms. Forgie\'s WhatsApp account will be the admin/owner of the',
+        'created group.',
+        '',
+        'Participant numbers MUST be looked up via get_member (use the',
+        'whatsappNumber field) for each teammate. If any teammate has no',
+        'whatsappNumber on file, list who is missing and ask the user how',
+        'to proceed — do NOT silently skip them.',
+      ].join('\n'),
+      inputSchema: z.object({
+        name: z.string().min(1).max(100).describe('Group name'),
+        participants: z.array(z.string().min(3)).min(1)
+          .describe('Array of E.164 numbers / 10-digit Indian numbers'),
+      }),
+      execute: async (input) => ({
+        proposed: true,
+        action: 'wa_create_group',
+        args: input,
+      }),
+    }),
+  }
+}
+
 // ─── Tool-use guidance for the system prompt ─────────────────────────────────
 // Appended to the system prompt so the model knows WHEN to reach for tools
 // instead of answering from the pre-loaded grounded context.
@@ -762,6 +860,30 @@ Always produce your TEXT reply first, explaining the plan, then the cards
 appear. Example: "I've proposed the meeting and two emails — Rohit and
 Radhesh will get the Meet link via their Google Calendar invite. Confirm
 all three cards to send everything."
+
+# WhatsApp (admin-only tools, when bridge is configured)
+
+If wa_* tools are available, you can send messages and create groups via the
+org-wide Forgie WhatsApp account.
+
+Workflow for "WhatsApp <name> that <message>":
+1. get_member(name) → look up their whatsappNumber.
+2. If whatsappNumber is null → tell the user; do NOT propose a send.
+3. propose_wa_send_message with to=whatsappNumber, message=<short, casual>.
+
+Workflow for "make a WhatsApp group with <names>":
+1. get_member for each name → collect whatsappNumber values.
+2. If any are null → list who's missing and ask the user before proposing.
+3. propose_wa_create_group with the resolved numbers.
+
+Workflow for "post in the <X> group on WhatsApp":
+1. wa_list_groups → find the group JID by name.
+2. propose_wa_send_message with to=<group JID>.
+
+If the user asks "is WhatsApp connected?" — call wa_bridge_status.
+
+Keep WhatsApp messages short (1-3 sentences). Don't use the formal email
+opening/sign-off structure here.
 
 # Proposing write actions
 

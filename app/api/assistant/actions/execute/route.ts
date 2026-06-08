@@ -21,7 +21,7 @@ import { type NextRequest } from 'next/server'
 import { z } from 'zod'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 import { createTask, updateTaskStatus } from '@/lib/assistant/tools/tasks'
@@ -39,6 +39,11 @@ import {
   createDoc,
   isUserDriveEnabled,
 } from '@/lib/assistant/tools/gdrive'
+import {
+  sendMessage as waSendMessage,
+  createGroup as waCreateGroup,
+  isWhatsAppEnabled,
+} from '@/lib/assistant/tools/whatsapp'
 
 // ─── Per-action arg schemas (server-side validation) ─────────────────────────
 
@@ -132,6 +137,16 @@ const SetProjectLeadArgs = z.object({
   newLeadId: z.string().min(1),
 })
 
+const WaSendMessageArgs = z.object({
+  to: z.string().min(3),
+  message: z.string().min(1).max(4000),
+})
+
+const WaCreateGroupArgs = z.object({
+  name: z.string().min(1).max(100),
+  participants: z.array(z.string().min(3)).min(1),
+})
+
 const Body = z.object({
   conversationId: z.string().min(1).nullable().optional(),
   action: z.enum([
@@ -148,6 +163,8 @@ const Body = z.object({
     'create_project',
     'add_project_member',
     'set_project_lead',
+    'wa_send_message',
+    'wa_create_group',
   ]),
   args: z.record(z.string(), z.unknown()),
 })
@@ -320,6 +337,34 @@ export async function POST(request: NextRequest) {
           throw new Error(`Invalid args for set_project_lead: ${a.error.issues[0]?.message ?? 'malformed'}`)
         }
         result = await setProjectLead(caller, a.data)
+        break
+      }
+      case 'wa_send_message': {
+        if (!isWhatsAppEnabled()) {
+          throw new Error('WhatsApp bridge is not configured on this server.')
+        }
+        if (!isAdminRole(caller.role)) {
+          throw new Error('Only admins can send WhatsApp messages from Forgie.')
+        }
+        const a = WaSendMessageArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for wa_send_message: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await waSendMessage(a.data)
+        break
+      }
+      case 'wa_create_group': {
+        if (!isWhatsAppEnabled()) {
+          throw new Error('WhatsApp bridge is not configured on this server.')
+        }
+        if (!isAdminRole(caller.role)) {
+          throw new Error('Only admins can create WhatsApp groups from Forgie.')
+        }
+        const a = WaCreateGroupArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for wa_create_group: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await waCreateGroup(a.data)
         break
       }
     }
