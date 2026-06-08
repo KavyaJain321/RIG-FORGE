@@ -160,6 +160,7 @@ async function useInMemoryAuthState() {
 // ─── App state ────────────────────────────────────────────────────────────────
 let sock         = null
 let qrData       = null
+let qrVersion    = 0    // bumped each time a fresh QR is issued so the /qr page can detect rotation
 let isReady      = false
 let isScanning   = false
 let startingUp   = true
@@ -223,10 +224,11 @@ async function startWA() {
 
     if (qr) {
       qrData     = qr
+      qrVersion += 1
       isReady    = false
       isScanning = false
       startingUp = false
-      logEvent('QR ready')
+      logEvent(`QR ready (v${qrVersion})`)
     }
 
     if (connection === 'connecting') {
@@ -301,6 +303,17 @@ app.use(express.json())
 
 app.get('/health', (_req, res) => res.json({ ok: true, ready: isReady }))
 
+// Public state — used by the /qr page's JS poller to detect transitions
+// (QR → scanning → connected, QR rotation, etc.) and reload promptly.
+// Returns only booleans + a rotation counter; no phone, creds, or events.
+app.get('/state', (_req, res) => res.json({
+  ready: isReady,
+  scanning: isScanning,
+  startingUp,
+  hasQR: !!qrData,
+  qrVersion,
+}))
+
 // Debug — last events
 app.get('/debug', requireSecret, (_req, res) => res.json({
   ready: isReady, scanning: isScanning, startingUp,
@@ -319,39 +332,46 @@ app.get('/reset', requireSecret, async (_req, res) => {
     try { sock?.end?.(new Error('reset')) } catch {}
     sock = null
     setTimeout(() => startWA().catch(err => logEvent(`restart err: ${err.message}`)), 500)
+    // One-shot redirect — don't use the /state poller here, since that would
+    // see the post-reset state diff and reload back to /reset (re-triggering it).
     res.send(page('🔄 Reset', `
       <h1>🔄 Auth wiped — restarting...</h1>
-      <p>Open <a href="/qr" style="color:#4ade80">/qr</a> in ~10 seconds.</p>`, 10))
+      <p>Taking you to <a href="/qr" style="color:#4ade80">/qr</a> in ~10 seconds.</p>
+      <script>setTimeout(() => { location.href = '/qr' }, 10000)</script>`))
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
 app.get('/qr', async (_req, res) => {
+  // Snapshot the state we're rendering so the client-side poller can detect
+  // any change (transition or QR rotation) and reload promptly.
+  const snapshot = { ready: isReady, scanning: isScanning, startingUp, hasQR: !!qrData, qrVersion }
+
   if (isReady) {
     return res.send(page('✅ Connected',
       `<h1 style="color:#4ade80">✅ Forgie is connected to WhatsApp</h1>
        <p>Phone: <b>${sock?.user?.id?.split(':')[0] ?? 'unknown'}</b></p>
-       <p style="color:#666">You can close this tab.</p>`))
+       <p style="color:#666">You can close this tab.</p>`, snapshot))
   }
 
   if (isScanning) {
     return res.send(page('🔄 Connecting...',
       `<h1>🔄 QR scanned — connecting...</h1>
        <p>Authenticating with WhatsApp servers. This can take up to 60 seconds.</p>
-       <div class="spinner"></div>`, 3))
+       <div class="spinner"></div>`, snapshot))
   }
 
   if (startingUp && !qrData) {
     return res.send(page('⏳ Starting up...',
       `<h1>⏳ Bridge starting up...</h1>
-       <p>QR will appear in ~10 seconds.</p>`, 3))
+       <p>QR will appear in ~10 seconds.</p>`, snapshot))
   }
 
   if (!qrData) {
     return res.send(page('⏳ Generating QR...',
       `<h1>⏳ Generating QR code...</h1>
-       <p>Please wait a few seconds.</p>`, 3))
+       <p>Please wait a few seconds.</p>`, snapshot))
   }
 
   const qrImage = await QRCode.toDataURL(qrData, { width: 300, margin: 2 })
@@ -363,9 +383,9 @@ app.get('/qr', async (_req, res) => {
       <p>Settings → Linked Devices → Link a Device → Scan this code</p>
     </div>
     <p style="color:#666;font-size:13px;margin-top:20px">
-      QR valid ~60s — page auto-refreshes with a new one if it expires.<br>
+      QR valid ~60s — this page updates instantly when a new one is issued or when you scan.<br>
       After scanning, wait up to 60 seconds for connection to complete.
-    </p>`, 20))
+    </p>`, snapshot))
 })
 
 app.get('/status', requireSecret, (_req, res) => res.json({
@@ -413,11 +433,26 @@ app.get('/groups', requireSecret, async (_req, res) => {
   }
 })
 
-// HTML page helper
-function page(title, body, refreshSec = 20) {
+// HTML page helper. Instead of meta-refresh (which had a multi-second blind
+// window after the user scanned the QR), pages poll the public /state endpoint
+// and reload the instant the state key changes. Pass `snapshot` so the client
+// can compare against the moment the page was rendered.
+function page(title, body, snapshot) {
+  const poller = snapshot ? `<script>
+    const initial = ${JSON.stringify(snapshot)};
+    const key = (s) => s.ready+'|'+s.scanning+'|'+s.startingUp+'|'+s.hasQR+'|'+s.qrVersion;
+    async function poll() {
+      try {
+        const r = await fetch('/state', { cache: 'no-store' });
+        if (!r.ok) return;
+        const s = await r.json();
+        if (key(s) !== key(initial)) location.reload();
+      } catch {}
+    }
+    setInterval(poll, 1500);
+  </script>` : ''
   return `<!DOCTYPE html><html><head>
     <title>Forgie WA — ${title}</title>
-    <meta http-equiv="refresh" content="${refreshSec}">
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
       body{display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -430,7 +465,7 @@ function page(title, body, refreshSec = 20) {
                border-radius:50%;animation:spin 0.8s linear infinite;margin:24px auto}
       @keyframes spin{to{transform:rotate(360deg)}}
     </style>
-  </head><body>${body}</body></html>`
+  </head><body>${body}${poller}</body></html>`
 }
 
 app.listen(PORT, () => console.log(`[bridge] listening on ${PORT}`))
