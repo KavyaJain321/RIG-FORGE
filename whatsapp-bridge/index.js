@@ -183,6 +183,75 @@ function markSeen(id) {
   return false
 }
 
+// WhatsApp is migrating newer accounts to send messages with @lid (Local
+// Identifier — a privacy-preserving ID that is NOT the phone number)
+// instead of @c.us (phone-number JID). The main app matches users by
+// phone number, so we MUST resolve @lid → @c.us before forwarding or
+// every message becomes "unknown sender".
+//
+// Strategy, in order:
+//   1. If the message key already carries an alt-form PN (senderPn,
+//      participantPn, remoteJidAlt with @c.us), use it directly. Baileys
+//      puts both forms on many keys precisely so we don't have to look up.
+//   2. Otherwise check our locally-learned cache (lid → pn). We populate
+//      this from any message where both forms are present.
+//   3. Otherwise ask Baileys's signalRepository.lidMapping (available in
+//      6.7+) for the cached PN, and remember the answer.
+//   4. If all of the above fail, return the @lid unchanged. The main app
+//      will log "unknown-sender" — at least visibly, not silently.
+const lidToPnCache = new Map()  // "<lid>@lid" → "<digits>@s.whatsapp.net" or @c.us
+
+function learnLidPn(key) {
+  if (!key) return
+  const pairs = [
+    [key.senderLid,    key.senderPn],
+    [key.participant,  key.participantPn],
+    [key.remoteJid,    key.remoteJidAlt],
+    [key.remoteJidAlt, key.remoteJid],
+  ]
+  for (const [a, b] of pairs) {
+    if (typeof a === 'string' && typeof b === 'string' &&
+        a.endsWith('@lid') && (b.endsWith('@c.us') || b.endsWith('@s.whatsapp.net'))) {
+      lidToPnCache.set(a, b)
+    }
+  }
+}
+
+function resolvePn(jid, key) {
+  if (typeof jid !== 'string' || !jid) return jid
+  if (jid.endsWith('@c.us') || jid.endsWith('@s.whatsapp.net') || jid.endsWith('@g.us')) {
+    return jid
+  }
+  if (!jid.endsWith('@lid')) return jid
+
+  // 1. Alt-form already on this key
+  if (key) {
+    if (typeof key.senderPn === 'string' && key.senderPn) return key.senderPn
+    if (typeof key.participantPn === 'string' && key.participantPn) return key.participantPn
+    if (typeof key.remoteJidAlt === 'string' &&
+        (key.remoteJidAlt.endsWith('@c.us') || key.remoteJidAlt.endsWith('@s.whatsapp.net'))) {
+      return key.remoteJidAlt
+    }
+  }
+  // 2. Our local cache
+  const cached = lidToPnCache.get(jid)
+  if (cached) return cached
+  // 3. Baileys's own LID mapping (best-effort — API surface varies by version)
+  try {
+    const mapped =
+      sock?.signalRepository?.lidMapping?.getPNForLID?.(jid) ??
+      sock?.signalRepository?.lidMapping?.getPnForLid?.(jid)
+    if (typeof mapped === 'string' && mapped) {
+      lidToPnCache.set(jid, mapped)
+      return mapped
+    }
+  } catch (err) {
+    logEvent(`lid lookup error for ${jid}: ${err.message}`)
+  }
+  // 4. Give up — let the main app see the raw lid and log unknown-sender.
+  return jid
+}
+
 function logEvent(msg) {
   const stamp = new Date().toISOString()
   console.log(`[bridge] ${stamp} ${msg}`)
@@ -303,6 +372,7 @@ async function startWA() {
     logEvent(`upsert type=${type} count=${messages?.length ?? 0}`)
     for (const msg of messages) {
       if (msg.key.fromMe) continue
+      learnLidPn(msg.key)
       const body =
         msg.message?.conversation ??
         msg.message?.extendedTextMessage?.text ?? ''
@@ -311,9 +381,19 @@ async function startWA() {
         logEvent(`dedup: skip already-seen id=${msg.key.id}`)
         continue
       }
-      const from    = msg.key.remoteJid ?? ''
-      const isGroup = isJidGroup(from)
-      const sender  = isGroup ? (msg.key.participant ?? '') : from
+
+      const rawRemote   = msg.key.remoteJid ?? ''
+      const isGroup     = isJidGroup(rawRemote)
+      const chatJid     = isGroup ? rawRemote : resolvePn(rawRemote, msg.key)
+      const rawSender   = isGroup ? (msg.key.participant ?? '') : rawRemote
+      const senderJid   = resolvePn(rawSender, msg.key)
+
+      // Loud log when we had to resolve a @lid, so future debugging is
+      // a one-curl-to-/debug answer instead of an investigation.
+      if (rawSender !== senderJid) {
+        logEvent(`lid→pn: ${rawSender} → ${senderJid}`)
+      }
+
       try {
         const res = await fetch(`${RIGFORGE_URL}/api/whatsapp/incoming`, {
           method: 'POST',
@@ -322,15 +402,19 @@ async function startWA() {
             'x-wa-secret': RIGFORGE_WA_SECRET,
           },
           body: JSON.stringify({
-            from: sender, chatJid: from, body, isGroup,
+            from: senderJid, chatJid, body, isGroup,
             pushName: msg.pushName ?? '',
             timestamp: msg.messageTimestamp,
+            // Also include the raw forms so the main app can fall back if
+            // it ever needs to disambiguate or build its own mapping.
+            senderLid: rawSender !== senderJid ? rawSender : undefined,
+            senderPn: senderJid,
           }),
         })
         if (!res.ok) {
-          logEvent(`Forward HTTP ${res.status} for id=${msg.key.id} from=${sender}`)
+          logEvent(`Forward HTTP ${res.status} for id=${msg.key.id} from=${senderJid}`)
         } else {
-          logEvent(`Forwarded id=${msg.key.id} from=${sender} (${isGroup ? 'group' : 'dm'})`)
+          logEvent(`Forwarded id=${msg.key.id} from=${senderJid} (${isGroup ? 'group' : 'dm'})`)
         }
       } catch (err) {
         logEvent(`Forward error for id=${msg.key.id}: ${err.message}`)
