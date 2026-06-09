@@ -27,6 +27,8 @@ async function bridge(method: 'GET' | 'POST', path: string, body?: object) {
       'x-bridge-secret': SECRET,
     },
     ...(body && { body: JSON.stringify(body) }),
+    // Don't hang forever if the bridge (Render free tier) is asleep/slow.
+    signal: AbortSignal.timeout(20_000),
   })
   const text = await res.text()
   let json: unknown

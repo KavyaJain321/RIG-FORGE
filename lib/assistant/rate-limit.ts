@@ -13,6 +13,15 @@ import { prisma } from '@/lib/db'
 
 const DEFAULT_LIMIT = 30
 
+/**
+ * Sentinel `provider` value for the atomic per-user reservation counter.
+ * Every message attempt increments this row BEFORE generation, so the limit
+ * can't be raced (read-then-act) or bypassed by cache/fallback/error turns.
+ * It is excluded from the admin usage stats (which report per-provider
+ * successful messages + tokens via recordUsage).
+ */
+export const RESERVATION_PROVIDER = '__reservation__'
+
 export interface RateLimitResult {
   allowed: boolean
   count: number
@@ -27,24 +36,46 @@ function getLimit(): number {
   return Number.isNaN(n) || n < 1 ? DEFAULT_LIMIT : n
 }
 
-export async function checkRateLimit(userId: string): Promise<RateLimitResult> {
+/**
+ * Reserve one message slot for this user in the current hour and report
+ * whether they're still within budget. The increment is a single atomic
+ * upsert, so concurrent requests can't all read a stale count and slip past
+ * the limit. Call this BEFORE generating — failed/fallback turns count too,
+ * which is intentional (they still cost work and shouldn't be a free bypass).
+ */
+export async function reserveRateLimit(userId: string): Promise<RateLimitResult> {
   const limit = getLimit()
   const now = new Date()
   const dateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const hour = now.getHours()
 
-  // Sum messageCount for this user in the current hour across all providers
-  const rows = await prisma.assistantUsage.findMany({
-    where: { userId, date: dateOnly, hour },
+  const row = await prisma.assistantUsage.upsert({
+    where: {
+      userId_date_hour_provider: {
+        userId,
+        date: dateOnly,
+        hour,
+        provider: RESERVATION_PROVIDER,
+      },
+    },
+    create: {
+      userId,
+      date: dateOnly,
+      hour,
+      provider: RESERVATION_PROVIDER,
+      messageCount: 1,
+      inputTokens: 0,
+      outputTokens: 0,
+    },
+    update: { messageCount: { increment: 1 } },
     select: { messageCount: true },
   })
 
-  const count = rows.reduce((acc, r) => acc + r.messageCount, 0)
-  const minutesElapsed = now.getMinutes()
-  const resetInMinutes = 60 - minutesElapsed
+  const count = row.messageCount
+  const resetInMinutes = 60 - now.getMinutes()
 
   return {
-    allowed: count < limit,
+    allowed: count <= limit,
     count,
     limit,
     resetInMinutes,

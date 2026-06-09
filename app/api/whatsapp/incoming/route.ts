@@ -23,6 +23,7 @@ import { type NextRequest } from 'next/server'
 
 import { errorResponse, successResponse } from '@/lib/api-helpers'
 import { handleIncomingWhatsapp } from '@/lib/assistant/whatsapp-handler'
+import { safeEqual } from '@/lib/secure-compare'
 
 export async function POST(request: NextRequest) {
   const expected = process.env.RIGFORGE_WA_SECRET
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
   }
 
   const got = request.headers.get('x-wa-secret')
-  if (!got || got !== expected) {
+  if (!got || !safeEqual(got, expected)) {
     return errorResponse('Unauthorized', 401)
   }
 
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     return errorResponse('Request body must be a JSON object', 400)
   }
 
-  const { from, chatJid, body: text, isGroup, pushName, timestamp } =
+  const { from, chatJid, body: text, isGroup, pushName, timestamp, msgId } =
     body as Record<string, unknown>
 
   if (typeof from !== 'string' || typeof text !== 'string') {
@@ -61,6 +62,7 @@ export async function POST(request: NextRequest) {
       isGroup: Boolean(isGroup),
       pushName: typeof pushName === 'string' ? pushName : '',
       timestamp: typeof timestamp === 'number' ? timestamp : 0,
+      msgId: typeof msgId === 'string' ? msgId : undefined,
     })
     return successResponse(result)
   } catch (err) {

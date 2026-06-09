@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { istDateOnly } from '@/lib/date-ist'
 
 export async function GET(request: NextRequest) {
   const token = getTokenFromCookies(request)
@@ -20,8 +21,7 @@ export async function GET(request: NextRequest) {
   const claims = verifyToken(token)
   if (!claims) return errorResponse('Invalid or expired session', 401)
 
-  const now = new Date()
-  const dateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const dateOnly = istDateOnly()
 
   const draft = await prisma.dailyLogDraft.findUnique({
     where: { userId_date: { userId: claims.userId, date: dateOnly } },

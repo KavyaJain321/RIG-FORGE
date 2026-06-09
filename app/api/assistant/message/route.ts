@@ -33,9 +33,10 @@ import { isAssistantEnabled, reportRateLimit } from '@/lib/llm/provider'
 import { startStream, consumeStream } from '@/lib/llm/stream'
 import { buildSystemPrompt } from '@/lib/assistant/prompts'
 import { buildForgieContext, renderContextBlock } from '@/lib/assistant/context'
-import { checkRateLimit, recordUsage } from '@/lib/assistant/rate-limit'
+import { reserveRateLimit, recordUsage } from '@/lib/assistant/rate-limit'
 import { lookupCache, storeCache, maybeSweepCache } from '@/lib/assistant/cache'
 import { buildAllToolsAsync, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
+import { signActionToken } from '@/lib/assistant/action-token'
 
 const MAX_HISTORY_MESSAGES = 10
 
@@ -81,8 +82,8 @@ export async function POST(request: NextRequest) {
   })
   if (!user || !user.isActive) return errorResponse('User not found or inactive', 404)
 
-  // ── 4. Rate limit (soft) ─────────────────────────────────────────────────
-  const rl = await checkRateLimit(user.id)
+  // ── 4. Rate limit (soft) — reserve a slot atomically before generating ───
+  const rl = await reserveRateLimit(user.id)
 
   // ── 5. Load or create conversation ───────────────────────────────────────
   let conversation = conversationId
@@ -340,6 +341,10 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
               actionId: `act_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
               action: r.action,
               args: r.args,
+              // HMAC binding so /actions/execute can verify this exact action +
+              // args was proposed by the server for this user (anti-tamper /
+              // anti-forge). See lib/assistant/action-token.ts.
+              token: signActionToken({ userId: args.user.id, action: r.action, args: r.args }),
               label: buildActionLabel(r.action, r.args, forgieCtx),
             }
           })

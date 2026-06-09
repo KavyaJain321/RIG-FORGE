@@ -18,6 +18,7 @@ import type { OAuth2Client } from 'google-auth-library'
 import { randomBytes } from 'crypto'
 
 import { prisma } from '@/lib/db'
+import { encryptSecret, decryptSecret } from '@/lib/secret-box'
 
 // Refresh access tokens this many ms before they expire.
 const REFRESH_THRESHOLD_MS = 5 * 60 * 1000  // 5 minutes
@@ -140,8 +141,8 @@ export async function getAuthorizedClient(userId: string): Promise<OAuth2Client>
 
   const client = buildOAuth2Client()
   client.setCredentials({
-    access_token: integ.accessToken,
-    refresh_token: integ.refreshToken,
+    access_token: decryptSecret(integ.accessToken),
+    refresh_token: decryptSecret(integ.refreshToken),
     expiry_date: integ.expiresAt.getTime(),
   })
 
@@ -154,10 +155,12 @@ export async function getAuthorizedClient(userId: string): Promise<OAuth2Client>
       await prisma.googleIntegration.update({
         where: { userId },
         data: {
-          accessToken: credentials.access_token,
+          accessToken: encryptSecret(credentials.access_token) ?? credentials.access_token,
           expiresAt: newExpiry,
           // refresh_token only returned if rotated; preserve old one otherwise
-          ...(credentials.refresh_token && { refreshToken: credentials.refresh_token }),
+          ...(credentials.refresh_token && {
+            refreshToken: encryptSecret(credentials.refresh_token) ?? credentials.refresh_token,
+          }),
           lastUsedAt: new Date(),
         },
       })
@@ -183,7 +186,7 @@ export async function disconnectGoogle(userId: string): Promise<void> {
   // Best-effort revoke at Google's end
   try {
     const client = buildOAuth2Client()
-    client.setCredentials({ refresh_token: integ.refreshToken })
+    client.setCredentials({ refresh_token: decryptSecret(integ.refreshToken) })
     await client.revokeCredentials()
   } catch (err) {
     // Already revoked at Google's end? Whatever — still remove our record.

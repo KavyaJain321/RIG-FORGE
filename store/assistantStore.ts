@@ -11,6 +11,8 @@ export interface PendingAction {
   actionId: string
   action: 'create_task' | 'create_ticket' | 'update_task_status' | string
   args: Record<string, unknown>
+  /** HMAC binding token; sent back to /actions/execute on confirm. */
+  token?: string
   label: string
   status: 'pending' | 'confirming' | 'confirmed' | 'cancelled' | 'failed'
   resultText?: string  // human label once executed

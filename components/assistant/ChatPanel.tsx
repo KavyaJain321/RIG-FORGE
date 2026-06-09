@@ -134,6 +134,7 @@ export default function ChatPanel() {
           actionId: string
           action: string
           args: Record<string, unknown>
+          token?: string
           label: string
         }>
         const pendingActions = rawActions.map((a) => ({

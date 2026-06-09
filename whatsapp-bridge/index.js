@@ -17,6 +17,7 @@ import { Boom } from '@hapi/boom'
 import QRCode from 'qrcode'
 import pino from 'pino'
 import pg from 'pg'
+import { timingSafeEqual } from 'node:crypto'
 
 const { Pool } = pg
 
@@ -164,6 +165,7 @@ let qrVersion    = 0    // bumped each time a fresh QR is issued so the /qr page
 let isReady      = false
 let isScanning   = false
 let startingUp   = true
+let reconnectAttempts = 0   // for exponential reconnect backoff
 const events     = []   // ring buffer of recent connection events for /debug
 
 // LRU of recently-seen message IDs so we don't double-process a message
@@ -260,9 +262,22 @@ function logEvent(msg) {
 }
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false
+  const ab = Buffer.from(a)
+  const bb = Buffer.from(b)
+  if (ab.length !== bb.length) return false
+  return timingSafeEqual(ab, bb)
+}
+
 function requireSecret(req, res, next) {
-  const secret = req.headers['x-bridge-secret'] ?? req.query.secret
-  if (!secret || secret !== BRIDGE_SECRET) return res.status(401).json({ error: 'Unauthorized' })
+  // Header only — never accept the secret via query string (it lands in access
+  // logs / proxies / browser history). Constant-time compare to avoid timing
+  // attacks on the shared secret.
+  const secret = req.headers['x-bridge-secret']
+  if (typeof secret !== 'string' || !safeEqual(secret, BRIDGE_SECRET)) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
   next()
 }
 
@@ -333,6 +348,7 @@ async function startWA() {
       isScanning = false
       qrData     = null
       startingUp = false
+      reconnectAttempts = 0   // healthy connection — reset backoff
       // Ensure latest creds are flushed immediately on successful auth.
       await flushDirty()
       logEvent(`✅ Connected as ${sock.user?.id?.split('@')[0] ?? '?'}`)
@@ -345,9 +361,17 @@ async function startWA() {
       const code = new Boom(lastDisconnect?.error)?.output?.statusCode
       const reason = lastDisconnect?.error?.message ?? 'unknown'
       const shouldReconnect = code !== DisconnectReason.loggedOut
-      logEvent(`✗ closed code=${code} reason="${reason}" reconnect=${shouldReconnect}`)
-      if (shouldReconnect) setTimeout(startWA, 5000)
-      else logEvent('Logged out — hit /reset to clear state')
+      if (shouldReconnect) {
+        // Exponential backoff with jitter, capped at 60s, to avoid a tight
+        // reconnect storm when the failure is persistent (e.g. 440 conflict).
+        reconnectAttempts += 1
+        const base = Math.min(5000 * 2 ** (reconnectAttempts - 1), 60_000)
+        const delay = Math.round(base / 2 + (base / 2) * Math.random())
+        logEvent(`✗ closed code=${code} reason="${reason}" — reconnect #${reconnectAttempts} in ${delay}ms`)
+        setTimeout(() => { startWA().catch(err => logEvent(`reconnect err: ${err.message}`)) }, delay)
+      } else {
+        logEvent(`✗ closed code=${code} reason="${reason}" — logged out, hit /reset to clear state`)
+      }
     }
   })
 
@@ -403,6 +427,7 @@ async function startWA() {
           },
           body: JSON.stringify({
             from: senderJid, chatJid, body, isGroup,
+            msgId: msg.key.id,   // for idempotency on the main app (dedupe replies)
             pushName: msg.pushName ?? '',
             timestamp: msg.messageTimestamp,
             // Also include the raw forms so the main app can fall back if
@@ -410,6 +435,9 @@ async function startWA() {
             senderLid: rawSender !== senderJid ? rawSender : undefined,
             senderPn: senderJid,
           }),
+          // The main app runs the LLM synchronously; cap how long we'll wait so
+          // one slow message can't stall the whole upsert batch indefinitely.
+          signal: AbortSignal.timeout(30_000),
         })
         if (!res.ok) {
           logEvent(`Forward HTTP ${res.status} for id=${msg.key.id} from=${senderJid}`)
@@ -448,8 +476,10 @@ app.get('/debug', requireSecret, (_req, res) => res.json({
   events: events.slice(-30),
 }))
 
-// Reset — wipe auth + restart
-app.get('/reset', requireSecret, async (_req, res) => {
+// Reset — wipe auth + restart. POST + header secret only (this is destructive:
+// it deletes the WhatsappAuth table and forces a re-link). Trigger with:
+//   curl -X POST -H "x-bridge-secret: <secret>" https://<bridge>/reset
+app.post('/reset', requireSecret, async (_req, res) => {
   logEvent('/reset triggered — wiping auth')
   try {
     await pool.query('DELETE FROM "WhatsappAuth"')

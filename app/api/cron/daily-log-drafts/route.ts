@@ -23,6 +23,7 @@ import { type NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { isCronAuthorized } from '@/lib/cron'
+import { istDateOnly } from '@/lib/date-ist'
 import {
   collectActivity,
   draftLogForActivity,
@@ -39,8 +40,7 @@ interface Counters {
 export async function POST(request: NextRequest) {
   if (!isCronAuthorized(request)) return errorResponse('Unauthorized', 401)
 
-  const today = new Date()
-  const dateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const dateOnly = istDateOnly()
 
   // All employees + admins eligible: active, onboarded, not in must-change-password
   const users = await prisma.user.findMany({

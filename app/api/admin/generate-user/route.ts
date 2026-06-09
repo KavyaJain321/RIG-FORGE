@@ -1,7 +1,9 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies, hashPassword, isAdminRole } from '@/lib/auth'
+import { hashPassword, isAdminRole } from '@/lib/auth'
+import { authenticateActive } from '@/lib/authz'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { encryptSecret } from '@/lib/secret-box'
 import crypto from 'crypto'
 
 function generateSecurePassword(): string {
@@ -26,9 +28,7 @@ function generateSecurePassword(): string {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const token = getTokenFromCookies(request)
-    if (!token) return errorResponse('Not authenticated', 401)
-    const payload = verifyToken(token)
+    const payload = await authenticateActive(request)
     if (!payload || !isAdminRole(payload.role)) return errorResponse('Admin access required', 403)
 
     let body: unknown
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         role: role as 'ADMIN' | 'EMPLOYEE',
         isOnboarding: false,          // pre-approved — no approval step needed
         currentStatus: 'NOT_WORKING',
-        tempPassword: temporaryPassword,  // stored so admins can retrieve it
+        tempPassword: encryptSecret(temporaryPassword),  // encrypted at rest; admins retrieve via the (decrypting) detail endpoint
         mustChangePassword: true,         // user must change on first login
       },
     })

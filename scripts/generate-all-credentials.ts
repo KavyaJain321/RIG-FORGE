@@ -7,6 +7,7 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { encryptSecret } from '../lib/secret-box'
 
 const prisma = new PrismaClient()
 
@@ -50,7 +51,7 @@ async function main() {
     const hash = await bcrypt.hash(pwd, 12)
     await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: hash, tempPassword: pwd, mustChangePassword: true },
+      data: { passwordHash: hash, tempPassword: encryptSecret(pwd), mustChangePassword: true },
     })
     results.push({
       name: user.name,

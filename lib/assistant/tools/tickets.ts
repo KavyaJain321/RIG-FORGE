@@ -7,6 +7,7 @@
 
 import { prisma } from '@/lib/db'
 import { isAdminRole } from '@/lib/auth'
+import { assertNoHtml } from '@/lib/sanitize'
 import type { Prisma } from '@prisma/client'
 import type { ToolUser } from './projects'
 
@@ -89,6 +90,8 @@ export interface CreateTicketArgs {
 export async function createTicket(caller: ToolUser, args: CreateTicketArgs) {
   if (args.title.trim().length < 5) throw new Error('Ticket title must be at least 5 characters')
   if (args.description.trim().length < 20) throw new Error('Ticket description must be at least 20 characters')
+  assertNoHtml(args.title, 'Ticket title')
+  assertNoHtml(args.description, 'Ticket description')
 
   // Caller must be a member of the project (or admin)
   const isAdmin = isAdminRole(caller.role)

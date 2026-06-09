@@ -15,7 +15,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (ticket.status !== 'OPEN') return errorResponse('Only open tickets can be cancelled', 400)
     if (ticket.raisedById !== payload.userId) return errorResponse('Only the ticket raiser can cancel it', 403)
 
-    await prisma.ticket.update({ where: { id: params.id }, data: { status: 'CANCELLED', cancelledAt: new Date() } })
+    // Atomically flip only if still OPEN (guards against a concurrent
+    // accept/complete that already moved the ticket on).
+    const flipped = await prisma.ticket.updateMany({
+      where: { id: params.id, status: 'OPEN' },
+      data: { status: 'CANCELLED', cancelledAt: new Date() },
+    })
+    if (flipped.count === 0) return errorResponse('Only open tickets can be cancelled', 409)
+
     return successResponse({ success: true, status: 'CANCELLED' })
   } catch (error) {
     console.error('[POST /api/tickets/[id]/cancel]', error)

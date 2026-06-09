@@ -181,7 +181,7 @@ export async function POST(
     })
     if (!leadUser) return errorResponse('leadId must reference a valid active user', 400)
 
-    const validStatuses = ['ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED']
+    const validStatuses = ['ACTIVE', 'ON_HOLD', 'COMPLETED', 'ARCHIVED']
     const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 
     const resolvedStatus =

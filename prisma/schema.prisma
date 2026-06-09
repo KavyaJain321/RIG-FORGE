@@ -78,7 +78,7 @@ model User {
   name          String
   email         String     @unique      // RIG login identifier (e.g. name@rigforge.com) — NOT a real mailbox
   personalEmail String?                 // deliverable Gmail (manual bootstrap). Authoritative source is the connected GoogleIntegration.email when present.
-  whatsappNumber String?                // WhatsApp number in E.164 format (+91XXXXXXXXXX). Used by Forgie's WA tools.
+  whatsappNumber String?   @unique       // WhatsApp number in E.164 format (+91XXXXXXXXXX). Unique so inbound WA messages resolve to exactly one user. (Nullable → many users may have none.)
   passwordHash  String
   role          Role
   avatarUrl          String?

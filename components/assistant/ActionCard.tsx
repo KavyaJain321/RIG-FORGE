@@ -29,6 +29,7 @@ export default function ActionCard({
           conversationId,
           action: action.action,
           args: action.args,
+          token: action.token,
         }),
       })
       const json = (await res.json()) as {

@@ -15,6 +15,7 @@ import { type NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { RESERVATION_PROVIDER } from '@/lib/assistant/rate-limit'
 
 export async function GET(request: NextRequest) {
   const token = getTokenFromCookies(request)
@@ -40,19 +41,20 @@ export async function GET(request: NextRequest) {
     prisma.assistantMessage.count(),
     prisma.assistantAuditLog.count(),
 
-    // Last 7 days, top users by message count
+    // Last 7 days, top users by message count (exclude the reservation sentinel
+    // so counts reflect real per-provider usage, not raw attempt reservations)
     prisma.assistantUsage.groupBy({
       by: ['userId'],
-      where: { date: { gte: sevenDaysAgoDate } },
+      where: { date: { gte: sevenDaysAgoDate }, provider: { not: RESERVATION_PROVIDER } },
       _sum: { messageCount: true, inputTokens: true, outputTokens: true },
       orderBy: { _sum: { messageCount: 'desc' } },
       take: 10,
     }),
 
-    // Last 7 days, by provider
+    // Last 7 days, by provider (exclude the reservation sentinel)
     prisma.assistantUsage.groupBy({
       by: ['provider'],
-      where: { date: { gte: sevenDaysAgoDate } },
+      where: { date: { gte: sevenDaysAgoDate }, provider: { not: RESERVATION_PROVIDER } },
       _sum: { messageCount: true, inputTokens: true, outputTokens: true },
       orderBy: { _sum: { messageCount: 'desc' } },
     }),

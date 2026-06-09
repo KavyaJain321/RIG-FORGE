@@ -17,21 +17,32 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return errorResponse('Only the ticket raiser or helper can complete it', 403)
     }
 
-    await prisma.ticket.update({ where: { id: params.id }, data: { status: 'COMPLETED', completedAt: new Date() } })
-
-    // Notify the other party
-    const otherUserId = ticket.raisedById === payload.userId ? ticket.helperId : ticket.raisedById
-    if (otherUserId) {
-      await prisma.notification.create({
-        data: {
-          userId: otherUserId,
-          type: 'TICKET_COMPLETED',
-          title: 'Ticket resolved',
-          body: `Ticket "${ticket.title}" has been marked as completed.`,
-          linkTo: `/dashboard/tickets/${ticket.id}`,
-        },
+    // Atomically flip status only if still ACCEPTED (guards against a
+    // concurrent complete/cancel), and write the notification in the same
+    // transaction so we never notify on a no-op.
+    const result = await prisma.$transaction(async (tx) => {
+      const flipped = await tx.ticket.updateMany({
+        where: { id: params.id, status: 'ACCEPTED' },
+        data: { status: 'COMPLETED', completedAt: new Date() },
       })
-    }
+      if (flipped.count === 0) return { changed: false }
+
+      const otherUserId = ticket.raisedById === payload.userId ? ticket.helperId : ticket.raisedById
+      if (otherUserId) {
+        await tx.notification.create({
+          data: {
+            userId: otherUserId,
+            type: 'TICKET_COMPLETED',
+            title: 'Ticket resolved',
+            body: `Ticket "${ticket.title}" has been marked as completed.`,
+            linkTo: `/dashboard/tickets/${ticket.id}`,
+          },
+        })
+      }
+      return { changed: true }
+    })
+
+    if (!result.changed) return errorResponse('Ticket is no longer in a completable state', 409)
 
     return successResponse({ success: true, status: 'COMPLETED' })
   } catch (error) {

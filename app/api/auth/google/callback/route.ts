@@ -11,6 +11,7 @@ import jwt from 'jsonwebtoken'
 
 import { prisma } from '@/lib/db'
 import { exchangeCodeForTokens } from '@/lib/google/oauth'
+import { encryptSecret } from '@/lib/secret-box'
 
 interface StateClaims {
   userId: string
@@ -76,15 +77,15 @@ export async function GET(request: NextRequest) {
       create: {
         userId: claims.userId,
         email: tokens.email,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
+        accessToken: encryptSecret(tokens.accessToken) ?? tokens.accessToken,
+        refreshToken: encryptSecret(tokens.refreshToken) ?? tokens.refreshToken,
         expiresAt: tokens.expiresAt,
         scopes: tokens.scope,
       },
       update: {
         email: tokens.email,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
+        accessToken: encryptSecret(tokens.accessToken) ?? tokens.accessToken,
+        refreshToken: encryptSecret(tokens.refreshToken) ?? tokens.refreshToken,
         expiresAt: tokens.expiresAt,
         scopes: tokens.scope,
         connectedAt: new Date(),

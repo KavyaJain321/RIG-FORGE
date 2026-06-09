@@ -8,9 +8,15 @@
  * Body:
  *   {
  *     conversationId: string,
- *     action: 'create_task' | 'create_ticket' | 'update_task_status',
- *     args: { ... }
+ *     action: 'create_task' | 'create_ticket' | 'update_task_status' | ...,
+ *     args: { ... },
+ *     token: string   // HMAC binding issued when the action was proposed
  *   }
+ *
+ * The `token` is re-derived server-side from (userId, action, args) and
+ * constant-time-compared, so the args executed are provably the ones Forgie
+ * proposed for this user — the client cannot tamper with them or invoke an
+ * action that was never proposed. Per-tool RBAC still runs on top of that.
  *
  * Every successful or failed execution is recorded in AssistantAuditLog
  * so admins can see what Forgie did and trace any wrong writes back to
@@ -21,8 +27,10 @@ import { type NextRequest } from 'next/server'
 import { z } from 'zod'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
+import { isAdminRole } from '@/lib/auth'
+import { authenticateActive } from '@/lib/authz'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { verifyActionToken } from '@/lib/assistant/action-token'
 
 import { createTask, updateTaskStatus } from '@/lib/assistant/tools/tasks'
 import { createTicket } from '@/lib/assistant/tools/tickets'
@@ -46,6 +54,43 @@ import {
   leaveGroup as waLeaveGroup,
   isWhatsAppEnabled,
 } from '@/lib/assistant/tools/whatsapp'
+
+// ── WhatsApp recipient allow-list ────────────────────────────────────────────
+// Forgie sends from the org-wide WA account, so any individual recipient must
+// be a known teammate's number. Group JIDs (…@g.us) are allowed as-is (the
+// bridge rejects groups it isn't in). This stops a prompt-injected or forged
+// proposal from turning the org account into a spam/impersonation vector to
+// arbitrary phone numbers.
+function recipientDigits(v: string): string | null {
+  if (v.endsWith('@g.us')) return null // group JID — allowed, not a phone number
+  const at = v.indexOf('@')
+  const digits = (at >= 0 ? v.slice(0, at) : v).replace(/\D/g, '')
+  return digits.length >= 8 ? digits : '' // '' signals an invalid/too-short value
+}
+
+async function assertKnownRecipients(values: string[]): Promise<void> {
+  const phones = values.map((v) => ({ v, d: recipientDigits(v) })).filter((x) => x.d !== null)
+  if (phones.length === 0) return
+
+  const invalid = phones.filter((x) => x.d === '')
+  if (invalid.length) {
+    throw new Error(`Not a valid WhatsApp recipient: ${invalid.map((x) => x.v).join(', ')}`)
+  }
+
+  const rows = await prisma.user.findMany({
+    where: { whatsappNumber: { not: null }, isActive: true },
+    select: { whatsappNumber: true },
+  })
+  const known = new Set(rows.map((r) => (r.whatsappNumber ?? '').replace(/\D/g, '')).filter(Boolean))
+
+  const unknown = phones.filter((x) => !known.has(x.d as string))
+  if (unknown.length) {
+    throw new Error(
+      `These numbers aren't linked to any teammate, so Forgie won't message them: ` +
+        `${unknown.map((x) => x.v).join(', ')}. Add the number to the person's profile first.`,
+    )
+  }
+}
 
 // ─── Per-action arg schemas (server-side validation) ─────────────────────────
 
@@ -184,14 +229,18 @@ const Body = z.object({
     'wa_leave_group',
   ]),
   args: z.record(z.string(), z.unknown()),
+  // HMAC token issued by /assistant/message when the action was proposed.
+  // Binds (userId, action, args) so the client can't tamper with the args or
+  // invoke a write action that was never proposed. See action-token.ts.
+  token: z.string().min(1),
 })
 
 export async function POST(request: NextRequest) {
   // ── Auth ─────────────────────────────────────────────────────────────────
-  const token = getTokenFromCookies(request)
-  if (!token) return errorResponse('Authentication required', 401)
-  const claims = verifyToken(token)
-  if (!claims) return errorResponse('Invalid or expired session', 401)
+  // Re-validate role + isActive against the live DB (not just the JWT), so a
+  // deactivated/demoted user can't execute privileged writes with a stale token.
+  const caller = await authenticateActive(request)
+  if (!caller) return errorResponse('Authentication required', 401)
 
   // ── Parse + validate body ────────────────────────────────────────────────
   let raw: unknown
@@ -207,18 +256,33 @@ export async function POST(request: NextRequest) {
 
   const { conversationId, action, args } = parsed.data
 
+  // ── Verify the proposal binding (anti-tamper / anti-forge) ───────────────
+  // The args we execute must be exactly what Forgie proposed for THIS user.
+  // Without a valid token, this is either a tampered payload or a write action
+  // that was never proposed — reject before doing anything.
+  const binding = verifyActionToken(parsed.data.token, {
+    userId: caller.userId,
+    action,
+    args,
+  })
+  if (!binding.ok) {
+    const msg =
+      binding.reason === 'expired'
+        ? 'This confirmation has expired. Ask Forgie to propose the action again.'
+        : 'This action could not be verified. Ask Forgie to propose it again.'
+    return errorResponse(msg, 400)
+  }
+
   // ── Confirm the conversation exists and belongs to this user ─────────────
   let validConvId: string | null = null
   if (conversationId) {
     const conv = await prisma.assistantConversation.findFirst({
-      where: { id: conversationId, userId: claims.userId },
+      where: { id: conversationId, userId: caller.userId },
       select: { id: true },
     })
     if (!conv) return errorResponse('Conversation not found', 404)
     validConvId = conv.id
   }
-
-  const caller = { userId: claims.userId, role: claims.role }
 
   // ── Dispatch + audit-log (always logged, success or failure) ─────────────
   try {
@@ -367,6 +431,7 @@ export async function POST(request: NextRequest) {
         if (!a.success) {
           throw new Error(`Invalid args for wa_send_message: ${a.error.issues[0]?.message ?? 'malformed'}`)
         }
+        await assertKnownRecipients([a.data.to])
         result = await waSendMessage(a.data)
         break
       }
@@ -381,6 +446,7 @@ export async function POST(request: NextRequest) {
         if (!a.success) {
           throw new Error(`Invalid args for wa_create_group: ${a.error.issues[0]?.message ?? 'malformed'}`)
         }
+        await assertKnownRecipients(a.data.participants)
         result = await waCreateGroup(a.data)
         break
       }
@@ -395,6 +461,7 @@ export async function POST(request: NextRequest) {
         if (!a.success) {
           throw new Error(`Invalid args for wa_remove_participants: ${a.error.issues[0]?.message ?? 'malformed'}`)
         }
+        await assertKnownRecipients(a.data.participants)
         result = await waRemoveParticipants(a.data)
         break
       }
@@ -417,7 +484,7 @@ export async function POST(request: NextRequest) {
     // Audit log — success path
     await prisma.assistantAuditLog.create({
       data: {
-        userId: claims.userId,
+        userId: caller.userId,
         conversationId: validConvId,
         action,
         args: args as object,
@@ -447,7 +514,7 @@ export async function POST(request: NextRequest) {
     // Audit log — failure path
     await prisma.assistantAuditLog.create({
       data: {
-        userId: claims.userId,
+        userId: caller.userId,
         conversationId: validConvId,
         action,
         args: args as object,

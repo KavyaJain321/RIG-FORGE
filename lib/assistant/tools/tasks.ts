@@ -9,6 +9,7 @@
 
 import { prisma } from '@/lib/db'
 import { isAdminRole } from '@/lib/auth'
+import { assertNoHtml } from '@/lib/sanitize'
 import type { Prisma } from '@prisma/client'
 import type { ToolUser } from './projects'
 
@@ -101,6 +102,9 @@ export interface CreateTaskArgs {
 }
 
 export async function createTask(caller: ToolUser, args: CreateTaskArgs) {
+  assertNoHtml(args.title, 'Task title')
+  assertNoHtml(args.description, 'Task description')
+
   // Must be admin OR project lead OR project member with task-create perm.
   const isAdmin = isAdminRole(caller.role)
   if (!isAdmin) {
@@ -112,6 +116,30 @@ export async function createTask(caller: ToolUser, args: CreateTaskArgs) {
     const isLead = project.leadId === caller.userId
     const isMember = project.members.length > 0
     if (!isLead && !isMember) throw new Error('You do not have permission to create tasks in this project')
+  }
+
+  // Validate the assignee (if any): must exist, be active, and belong to the
+  // project (as a member or its lead). Prevents assigning tasks to arbitrary
+  // or non-existent user ids supplied via the tool args.
+  if (args.assigneeId) {
+    const [assignee, project] = await Promise.all([
+      prisma.user.findFirst({
+        where: { id: args.assigneeId, isActive: true },
+        select: {
+          projects: { where: { projectId: args.projectId }, select: { id: true } },
+        },
+      }),
+      prisma.project.findUnique({
+        where: { id: args.projectId },
+        select: { leadId: true },
+      }),
+    ])
+    if (!assignee) throw new Error('Assignee not found or is inactive')
+    const assigneeIsMember = assignee.projects.length > 0
+    const assigneeIsLead = project?.leadId === args.assigneeId
+    if (!assigneeIsMember && !assigneeIsLead) {
+      throw new Error('Assignee must be a member or lead of this project')
+    }
   }
 
   const task = await prisma.task.create({
@@ -149,17 +177,19 @@ export async function updateTaskStatus(
     where: { id: taskId, isActive: true },
     select: {
       assigneeId: true,
-      project: { select: { leadId: true, members: { where: { userId: caller.userId } } } },
+      project: { select: { leadId: true } },
     },
   })
   if (!task) throw new Error('Task not found')
 
+  // Only the task's assignee, the project lead, or an admin may change status.
+  // Bare project membership is intentionally NOT sufficient — otherwise any
+  // member could flip the status of a teammate's task.
   const isAdmin = isAdminRole(caller.role)
   const isAssignee = task.assigneeId === caller.userId
   const isLead = task.project.leadId === caller.userId
-  const isMember = task.project.members.length > 0
 
-  if (!isAdmin && !isAssignee && !isLead && !isMember) {
+  if (!isAdmin && !isAssignee && !isLead) {
     throw new Error('You do not have permission to update this task')
   }
 

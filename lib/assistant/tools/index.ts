@@ -125,7 +125,7 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     name: 'update_task_status',
-    description: 'Move a task to TODO, IN_PROGRESS, or DONE. Caller must be assignee, project lead, member, or admin.',
+    description: 'Move a task to TODO, IN_PROGRESS, or DONE. Caller must be the task assignee, the project lead, or an admin.',
     inputSchema: {
       type: 'object',
       properties: {

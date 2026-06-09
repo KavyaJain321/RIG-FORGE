@@ -4,13 +4,14 @@ import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { DailyLogEntry } from '@/lib/types'
+import { istDateOnly } from '@/lib/date-ist'
 
 const MAX_WORK_SUMMARY_LENGTH = 2000
 
-function getTodayUTC(): Date {
-  const today = new Date()
-  today.setUTCHours(0, 0, 0, 0)
-  return today
+// Key daily logs by the IST calendar day (see lib/date-ist.ts) so they line up
+// with heartbeats/activity and the crons regardless of the UTC server clock.
+function getToday(): Date {
+  return istDateOnly()
 }
 
 export async function GET(request: NextRequest) {
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid or expired token', 401)
 
-    const today = getTodayUTC()
+    const today = getToday()
 
     const log = await prisma.dailyLog.findUnique({
       where: {
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
         ? notes
         : null
 
-    const today = getTodayUTC()
+    const today = getToday()
 
     // Check for lock before upsert
     const existing = await prisma.dailyLog.findUnique({

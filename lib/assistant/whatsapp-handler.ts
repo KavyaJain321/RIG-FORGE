@@ -27,7 +27,7 @@ import { generate } from '@/lib/llm/generate'
 import { buildForgieContext, renderContextBlock } from './context'
 import { buildSystemPrompt } from './prompts'
 import { buildAllToolsAsync, TOOL_USE_GUIDANCE } from './ai-sdk-tools'
-import { checkRateLimit, recordUsage } from './rate-limit'
+import { reserveRateLimit, recordUsage } from './rate-limit'
 import { sendWhatsappMessage } from '@/lib/whatsapp/bridge'
 
 const MAX_HISTORY_MESSAGES = 10
@@ -61,6 +61,28 @@ export interface IncomingWaMessage {
   isGroup: boolean
   pushName: string
   timestamp: number
+  msgId?: string      // WhatsApp message id — used for idempotency
+}
+
+// Idempotency guard. The bridge dedupes in-process, but a bridge restart can
+// replay a message after its in-memory set is wiped. This in-memory LRU lives
+// in the long-running main-app process (a different service from the bridge),
+// so it catches restart-replays and prevents a second AI reply + LLM charge.
+// Best-effort by design: single-instance memory; a multi-instance deploy would
+// need a persisted dedupe key (tracked in SECURITY_TODO.md).
+const recentMsgIds = new Set<string>()
+const MAX_SEEN_IDS = 1000
+
+function alreadyHandled(msgId?: string): boolean {
+  if (!msgId) return false
+  if (recentMsgIds.has(msgId)) return true
+  recentMsgIds.add(msgId)
+  if (recentMsgIds.size > MAX_SEEN_IDS) {
+    // Set preserves insertion order — evict the oldest.
+    const oldest = recentMsgIds.values().next().value
+    if (oldest !== undefined) recentMsgIds.delete(oldest)
+  }
+  return false
 }
 
 export interface HandleResult {
@@ -103,6 +125,12 @@ function readOnly(tools: ToolSet): ToolSet {
 export async function handleIncomingWhatsapp(
   msg: IncomingWaMessage,
 ): Promise<HandleResult> {
+  // Idempotency — drop a message we've already handled (e.g. bridge restart
+  // replay) before doing any LLM work, so the user never gets a double reply.
+  if (alreadyHandled(msg.msgId)) {
+    return { processed: false, reason: 'duplicate' }
+  }
+
   const e164 = jidToE164(msg.from)
   if (!e164) return { processed: false, reason: 'bad-jid' }
 
@@ -115,16 +143,12 @@ export async function handleIncomingWhatsapp(
     select: { id: true, name: true, role: true },
   })
   if (!user) {
-    // Some pre-seed rows may store the bare digits. One more attempt.
+    // Some pre-seed rows may store the bare digits (no leading "+"). Match that
+    // exact form only — a loose `endsWith` could resolve to the WRONG user
+    // whose longer number merely ends with these digits.
     const digits = e164.slice(1)
     user = await prisma.user.findFirst({
-      where: {
-        isActive: true,
-        OR: [
-          { whatsappNumber: digits },
-          { whatsappNumber: { endsWith: digits } },
-        ],
-      },
+      where: { isActive: true, whatsappNumber: digits },
       select: { id: true, name: true, role: true },
     })
   }
@@ -144,7 +168,7 @@ export async function handleIncomingWhatsapp(
   if (!userBody) return { processed: false, reason: 'empty-body' }
 
   // Step 3 — rate limit (shared per-user budget with the web chat).
-  const rl = await checkRateLimit(user.id)
+  const rl = await reserveRateLimit(user.id)
   if (!rl.allowed) {
     await safeSend(
       msg.chatJid,

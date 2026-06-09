@@ -46,6 +46,38 @@ export function signToken(payload: TokenPayload): string | null {
   }
 }
 
+/**
+ * Mint a short-lived, narrowly-scoped token for the realtime/socket channel.
+ * This is what gets handed to client-side JS (via /api/auth/token) — NOT the
+ * 7-day session cookie. So an XSS that reads it gets a ~2-minute, socket-only
+ * credential that can't be replayed as a session (different shape + scope).
+ */
+export function signSocketToken(userId: string): string | null {
+  try {
+    return jwt.sign({ sub: userId, scope: 'socket' }, getJwtSecret(), { expiresIn: '2m' })
+  } catch {
+    return null
+  }
+}
+
+/** Verify a socket-scoped token. Returns the userId, or null if invalid. */
+export function verifySocketToken(token: string): { userId: string } | null {
+  try {
+    const decoded = jwt.verify(token, getJwtSecret())
+    if (
+      typeof decoded === 'object' &&
+      decoded !== null &&
+      (decoded as { scope?: string }).scope === 'socket' &&
+      'sub' in decoded
+    ) {
+      return { userId: String((decoded as { sub: unknown }).sub) }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 export function verifyToken(token: string): TokenPayload | null {
   try {
     const decoded = jwt.verify(token, getJwtSecret())

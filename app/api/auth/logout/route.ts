@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken, getTokenFromCookies, COOKIE_NAME } from '@/lib/auth'
 import { successResponse } from '@/lib/api-helpers'
+import { istDateOnly } from '@/lib/date-ist'
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -9,8 +10,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const payload = token ? verifyToken(token) : null
 
     if (payload?.userId) {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      const today = istDateOnly()
       await Promise.all([
         prisma.user.update({ where: { id: payload.userId }, data: { currentStatus: 'NOT_WORKING' } }),
         prisma.dailyActivity.upsert({

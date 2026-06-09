@@ -10,6 +10,7 @@
 
 import { prisma } from '@/lib/db'
 import { generate } from '@/lib/llm/generate'
+import { istDayRangeFromKey } from '@/lib/date-ist'
 
 export interface ActivityEvidence {
   tasksClosed: Array<{ id: string; title: string; projectName: string; completedAt: string }>
@@ -30,10 +31,9 @@ export async function collectActivity(
   userId: string,
   dateOnly: Date,
 ): Promise<ActivityEvidence | null> {
-  const startOfDay = new Date(dateOnly)
-  startOfDay.setHours(0, 0, 0, 0)
-  const endOfDay = new Date(startOfDay)
-  endOfDay.setDate(endOfDay.getDate() + 1)
+  // Match the IST calendar day this draft is keyed to (the dateOnly key is an
+  // istDateOnly value), not a UTC-midnight window.
+  const { start: startOfDay, end: endOfDay } = istDayRangeFromKey(dateOnly)
 
   const [tasksClosed, ticketsAccepted, ticketsCompleted, threadMessages] = await Promise.all([
     prisma.task.findMany({

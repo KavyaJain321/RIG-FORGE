@@ -17,6 +17,7 @@ import { type NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { isCronAuthorized } from '@/lib/cron'
+import { istDateOnly, istDayRangeFromKey } from '@/lib/date-ist'
 import { getProjectHealth } from '@/lib/assistant/tools/projects'
 
 const HEALTH_THRESHOLD = 50  // projects below this score get an alert
@@ -24,10 +25,9 @@ const HEALTH_THRESHOLD = 50  // projects below this score get an alert
 export async function POST(request: NextRequest) {
   if (!isCronAuthorized(request)) return errorResponse('Unauthorized', 401)
 
-  const now = new Date()
-  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const tomorrow0 = new Date(today0)
-  tomorrow0.setDate(tomorrow0.getDate() + 1)
+  // Dedupe window = the IST calendar day (see lib/date-ist.ts), so "already
+  // alerted today" tracks the team's day rather than the UTC server clock.
+  const { start: today0, end: tomorrow0 } = istDayRangeFromKey(istDateOnly())
 
   // Find all active projects
   const projects = await prisma.project.findMany({

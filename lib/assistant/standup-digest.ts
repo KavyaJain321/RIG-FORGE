@@ -8,6 +8,7 @@
 
 import { prisma } from '@/lib/db'
 import { generate } from '@/lib/llm/generate'
+import { istDateOnly, istDayRangeFromKey } from '@/lib/date-ist'
 
 export interface StandupMetrics {
   dateFrom: string
@@ -32,11 +33,11 @@ export interface StandupMetrics {
 
 export async function buildStandupMetrics(): Promise<StandupMetrics> {
   const now = new Date()
-  const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const yesterday0 = new Date(today0)
-  yesterday0.setDate(yesterday0.getDate() - 1)
-  const tomorrow0 = new Date(today0)
-  tomorrow0.setDate(tomorrow0.getDate() + 1)
+  // Day boundaries anchored to the IST calendar day (see lib/date-ist.ts), so
+  // "yesterday's work" and "today's deadlines" match the team's day, not UTC.
+  const todayKey = istDateOnly(now)
+  const { start: today0, end: tomorrow0 } = istDayRangeFromKey(todayKey)
+  const yesterday0 = new Date(today0.getTime() - 24 * 60 * 60 * 1000)
 
   // ── Yesterday totals ─────────────────────────────────────────────────────
   const [
@@ -181,8 +182,8 @@ export async function buildStandupMetrics(): Promise<StandupMetrics> {
     .slice(0, 5)
 
   return {
-    dateFrom: yesterday0.toISOString().slice(0, 10),
-    dateTo: today0.toISOString().slice(0, 10),
+    dateFrom: new Date(todayKey.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    dateTo: todayKey.toISOString().slice(0, 10),
     totals: {
       tasksClosed,
       ticketsRaised,

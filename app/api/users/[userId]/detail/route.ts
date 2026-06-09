@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { decryptSecret } from '@/lib/secret-box'
 import type { MemberDetail } from '@/lib/types'
 
 // ─── GET /api/users/[userId]/detail ─────────────────────────────────────────
@@ -243,7 +244,7 @@ export async function GET(
       dailyLogsThisWeek,
       ...(isAdmin && {
         mustChangePassword: typedUserRecord.mustChangePassword ?? false,
-        tempPassword: canSeeTempPassword ? (typedUserRecord.tempPassword ?? null) : null,
+        tempPassword: canSeeTempPassword ? decryptSecret(typedUserRecord.tempPassword) : null,
       }),
     }
 

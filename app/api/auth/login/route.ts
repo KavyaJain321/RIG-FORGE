@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { comparePassword, signToken, COOKIE_NAME } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { istDateOnly } from '@/lib/date-ist'
 import type { AuthUser, ApiResponse } from '@/lib/types'
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7
@@ -28,8 +29,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     // Fire-and-forget: a transient DB blip on these presence writes must NOT
     // fail the whole login response — the user is already authenticated.
     if (!user.isOnboarding) {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      const today = istDateOnly()
       void Promise.all([
         prisma.user.update({ where: { id: user.id }, data: { currentStatus: 'WORKING' } }),
         prisma.dailyActivity.upsert({

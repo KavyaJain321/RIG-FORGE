@@ -2,8 +2,10 @@ import { type NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies, hashPassword, isAdminRole } from '@/lib/auth'
+import { hashPassword, isAdminRole } from '@/lib/auth'
+import { authenticateActive } from '@/lib/authz'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { encryptSecret } from '@/lib/secret-box'
 
 function generateSecurePassword(): string {
   const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
@@ -36,10 +38,7 @@ export async function POST(
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
   try {
-    const token = getTokenFromCookies(request)
-    if (!token) return errorResponse('Not authenticated', 401)
-
-    const caller = verifyToken(token)
+    const caller = await authenticateActive(request)
     if (!caller || !isAdminRole(caller.role)) return errorResponse('Admin access required', 403)
 
     const { id: targetId } = params
@@ -70,7 +69,7 @@ export async function POST(
       where: { id: targetId },
       data: {
         passwordHash,
-        tempPassword: newTempPassword,
+        tempPassword: encryptSecret(newTempPassword),  // encrypted at rest
         mustChangePassword: true,
       },
     })

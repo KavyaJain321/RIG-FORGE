@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken, getTokenFromCookies } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { istDateOnly } from '@/lib/date-ist'
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -10,8 +11,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid token', 401)
 
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const today = istDateOnly()
 
     await prisma.dailyActivity.upsert({
       where: { userId_date: { userId: payload.userId, date: today } },

@@ -39,25 +39,32 @@ export async function POST(
       return errorResponse('Ticket is already closed', 400)
     }
 
-    await prisma.ticket.update({
-      where: { id: params.id },
-      data: { status: 'COMPLETED', completedAt: new Date() },
+    // Atomically flip status only if still OPEN or ACCEPTED (guards against a
+    // concurrent resolve/cancel), and notify in the same transaction.
+    const result = await prisma.$transaction(async (tx) => {
+      const flipped = await tx.ticket.updateMany({
+        where: { id: params.id, status: { in: ['OPEN', 'ACCEPTED'] } },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      })
+      if (flipped.count === 0) return { changed: false }
+
+      const otherUserId =
+        ticket.raisedById === payload.userId ? ticket.helperId : ticket.raisedById
+      if (otherUserId && otherUserId !== payload.userId) {
+        await tx.notification.create({
+          data: {
+            userId: otherUserId,
+            type: 'TICKET_COMPLETED',
+            title: 'Ticket resolved',
+            body: `Ticket "${ticket.title}" has been marked as resolved.`,
+            linkTo: `/dashboard/tickets/${ticket.id}`,
+          },
+        })
+      }
+      return { changed: true }
     })
 
-    // Notify the other party
-    const otherUserId =
-      ticket.raisedById === payload.userId ? ticket.helperId : ticket.raisedById
-    if (otherUserId && otherUserId !== payload.userId) {
-      await prisma.notification.create({
-        data: {
-          userId: otherUserId,
-          type: 'TICKET_COMPLETED',
-          title: 'Ticket resolved',
-          body: `Ticket "${ticket.title}" has been marked as resolved.`,
-          linkTo: `/dashboard/tickets/${ticket.id}`,
-        },
-      })
-    }
+    if (!result.changed) return errorResponse('Ticket is already closed', 409)
 
     return successResponse({ success: true, status: 'COMPLETED' })
   } catch (error) {

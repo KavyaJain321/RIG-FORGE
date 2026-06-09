@@ -129,21 +129,43 @@ export async function PATCH(request: NextRequest) {
       return errorResponse('No fields to update', 400)
     }
 
-    const updated = await prisma.user.update({
-      where: { id: claims.userId },
-      data: updateData,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        avatarUrl: true,
-        currentStatus: true,
-        isOnboarding: true,
-        mustChangePassword: true,
-        createdAt: true,
-      },
-    })
+    // Friendly pre-check: a WhatsApp number must map to exactly one user, or
+    // inbound WA messages can't be resolved unambiguously. The DB @unique
+    // constraint is the hard guarantee; this returns a clean 409 first.
+    if (updateData.whatsappNumber) {
+      const clash = await prisma.user.findFirst({
+        where: { whatsappNumber: updateData.whatsappNumber, id: { not: claims.userId } },
+        select: { id: true },
+      })
+      if (clash) {
+        return errorResponse('That WhatsApp number is already linked to another account.', 409)
+      }
+    }
+
+    let updated
+    try {
+      updated = await prisma.user.update({
+        where: { id: claims.userId },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          avatarUrl: true,
+          currentStatus: true,
+          isOnboarding: true,
+          mustChangePassword: true,
+          createdAt: true,
+        },
+      })
+    } catch (err) {
+      // Unique-constraint race on whatsappNumber → friendly 409 instead of 500.
+      if ((err as { code?: string })?.code === 'P2002') {
+        return errorResponse('That WhatsApp number is already linked to another account.', 409)
+      }
+      throw err
+    }
 
     const user: AuthUser = {
       id: updated.id,
