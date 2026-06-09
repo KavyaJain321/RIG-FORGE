@@ -65,7 +65,7 @@ export interface IncomingWaMessage {
 
 export interface HandleResult {
   processed: boolean       // did we send a reply?
-  reason: string           // 'replied' | 'unknown-sender' | 'group-not-mentioned' | 'rate-limited' | 'empty-body' | 'send-failed' | ...
+  reason: string           // 'replied' | 'unknown-sender' | 'group-not-mentioned' | 'rate-limited' | 'empty-body' | 'send-failed' | 'pipeline-error' | ...
   conversationId?: string
 }
 
@@ -185,91 +185,125 @@ export async function handleIncomingWhatsapp(
     },
   })
 
-  // Step 6 — build context + system prompt + tools.
-  const context = await buildForgieContext({
-    userId: user.id,
-    userName: user.name,
-    userRole: user.role,
-  })
-
-  const systemPrompt = [
-    buildSystemPrompt({ id: user.id, name: user.name, role: user.role as Role }),
-    '',
-    renderContextBlock(context),
-    '',
-    TOOL_USE_GUIDANCE,
-    '',
-    WA_REPLY_GUIDANCE,
-  ].join('\n')
-
-  const allTools = await buildAllToolsAsync({ userId: user.id, role: user.role })
-  const tools = readOnly(allTools)
-
-  // Step 7 — load the last few exchanges so Forgie has memory.
-  const history = await prisma.assistantMessage.findMany({
-    where: {
-      conversationId: conversation.id,
-      role: { in: ['USER', 'ASSISTANT'] },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: MAX_HISTORY_MESSAGES,
-    select: { role: true, content: true },
-  })
-  const ordered = history.reverse()
-
-  const messages: ModelMessage[] = [
-    { role: 'system', content: systemPrompt },
-    ...ordered.map((m) => ({
-      role: (m.role === 'USER' ? 'user' : 'assistant') as 'user' | 'assistant',
-      content: m.content,
-    })),
-  ]
-
-  // Step 8 — call the LLM.
-  const result = await generate(messages, { tools })
-
-  // Step 9 — persist the assistant message + usage. Bookkeeping mistakes
-  // shouldn't block the reply going out, so .catch() each one.
-  await prisma.assistantMessage
-    .create({
-      data: {
-        conversationId: conversation.id,
-        role: 'ASSISTANT',
-        content: result.text,
-        provider: result.provider ?? undefined,
-        model: result.model ?? undefined,
-        inputTokens: result.inputTokens ?? undefined,
-        outputTokens: result.outputTokens ?? undefined,
-        latencyMs: result.latencyMs,
-        ...(result.toolCalls.length && {
-          toolCalls: JSON.parse(JSON.stringify(result.toolCalls)),
-        }),
-      },
-    })
-    .catch((e) => console.error('[wa-handler] save assistant msg failed:', e))
-
-  await prisma.assistantConversation
-    .update({
-      where: { id: conversation.id },
-      data: { updatedAt: new Date() },
-    })
-    .catch(() => {})
-
-  if (result.provider && (result.inputTokens || result.outputTokens)) {
-    await recordUsage({
+  // Steps 6-10 — build context, call the LLM, persist, and reply.
+  //
+  // Durability guarantee: WhatsApp inbound is fire-and-forget — the bridge
+  // does NOT retry the webhook (see reference-wa-bridge). So if anything in
+  // this section throws (context build, tool setup, a DB hiccup), the user's
+  // message stays persisted as a USER row but no reply ever goes out — a
+  // silent drop, exactly the failure the web chat route guards against with
+  // its "never leave an empty bubble" safety net. We wrap the whole pipeline
+  // so ANY unexpected failure still sends the user a short apology telling
+  // them to retry, instead of leaving them hanging.
+  //
+  // Note: generate() itself does NOT throw on provider exhaustion — it
+  // returns a canned (fallback:true) result — so a plain LLM outage already
+  // produces a "try again" reply and won't reach this catch.
+  try {
+    // Step 6 — build context + system prompt + tools.
+    const context = await buildForgieContext({
       userId: user.id,
-      provider: result.provider,
-      inputTokens: result.inputTokens ?? 0,
-      outputTokens: result.outputTokens ?? 0,
-    }).catch(() => {})
+      userName: user.name,
+      userRole: user.role,
+    })
+
+    const systemPrompt = [
+      buildSystemPrompt({ id: user.id, name: user.name, role: user.role as Role }),
+      '',
+      renderContextBlock(context),
+      '',
+      TOOL_USE_GUIDANCE,
+      '',
+      WA_REPLY_GUIDANCE,
+    ].join('\n')
+
+    const allTools = await buildAllToolsAsync({ userId: user.id, role: user.role })
+    const tools = readOnly(allTools)
+
+    // Step 7 — load the last few exchanges so Forgie has memory.
+    const history = await prisma.assistantMessage.findMany({
+      where: {
+        conversationId: conversation.id,
+        role: { in: ['USER', 'ASSISTANT'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: MAX_HISTORY_MESSAGES,
+      select: { role: true, content: true },
+    })
+    const ordered = history.reverse()
+
+    const messages: ModelMessage[] = [
+      { role: 'system', content: systemPrompt },
+      ...ordered.map((m) => ({
+        role: (m.role === 'USER' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.content,
+      })),
+    ]
+
+    // Step 8 — call the LLM.
+    const result = await generate(messages, { tools })
+
+    // Step 9 — persist the assistant message + usage. Bookkeeping mistakes
+    // shouldn't block the reply going out, so .catch() each one.
+    await prisma.assistantMessage
+      .create({
+        data: {
+          conversationId: conversation.id,
+          role: 'ASSISTANT',
+          content: result.text,
+          provider: result.provider ?? undefined,
+          model: result.model ?? undefined,
+          inputTokens: result.inputTokens ?? undefined,
+          outputTokens: result.outputTokens ?? undefined,
+          latencyMs: result.latencyMs,
+          ...(result.toolCalls.length && {
+            toolCalls: JSON.parse(JSON.stringify(result.toolCalls)),
+          }),
+        },
+      })
+      .catch((e) => console.error('[wa-handler] save assistant msg failed:', e))
+
+    await prisma.assistantConversation
+      .update({
+        where: { id: conversation.id },
+        data: { updatedAt: new Date() },
+      })
+      .catch(() => {})
+
+    if (result.provider && (result.inputTokens || result.outputTokens)) {
+      await recordUsage({
+        userId: user.id,
+        provider: result.provider,
+        inputTokens: result.inputTokens ?? 0,
+        outputTokens: result.outputTokens ?? 0,
+      }).catch(() => {})
+    }
+
+    // Step 10 — send the reply over the bridge, with disclaimer.
+    const replyBody = (result.text.trim() || "I didn't catch that — try again?") + WA_DISCLAIMER
+    const sent = await safeSend(msg.chatJid, replyBody)
+    if (!sent) return { processed: false, reason: 'send-failed', conversationId: conversation.id }
+
+    return { processed: true, reason: 'replied', conversationId: conversation.id }
+  } catch (err) {
+    // Unexpected failure in the reply pipeline (context build, tool setup,
+    // DB, etc.). The user's message was already accepted — don't leave them
+    // with silence. Send a short apology so they know to retry.
+    //
+    // We deliberately DON'T persist an assistant turn here: keeping the
+    // conversation's last message as the USER's question means it shows up
+    // as "unreplied" (last role = USER) and stays recoverable for a future
+    // replay, instead of being masked by an apology assistant row.
+    console.error(
+      '[wa-handler] reply pipeline failed:',
+      err instanceof Error ? err.message : err,
+    )
+    await safeSend(
+      msg.chatJid,
+      `Sorry — something went wrong on my end and I couldn't answer that. Please send it again in a moment.${WA_DISCLAIMER}`,
+    )
+    return { processed: false, reason: 'pipeline-error', conversationId: conversation.id }
   }
-
-  // Step 10 — send the reply over the bridge, with disclaimer.
-  const replyBody = (result.text.trim() || "I didn't catch that — try again?") + WA_DISCLAIMER
-  const sent = await safeSend(msg.chatJid, replyBody)
-  if (!sent) return { processed: false, reason: 'send-failed', conversationId: conversation.id }
-
-  return { processed: true, reason: 'replied', conversationId: conversation.id }
 }
 
 // Wrap bridge send so a transient failure doesn't take down the handler.
