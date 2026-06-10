@@ -190,6 +190,7 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
               provider: 'cache',
               model: 'cache',
             })
+            await maybeAutoTitle(args.conversationId, args.content, priorCount)
             controller.close()
             return
           }
@@ -372,16 +373,13 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
         })
 
         // ── Auto-title on first exchange ───────────────────────────────────
-        if (priorCount === 0) {
-          const autoTitle =
-            args.content.length > 60 ? args.content.slice(0, 57) + '...' : args.content
-          await prisma.assistantConversation
-            .update({ where: { id: args.conversationId }, data: { title: autoTitle } })
-            .catch(() => {})
-        }
+        await maybeAutoTitle(args.conversationId, args.content, priorCount)
 
         // ── Cache + usage (best-effort, non-blocking) ──────────────────────
-        if (priorCount === 0 && metadata?.provider && metadata && fullText) {
+        // Don't cache replies that proposed actions: a cache hit replays
+        // text only (pendingActions: []), so the confirmation card would
+        // silently vanish on replay.
+        if (priorCount <= 1 && metadata?.provider && fullText && pendingActions.length === 0) {
           void storeCache({
             userId: args.user.id,
             role: args.user.role,
@@ -425,6 +423,23 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Title a conversation after its first exchange. priorCount includes the
+ * user message saved in step 6, so a fresh conversation has priorCount === 1
+ * (same convention as the lookupCache gate).
+ */
+async function maybeAutoTitle(
+  conversationId: string,
+  content: string,
+  priorCount: number,
+): Promise<void> {
+  if (priorCount > 1) return
+  const autoTitle = content.length > 60 ? content.slice(0, 57) + '...' : content
+  await prisma.assistantConversation
+    .update({ where: { id: conversationId }, data: { title: autoTitle } })
+    .catch(() => {})
+}
 
 async function persistAssistant(
   conversationId: string,
