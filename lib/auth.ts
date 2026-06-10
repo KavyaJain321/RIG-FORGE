@@ -19,6 +19,21 @@ export function isAdminRole(role: string): boolean {
   return role === 'ADMIN' || role === 'SUPER_ADMIN'
 }
 
+/**
+ * Allowlist gate for the hidden developer dashboard (/dashboard/dev).
+ * Access is NOT tied to role — only emails listed in the DEV_DASHBOARD_EMAILS
+ * env var (comma-separated, case-insensitive) can see it. This keeps the
+ * dashboard invisible to admins and the owner unless explicitly added.
+ */
+export function isDeveloperEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  const allow = (process.env.DEV_DASHBOARD_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+  return allow.includes(email.toLowerCase())
+}
+
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET
   if (!secret) {
