@@ -6,6 +6,7 @@ import type { AdminDashboardData, AuthUser, ApiResponse } from '@/lib/types'
 import MemberSlideOver from '@/components/people/MemberSlideOver'
 import DailyLogDraftCard from '@/components/assistant/DailyLogDraftCard'
 import StandupCard from '@/components/assistant/StandupCard'
+import SetupPrompt from '@/components/dashboard/SetupPrompt'
 
 interface AdminDashboardProps {
   user: AuthUser
@@ -125,6 +126,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   return (
     <div className="min-h-screen bg-[#EAEAE4] p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
+
+        <SetupPrompt />
 
         {/* Header */}
         <div>

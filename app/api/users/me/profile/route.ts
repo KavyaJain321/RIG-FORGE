@@ -29,37 +29,10 @@ interface DailyLogEntry {
 export interface ProfileResponse {
   user: AuthUser
   whatsappNumber: string | null
+  whatsappVerified: boolean
   projects: ProjectEntry[]
   activityThisWeek: ActivityEntry[]
   dailyLogsThisWeek: DailyLogEntry[]
-}
-
-// Accepts loose input (with spaces / dashes / parens, optional + prefix,
-// or a bare 10-digit Indian number) and returns canonical E.164 like
-// "+919876543210". Throws on garbage. Empty string → null.
-function normalizeWhatsappNumber(input: string): string | null {
-  const trimmed = input.trim()
-  if (!trimmed) return null
-
-  const hasPlus = trimmed.startsWith('+')
-  const digits = trimmed.replace(/\D/g, '')
-
-  if (!digits) {
-    throw new Error('WhatsApp number must contain digits')
-  }
-
-  // Bare 10 digits → assume India (matches the bridge's normaliseRecipient).
-  if (!hasPlus && digits.length === 10) return `+91${digits}`
-
-  // 12 digits starting with 91 → India, just add the +.
-  if (!hasPlus && digits.length === 12 && digits.startsWith('91')) return `+${digits}`
-
-  // E.164 allows 7–15 digits after the +.
-  if (digits.length >= 10 && digits.length <= 15) return `+${digits}`
-
-  throw new Error(
-    'Use E.164 format (e.g. +919876543210) or a 10-digit Indian number',
-  )
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -101,6 +74,11 @@ export async function PATCH(request: NextRequest) {
       name?: string
       avatarUrl?: string
       whatsappNumber?: string | null
+      whatsappVerified?: boolean
+      waPendingNumber?: string | null
+      waVerifyCodeHash?: string | null
+      waVerifyExpiresAt?: Date | null
+      waVerifyAttempts?: number
     } = {}
 
     if (body.name !== undefined) {
@@ -112,34 +90,26 @@ export async function PATCH(request: NextRequest) {
       updateData.avatarUrl = body.avatarUrl ?? undefined
     }
     if (body.whatsappNumber !== undefined) {
-      // null or empty string both clear the field
+      // Setting a number now goes through OTP verification (see
+      // /api/users/me/whatsapp/*). PATCH only supports CLEARING it, which also
+      // resets the verified flag and any pending verification.
       if (body.whatsappNumber === null || body.whatsappNumber === '') {
         updateData.whatsappNumber = null
+        updateData.whatsappVerified = false
+        updateData.waPendingNumber = null
+        updateData.waVerifyCodeHash = null
+        updateData.waVerifyExpiresAt = null
+        updateData.waVerifyAttempts = 0
       } else {
-        try {
-          updateData.whatsappNumber = normalizeWhatsappNumber(String(body.whatsappNumber))
-        } catch (err) {
-          const message = err instanceof Error ? err.message : 'Invalid WhatsApp number'
-          return errorResponse(message, 400)
-        }
+        return errorResponse(
+          'To set a WhatsApp number, verify it via the verification flow.',
+          400,
+        )
       }
     }
 
     if (Object.keys(updateData).length === 0) {
       return errorResponse('No fields to update', 400)
-    }
-
-    // Friendly pre-check: a WhatsApp number must map to exactly one user, or
-    // inbound WA messages can't be resolved unambiguously. The DB @unique
-    // constraint is the hard guarantee; this returns a clean 409 first.
-    if (updateData.whatsappNumber) {
-      const clash = await prisma.user.findFirst({
-        where: { whatsappNumber: updateData.whatsappNumber, id: { not: claims.userId } },
-        select: { id: true },
-      })
-      if (clash) {
-        return errorResponse('That WhatsApp number is already linked to another account.', 409)
-      }
     }
 
     let updated
@@ -213,6 +183,7 @@ export async function GET(request: NextRequest) {
           mustChangePassword: true,
           createdAt: true,
           whatsappNumber: true,
+          whatsappVerified: true,
         },
       }),
       prisma.projectMember.findMany({
@@ -278,6 +249,7 @@ export async function GET(request: NextRequest) {
     const response: ProfileResponse = {
       user,
       whatsappNumber: userRecord.whatsappNumber ?? null,
+      whatsappVerified: userRecord.whatsappVerified,
       projects,
       activityThisWeek,
       dailyLogsThisWeek,

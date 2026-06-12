@@ -79,6 +79,13 @@ model User {
   email         String     @unique      // RIG login identifier (e.g. name@rigforge.com) — NOT a real mailbox
   personalEmail String?                 // deliverable Gmail (manual bootstrap). Authoritative source is the connected GoogleIntegration.email when present.
   whatsappNumber String?   @unique       // WhatsApp number in E.164 format (+91XXXXXXXXXX). Unique so inbound WA messages resolve to exactly one user. (Nullable → many users may have none.)
+  whatsappVerified Boolean @default(false) // true only after the user confirms an OTP we sent to that number. Existing pre-OTP numbers stay false but still resolve inbound.
+  // ── WhatsApp OTP verification (transient; cleared on success/expiry) ──
+  waPendingNumber  String?              // candidate E.164 number awaiting OTP confirmation. NOT promoted to whatsappNumber until verified, so unverified numbers never resolve inbound.
+  waVerifyCodeHash String?              // bcrypt hash of the 6-digit code we sent
+  waVerifyExpiresAt DateTime?           // code expiry (~10 min after send)
+  waVerifyAttempts Int     @default(0)  // wrong-code attempts for the current code; locks at a cap
+  waVerifyLastSentAt DateTime?          // last OTP send, for resend rate-limiting
   passwordHash  String
   role          Role
   avatarUrl          String?

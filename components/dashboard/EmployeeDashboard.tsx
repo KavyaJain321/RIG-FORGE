@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { EmployeeDashboardData, AuthUser, ApiResponse } from '@/lib/types'
 import DailyLogDraftCard from '@/components/assistant/DailyLogDraftCard'
 import StandupCard from '@/components/assistant/StandupCard'
+import SetupPrompt from '@/components/dashboard/SetupPrompt'
 
 interface EmployeeDashboardProps {
   user: AuthUser
@@ -112,6 +113,8 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
   return (
     <div className="min-h-screen bg-[#EAEAE4] p-6 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
+
+        <SetupPrompt />
 
         {/* Header */}
         <div className="flex items-center justify-between">

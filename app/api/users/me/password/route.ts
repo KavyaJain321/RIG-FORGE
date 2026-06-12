@@ -104,8 +104,8 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
             userId: user.id,
             type: 'WELCOME',
             title: `Welcome to RIG FORGE, ${user.name}!`,
-            body: 'Your account is set up and ready. Explore your projects, raise tickets, and keep your daily logs updated.',
-            linkTo: '/dashboard',
+            body: 'Finish setting up your account: connect your Google account and verify your WhatsApp number so Forgie can work for you. Tap here to open your profile.',
+            linkTo: '/dashboard/profile',
           },
         })
       }

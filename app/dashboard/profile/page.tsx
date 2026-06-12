@@ -9,6 +9,7 @@ import { isAdminRole } from '@/lib/auth'
 import type { ApiResponse } from '@/lib/types'
 import type { ProfileResponse } from '@/app/api/users/me/profile/route'
 import GoogleConnectCard from '@/components/assistant/GoogleConnectCard'
+import WhatsappVerifyCard from '@/components/profile/WhatsappVerifyCard'
 
 // ─── Day labels ────────────────────────────────────────────────────────────
 
@@ -95,12 +96,6 @@ export default function ProfilePage() {
   const [pwSuccess, setPwSuccess] = useState(false)
   const [pwError, setPwError] = useState<string | null>(null)
 
-  // WhatsApp number form state
-  const [waEditing, setWaEditing] = useState(false)
-  const [waInput, setWaInput] = useState('')
-  const [waSaving, setWaSaving] = useState(false)
-  const [waSuccess, setWaSuccess] = useState(false)
-  const [waError, setWaError] = useState<string | null>(null)
 
   // (Legacy admin-redirect removed — admins now also use this page for
   // integrations + password changes. Employee-specific sections below
@@ -179,37 +174,6 @@ export default function ProfilePage() {
       setLogError('Failed to save log')
     } finally {
       setLogSaving(false)
-    }
-  }
-
-  // ── Save WhatsApp number ──────────────────────────────────────────────
-
-  async function handleSaveWhatsapp() {
-    setWaError(null)
-    setWaSuccess(false)
-    setWaSaving(true)
-    try {
-      const res = await fetch('/api/users/me/profile', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          whatsappNumber: waInput.trim() === '' ? null : waInput.trim(),
-        }),
-      })
-      const json = (await res.json()) as ApiResponse<unknown>
-      if (!res.ok) {
-        setWaError(json.error ?? 'Failed to save WhatsApp number')
-        return
-      }
-      setWaSuccess(true)
-      setWaEditing(false)
-      // Re-fetch profile so the displayed (canonical) value updates
-      void fetchProfile()
-    } catch {
-      setWaError('Failed to save WhatsApp number')
-    } finally {
-      setWaSaving(false)
     }
   }
 
@@ -298,6 +262,7 @@ export default function ProfilePage() {
   const {
     user: profileUser,
     whatsappNumber,
+    whatsappVerified,
     projects,
     activityThisWeek,
     dailyLogsThisWeek,
@@ -373,79 +338,16 @@ export default function ProfilePage() {
             WHATSAPP NUMBER
           </label>
 
-          {!waEditing ? (
-            <div className="flex items-center justify-between gap-3">
-              <div className="font-mono text-xs">
-                {whatsappNumber ? (
-                  <span className="text-text-primary">{whatsappNumber}</span>
-                ) : (
-                  <span className="text-text-muted italic">Not set</span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setWaInput(whatsappNumber ?? '')
-                  setWaSuccess(false)
-                  setWaError(null)
-                  setWaEditing(true)
-                }}
-                className="font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent transition-colors"
-              >
-                {whatsappNumber ? 'EDIT' : 'ADD NUMBER'}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <input
-                type="tel"
-                value={waInput}
-                onChange={(e) => setWaInput(e.target.value)}
-                placeholder="+919876543210"
-                inputMode="tel"
-                autoComplete="tel"
-                className="w-full bg-background-primary border border-border-default font-mono text-xs text-text-primary placeholder:text-text-muted p-3 focus:outline-none focus:border-accent transition-colors"
-              />
-              <p className="font-mono text-[10px] text-text-muted">
-                E.164 format with country code, e.g. <span className="text-text-secondary">+919876543210</span>.
-                A bare 10-digit number is treated as Indian (+91).
-                Leave empty and save to clear.
-              </p>
-              <div className="flex items-center gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => void handleSaveWhatsapp()}
-                  disabled={waSaving}
-                  className="font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {waSaving ? 'SAVING…' : 'SAVE'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWaEditing(false)
-                    setWaError(null)
-                  }}
-                  disabled={waSaving}
-                  className="font-mono text-xs text-text-muted tracking-widest hover:text-text-primary transition-colors disabled:opacity-40"
-                >
-                  CANCEL
-                </button>
-                {waError && (
-                  <span className="font-mono text-[10px] text-status-danger">{waError}</span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {waSuccess && !waEditing && (
-            <p className="font-mono text-[10px] text-status-success tracking-widest mt-2">
-              ✓ SAVED
-            </p>
-          )}
+          <WhatsappVerifyCard
+            whatsappNumber={whatsappNumber}
+            verified={whatsappVerified}
+            onChange={() => void fetchProfile()}
+          />
 
           <p className="font-mono text-[10px] text-text-muted mt-3">
-            Used by Forgie when admins ask it to WhatsApp you. Not shown to teammates.
+            Used by Forgie when admins ask it to WhatsApp you, and to recognise
+            you when you message Forgie on WhatsApp. We verify it with a one-time
+            code. Not shown to teammates.
           </p>
         </div>
       </div>
