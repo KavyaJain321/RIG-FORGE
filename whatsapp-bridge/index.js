@@ -166,6 +166,7 @@ let isReady      = false
 let isScanning   = false
 let startingUp   = true
 let reconnectAttempts = 0   // for exponential reconnect backoff
+let startingLock = false    // guards against overlapping startWA() → twin-socket 440 conflicts
 const events     = []   // ring buffer of recent connection events for /debug
 
 // LRU of recently-seen message IDs so we don't double-process a message
@@ -285,6 +286,24 @@ function requireSecret(req, res, next) {
 const logger = pino({ level: 'silent' })
 
 async function startWA() {
+  // Prevent overlapping (re)starts. Two startWA() runs would each open a new
+  // socket with the SAME creds, and WhatsApp kicks both with a 440 "Stream
+  // Errored (conflict)" — a self-inflicted conflict death-loop. The old
+  // reconnect-on-close path could trigger this (it scheduled startWA without
+  // tearing down the previous socket).
+  if (startingLock) { logEvent('startWA() skipped — already (re)starting'); return }
+  startingLock = true
+  try {
+
+  // Tear down any previous socket BEFORE opening a new one. Remove its
+  // listeners first so the dying socket's own 'close' event can't schedule
+  // yet another reconnect behind our back.
+  if (sock) {
+    try { sock.ev.removeAllListeners() } catch {}
+    try { sock.end(new Error('replacing socket')) } catch {}
+    sock = null
+  }
+
   startingUp = true
   isReady    = false
   isScanning = false
@@ -449,6 +468,12 @@ async function startWA() {
       }
     }
   })
+
+  } finally {
+    // Release the lock once setup is done (or if it threw). Connection events
+    // fire asynchronously after this point — they don't need the lock held.
+    startingLock = false
+  }
 }
 
 // ─── Express ──────────────────────────────────────────────────────────────────
