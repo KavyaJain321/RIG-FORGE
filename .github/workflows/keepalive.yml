@@ -1,0 +1,40 @@
+name: Keep Render services awake
+
+# Render free-tier web services spin down after ~15 min of no inbound HTTP.
+# When the WhatsApp bridge spins down, its Baileys socket dies and incoming
+# WhatsApp messages stop being forwarded — and a long offline window makes
+# WhatsApp drop the device link (forcing a QR re-scan). This workflow pings
+# both services every 10 minutes to keep them warm.
+#
+# CAVEAT: this only prevents idle spin-down. Render free tier also caps total
+# instance-hours (~750/month, shared across the account). With two services
+# running 24/7 you will still exhaust the cap mid-month and get suspended.
+# The durable fix is upgrading the bridge to Render Starter ($7/mo) so it
+# never spins down and isn't hour-capped. See docs/FORGIE_DEPLOYMENT.md.
+#
+# Note: GitHub disables scheduled workflows after 60 days of repo inactivity,
+# and cron timing can drift under load. cron-job.org is a more reliable free
+# alternative — see docs/FORGIE_DEPLOYMENT.md.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # every 10 minutes
+  workflow_dispatch:          # allow manual "Run workflow" from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping WhatsApp bridge
+        run: |
+          echo "Pinging bridge /health..."
+          curl -sf --max-time 30 https://forgie-whatsapp-bridge.onrender.com/health \
+            && echo " — bridge OK" \
+            || echo " — bridge ping failed (will retry next run)"
+
+      - name: Ping main app
+        run: |
+          echo "Pinging app /api/health..."
+          curl -sf --max-time 30 https://rig-forge.onrender.com/api/health \
+            && echo " — app OK" \
+            || echo " — app ping failed (will retry next run)"

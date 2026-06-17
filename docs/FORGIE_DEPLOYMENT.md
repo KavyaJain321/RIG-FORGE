@@ -144,6 +144,43 @@ https://render.com/docs/cronjobs.
 
 ---
 
+## 4b. Keep the WhatsApp bridge alive (REQUIRED on free tier)
+
+⚠️ This is separate from the LLM crons above and is the #1 cause of
+"WhatsApp stopped working" complaints.
+
+The bridge (`forgie-whatsapp-bridge`) is a Render **free** web service.
+Free services spin down after ~15 min with no inbound HTTP. Incoming
+WhatsApp messages do **not** count as traffic to the bridge, so nothing
+keeps it awake on its own. Once it spins down the Baileys socket dies,
+messages stop forwarding, and a long-enough outage makes WhatsApp drop
+the device link — forcing a QR re-scan at `/qr`.
+
+To keep it warm, ping its public `/health` every ~10 minutes. Two ways:
+
+**Built-in (committed):** `.github/workflows/keepalive.yml` runs every
+10 min and pings both the bridge and the main app. Confirm it's enabled
+under the repo's **Actions** tab (GitHub disables scheduled workflows
+after 60 days of repo inactivity — push any commit to re-enable).
+
+**More reliable, also free:** add a cron-job.org monitor:
+
+| Title | URL | Schedule | Method |
+|---|---|---|---|
+| Bridge keep-alive | `https://forgie-whatsapp-bridge.onrender.com/health` | every 10 min | GET |
+| App keep-alive | `https://rig-forge.onrender.com/api/health` | every 10 min | GET |
+
+Both `/health` endpoints are public (no secret) and return `200` —
+nothing sensitive is exposed.
+
+> ❗ Keep-alive only fixes idle spin-down. Render free tier also caps
+> total instance-hours (~750/month, shared across the account). Two
+> services running 24/7 exceed that, so they will still be suspended
+> mid-month. For a bridge that **never** stops, upgrade it to Starter
+> ($7/mo) — set `plan: starter` in `whatsapp-bridge/render.yaml`.
+
+---
+
 ## 5. Smoke checklist (after cron wiring)
 
 - [ ] Manually trigger daily-log-drafts via cron service "Execute now"
