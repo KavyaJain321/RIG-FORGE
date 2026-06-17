@@ -554,10 +554,34 @@ app.post('/send', requireSecret, async (req, res) => {
   const { to, message } = req.body
   if (!to || !message) return res.status(400).json({ error: '"to" and "message" required' })
   try {
-    const jid = to.includes('@') ? to : `${to.replace(/\D/g, '')}@c.us`
-    await sock.sendMessage(jid, { text: message })
+    // Resolve the recipient to a ROUTABLE JID. The old code blindly appended
+    // "@c.us" (whatsapp-web.js format, not Baileys) or trusted whatever JID we
+    // were handed. On accounts migrated to WhatsApp's @lid privacy scheme,
+    // sending to @c.us / @s.whatsapp.net / a raw @lid is accepted locally by
+    // sock.sendMessage (so we'd reply "ok") but SILENTLY DROPPED by WhatsApp —
+    // the message never arrives. onWhatsApp() asks WhatsApp for the address it
+    // actually routes to, which fixes outbound on @lid accounts.
+    let jid
+    if (typeof to === 'string' && (to.endsWith('@g.us') || to.endsWith('@lid'))) {
+      // Group JID, or an already-resolved @lid we were explicitly told to use.
+      jid = to
+    } else {
+      const number = String(to).replace(/\D/g, '')
+      let resolved
+      try {
+        const [hit] = await sock.onWhatsApp(number)
+        if (hit?.exists && hit.jid) resolved = hit.jid
+      } catch (e) {
+        logEvent(`send: onWhatsApp(${number}) failed: ${e.message}`)
+      }
+      // Fall back to the canonical Baileys user JID if the lookup is unavailable.
+      jid = resolved ?? `${number}@s.whatsapp.net`
+    }
+    const sent = await sock.sendMessage(jid, { text: message })
+    logEvent(`sent to ${jid} (id=${sent?.key?.id ?? '?'})`)
     res.json({ ok: true, to: jid })
   } catch (err) {
+    logEvent(`send error to ${to}: ${err.message}`)
     res.status(500).json({ error: err.message })
   }
 })
