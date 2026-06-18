@@ -26,16 +26,38 @@ import { generate } from '@/lib/llm/generate'
 
 import { buildForgieContext, renderContextBlock } from './context'
 import { buildSystemPrompt } from './prompts'
-import { buildAllToolsAsync, TOOL_USE_GUIDANCE } from './ai-sdk-tools'
+import { buildAllToolsAsync } from './ai-sdk-tools'
 import { reserveRateLimit, recordUsage } from './rate-limit'
 import { sendWhatsappMessage } from '@/lib/whatsapp/bridge'
 
-const MAX_HISTORY_MESSAGES = 10
+// Kept modest for WhatsApp: combined with the trimmed WA tool guidance this
+// keeps the request under Groq's free-tier 12k tokens/minute cap so the fast
+// provider stays usable instead of always falling through to Gemini.
+const MAX_HISTORY_MESSAGES = 6
 
 // Italics in WhatsApp use _underscores_. Two newlines separates it from
 // the model's reply so it reads like a footer, not the last sentence.
 export const WA_DISCLAIMER =
   '\n\n_This is an AI-generated reply and may contain mistakes — verify anything important._'
+
+// Compact tool guidance for WhatsApp. The web chat's full TOOL_USE_GUIDANCE
+// is ~1.8k tokens and is mostly scheduling/email/group-send workflows for
+// propose_* tools — which are STRIPPED over WhatsApp (readOnly). Sending it
+// pushed the WA request to ~12k tokens and tripped Groq's free-tier 12k TPM
+// cap (413), so every WA reply fell through to Gemini. This keeps only the
+// bits that matter when answering from read tools + grounded context.
+const WA_TOOL_GUIDANCE = `# Using tools over WhatsApp
+
+The grounded-data block above already holds this user's projects, tasks,
+tickets (and, for admins, an org snapshot). Answer common questions
+straight from it — don't call a tool for something already loaded.
+
+Call a READ tool only for something NOT in that snapshot: a specific
+teammate (get_member), a project they're not on, a ticket/task filter,
+or a GitHub lookup. Strip honorifics/nicknames before searching a name
+("Rohit sir" → search "Rohit"). One well-chosen call beats three; never
+chain more than 3. If a lookup is empty, say so — don't invent. Never
+return an empty reply.`
 
 // Appended to the system prompt so the model knows it's writing for
 // WhatsApp instead of the web chat UI.
@@ -236,7 +258,7 @@ export async function handleIncomingWhatsapp(
       '',
       renderContextBlock(context),
       '',
-      TOOL_USE_GUIDANCE,
+      WA_TOOL_GUIDANCE,
       '',
       WA_REPLY_GUIDANCE,
     ].join('\n')
