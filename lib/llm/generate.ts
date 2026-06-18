@@ -61,6 +61,13 @@ export async function generate(
   const t0 = Date.now()
   let lastError: unknown = null
 
+  // The AI SDK prefers a dedicated `system` option over a role:'system'
+  // entry inside `messages` (the latter logs a prompt-injection warning and
+  // is discouraged). Callers still hand us one array; split it here so every
+  // caller is fixed centrally.
+  const systemText = extractSystem(messages)
+  const convo = messages.filter((m) => m.role !== 'system')
+
   for (let attempt = 0; attempt < MAX_FALLBACK_ATTEMPTS; attempt++) {
     const selection = selectNextModel()
     if (!selection) {
@@ -79,7 +86,8 @@ export async function generate(
       try {
         result = await generateText({
           model: selection.model,
-          messages,
+          ...(systemText && { system: systemText }),
+          messages: convo,
           temperature: 0.85,
           ...(options.tools && {
             tools: options.tools,
@@ -95,7 +103,8 @@ export async function generate(
         )
         result = await generateText({
           model: selection.model,
-          messages,
+          ...(systemText && { system: systemText }),
+          messages: convo,
           temperature: 0.85,
         })
       }
@@ -158,6 +167,18 @@ export async function generate(
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Join all role:'system' messages into one string for the AI SDK's `system`
+// option. Returns undefined when there are none (so we can conditionally
+// spread it). System messages always carry string content in our usage; the
+// typeof guard keeps TypeScript happy against the ModelMessage union.
+function extractSystem(messages: ModelMessage[]): string | undefined {
+  const parts = messages
+    .filter((m) => m.role === 'system')
+    .map((m) => (typeof m.content === 'string' ? m.content : ''))
+    .filter(Boolean)
+  return parts.length ? parts.join('\n\n') : undefined
+}
 
 function canned(text: string, latencyMs = 0): GenerateResult {
   return {

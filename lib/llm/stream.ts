@@ -90,6 +90,12 @@ export async function startStream(
     return { success: false, reason: 'assistant_disabled' }
   }
 
+  // Pass the system prompt via the SDK's dedicated `system` option instead of
+  // a role:'system' entry in `messages` (which logs a prompt-injection
+  // warning). Split once here so the web-chat caller doesn't have to.
+  const systemText = extractSystem(messages)
+  const convo = messages.filter((m) => m.role !== 'system')
+
   for (let attempt = 0; attempt < MAX_FALLBACK_ATTEMPTS; attempt++) {
     const selection = selectNextModel()
     if (!selection) {
@@ -99,7 +105,8 @@ export async function startStream(
     try {
       const result = streamText({
         model: selection.model,
-        messages,
+        ...(systemText && { system: systemText }),
+        messages: convo,
         temperature: 0.85,
         ...(options.tools && {
           tools: options.tools,
@@ -193,6 +200,17 @@ export async function consumeStream(
     toolCalls,
     fallback: false,
   }
+}
+
+// Join all role:'system' messages into one string for the AI SDK's `system`
+// option; undefined when there are none. The typeof guard narrows the
+// ModelMessage union (system content is always a string in our usage).
+function extractSystem(messages: ModelMessage[]): string | undefined {
+  const parts = messages
+    .filter((m) => m.role === 'system')
+    .map((m) => (typeof m.content === 'string' ? m.content : ''))
+    .filter(Boolean)
+  return parts.length ? parts.join('\n\n') : undefined
 }
 
 function errMsg(err: unknown): string {
