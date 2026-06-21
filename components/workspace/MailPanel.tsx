@@ -63,6 +63,7 @@ export default function MailPanel() {
   const [forgieBusy, setForgieBusy] = useState(false)
   const [compose, setCompose] = useState<Compose | null>(null)
   const [sending, setSending] = useState(false)
+  const [scope, setScope] = useState<'work' | 'all'>('work')
 
   useEffect(() => {
     void (async () => {
@@ -81,14 +82,14 @@ export default function MailPanel() {
   const loadInbox = useCallback(async () => {
     setLoading(true)
     try {
-      const r = await api<{ messages: MailMsg[] }>('/api/google/gmail/list?q=in:inbox&limit=25')
+      const r = await api<{ messages: MailMsg[] }>(`/api/google/gmail/list?scope=${scope}&limit=25`)
       setMessages(r.messages)
     } catch (e) {
       console.error('[mail] inbox', e)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [scope])
 
   useEffect(() => {
     if (connected) void loadInbox()
@@ -164,10 +165,13 @@ export default function MailPanel() {
     <div className="flex h-[calc(100vh-9rem)] border border-border-default rounded-xl overflow-hidden">
       {/* Inbox list */}
       <div className={`w-full sm:w-80 shrink-0 sm:border-r border-border-default flex-col bg-surface-raised/40 ${selected ? 'hidden sm:flex' : 'flex'}`}>
-        <div className="h-12 px-4 flex items-center justify-between border-b border-border-default">
-          <span className="font-mono text-xs uppercase tracking-widest text-text-secondary">Inbox</span>
-          <div className="flex gap-3">
-            <button type="button" onClick={() => setCompose({ to: '', subject: '', body: '' })} className="text-[#3F7A0A] text-xs font-mono">✎ Compose</button>
+        <div className="h-12 px-3 flex items-center justify-between gap-2 border-b border-border-default">
+          <div className="flex items-center gap-0.5 bg-black/[0.04] rounded-full p-0.5">
+            <button type="button" onClick={() => setScope('work')} title="Team & company mail only" className={`px-2.5 py-1 rounded-full text-[11px] font-mono ${scope === 'work' ? 'bg-[#3F7A0A] text-white' : 'text-text-secondary'}`}>Work</button>
+            <button type="button" onClick={() => setScope('all')} title="Everything in your inbox" className={`px-2.5 py-1 rounded-full text-[11px] font-mono ${scope === 'all' ? 'bg-[#3F7A0A] text-white' : 'text-text-secondary'}`}>All</button>
+          </div>
+          <div className="flex gap-3 items-center">
+            <button type="button" onClick={() => setCompose({ to: '', subject: '', body: '' })} className="text-[#3F7A0A] text-sm" title="Compose">✎</button>
             <button type="button" onClick={() => void loadInbox()} className="text-text-secondary text-sm" title="Refresh">⟳</button>
           </div>
         </div>
@@ -175,7 +179,9 @@ export default function MailPanel() {
           {loading ? (
             <p className="p-4 text-xs text-text-secondary">Loading…</p>
           ) : messages.length === 0 ? (
-            <p className="p-4 text-xs text-text-secondary">No mail in your inbox.</p>
+            <p className="p-4 text-xs text-text-secondary">
+              {scope === 'work' ? 'No team/company mail here. Tap “All” to see everything.' : 'No mail in your inbox.'}
+            </p>
           ) : (
             messages.map((m) => (
               <button
