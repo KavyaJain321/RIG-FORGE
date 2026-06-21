@@ -174,6 +174,7 @@ export default function MessageThread({
   const mediaRecRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const recordCancelledRef = useRef(false)
   const typingChannelRef = useRef<RealtimeChannel | null>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTypingSentRef = useRef(0)
@@ -286,11 +287,13 @@ export default function MessageThread({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mr = new MediaRecorder(stream)
       chunksRef.current = []
+      recordCancelledRef.current = false
       mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data) }
       mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        if (recordCancelledRef.current) return
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
         onSendImage(new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' }))
-        stream.getTracks().forEach((t) => t.stop())
       }
       mr.start()
       mediaRecRef.current = mr
@@ -303,6 +306,13 @@ export default function MessageThread({
   }
 
   function stopRecording() {
+    mediaRecRef.current?.stop()
+    setRecording(false)
+    if (recTimerRef.current) clearInterval(recTimerRef.current)
+  }
+
+  function cancelRecording() {
+    recordCancelledRef.current = true
     mediaRecRef.current?.stop()
     setRecording(false)
     if (recTimerRef.current) clearInterval(recTimerRef.current)
@@ -483,7 +493,15 @@ export default function MessageThread({
                 {dateSep}
                 <div id={`m-${m.id}`} className={`flex flex-col rounded-lg transition-shadow ${mine ? 'items-end' : 'items-start'}`}>
                   <div
-                    onContextMenu={m.deletedAt ? undefined : (e) => { e.preventDefault(); setCtxMenu({ msg: m, x: e.clientX, y: e.clientY }) }}
+                    onContextMenu={m.deletedAt ? undefined : (e) => {
+                      e.preventDefault()
+                      const MW = 180
+                      const MH = 360
+                      const x = e.clientX + MW > window.innerWidth ? Math.max(8, window.innerWidth - MW - 8) : e.clientX
+                      const y = e.clientY + MH > window.innerHeight ? Math.max(8, window.innerHeight - MH - 8) : e.clientY
+                      setCtxMenu({ msg: m, x, y })
+                    }}
+                    onDoubleClick={m.deletedAt ? undefined : () => setReplyingTo(m)}
                     className={`max-w-[78%] sm:max-w-[70%] rounded-2xl px-3 py-2 ${m.deletedAt ? '' : 'cursor-context-menu'} ${
                       mine
                         ? 'bg-[#3F7A0A] text-white rounded-br-sm'
@@ -643,9 +661,14 @@ export default function MessageThread({
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onSendImage(f); e.target.value = '' }}
           />
           {recording ? (
-            <button type="button" onClick={stopRecording} title="Stop recording" className="h-10 px-3 shrink-0 rounded-full bg-red-500 text-white text-xs flex items-center gap-1">
-              ⏹ {recordSecs}s
-            </button>
+            <>
+              <button type="button" onClick={cancelRecording} title="Cancel recording" className="h-10 w-10 shrink-0 rounded-full border border-border-default flex items-center justify-center text-text-secondary hover:text-red-500">
+                ✕
+              </button>
+              <button type="button" onClick={stopRecording} title="Stop & send" className="h-10 px-3 shrink-0 rounded-full bg-red-500 text-white text-xs flex items-center gap-1">
+                ⏹ {recordSecs}s
+              </button>
+            </>
           ) : (
             <button type="button" onClick={() => void startRecording()} title="Record voice note" className="h-10 w-10 shrink-0 rounded-full border border-border-default flex items-center justify-center text-text-secondary hover:text-text-primary">
               🎤

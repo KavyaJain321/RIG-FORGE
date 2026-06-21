@@ -6,7 +6,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { sendMediaMessage } from '@/lib/chat/service'
 
 const BUCKET = 'chat-media'
-const MAX_BYTES = 25 * 1024 * 1024
+const MAX_BYTES = 50 * 1024 * 1024
 
 // POST /api/chat/conversations/[id]/media — multipart upload of an image,
 // audio note, or document → creates an IMAGE/AUDIO/FILE message.
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const form = await request.formData().catch(() => null)
     const file = form?.get('file')
     if (!(file instanceof File)) return errorResponse('file is required (multipart form-data)', 400)
-    if (file.size > MAX_BYTES) return errorResponse('file must be under 25MB', 400)
+    if (file.size > MAX_BYTES) return errorResponse('file must be under 50MB', 400)
 
     const admin = getSupabaseAdmin()
     if (!admin) return errorResponse('Storage not configured', 500)
