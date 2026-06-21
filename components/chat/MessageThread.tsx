@@ -56,6 +56,12 @@ function formatText(text: string): ReactNode[] {
   return nodes
 }
 
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
+
 function groupReactions(reactions: { emoji: string; userId: string }[], meId: string) {
   const map = new Map<string, { emoji: string; count: number; mine: boolean }>()
   for (const r of reactions) {
@@ -142,6 +148,7 @@ export default function MessageThread({
   const scrollRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const docRef = useRef<HTMLInputElement>(null)
   const typingChannelRef = useRef<RealtimeChannel | null>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTypingSentRef = useRef(0)
@@ -455,6 +462,17 @@ export default function MessageThread({
                         {m.type === 'IMAGE' ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={m.content} alt="" className="rounded-lg max-w-full max-h-72 object-cover" />
+                        ) : m.type === 'FILE' ? (
+                          <a href={m.content} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${mine ? 'bg-black/15' : 'bg-black/[0.04]'}`}>
+                            <span className="text-lg shrink-0">📄</span>
+                            <span className="min-w-0">
+                              <span className="block text-sm truncate underline">{m.fileName ?? 'Download file'}</span>
+                              {m.fileSize ? <span className="block text-[10px] opacity-70">{formatBytes(m.fileSize)}</span> : null}
+                            </span>
+                          </a>
+                        ) : m.type === 'AUDIO' ? (
+                          // eslint-disable-next-line jsx-a11y/media-has-caption
+                          <audio controls src={m.content} className="max-w-[240px]" />
                         ) : (
                           <p className="text-sm whitespace-pre-wrap break-words">{formatText(m.content)}</p>
                         )}
@@ -536,6 +554,20 @@ export default function MessageThread({
             ref={fileRef}
             type="file"
             accept="image/*"
+            hidden
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onSendImage(f); e.target.value = '' }}
+          />
+          <button
+            type="button"
+            onClick={() => docRef.current?.click()}
+            title="Send a file"
+            className="h-10 w-10 shrink-0 rounded-full border border-border-default flex items-center justify-center text-text-secondary hover:text-text-primary"
+          >
+            📎
+          </button>
+          <input
+            ref={docRef}
+            type="file"
             hidden
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onSendImage(f); e.target.value = '' }}
           />

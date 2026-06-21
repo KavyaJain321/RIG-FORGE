@@ -355,13 +355,24 @@ export async function markDelivered(messageId: string, userId: string) {
 export async function sendMediaMessage(
   conversationId: string,
   userId: string,
-  mediaType: 'IMAGE' | 'FILE',
+  mediaType: 'IMAGE' | 'FILE' | 'AUDIO',
   url: string,
+  fileName?: string,
+  fileSize?: number,
 ) {
   await assertMember(conversationId, userId)
   const [message] = await prisma.$transaction([
     prisma.chatMessage.create({
-      data: { organizationId: ORG, conversationId, senderId: userId, kind: 'USER', type: mediaType, content: url },
+      data: {
+        organizationId: ORG,
+        conversationId,
+        senderId: userId,
+        kind: 'USER',
+        type: mediaType,
+        content: url,
+        fileName: fileName ?? null,
+        fileSize: fileSize ?? null,
+      },
       include: { sender: { select: memberUserSelect } },
     }),
     prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } }),

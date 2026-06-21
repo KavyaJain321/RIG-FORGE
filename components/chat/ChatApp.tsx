@@ -31,6 +31,9 @@ function rowToMsg(row: Record<string, unknown>): ChatMessageDTO {
     kind: row.kind as ChatMessageDTO['kind'],
     type: row.type as ChatMessageDTO['type'],
     content: String(row.content),
+    fileName: row.fileName ? String(row.fileName) : null,
+    fileSize: typeof row.fileSize === 'number' ? row.fileSize : null,
+    linkPreview: (row.linkPreview as ChatMessageDTO['linkPreview']) ?? null,
     replyToId: row.replyToId ? String(row.replyToId) : null,
     deliveredAt: row.deliveredAt ? String(row.deliveredAt) : null,
     editedAt: row.editedAt ? String(row.editedAt) : null,
@@ -158,6 +161,7 @@ export default function ChatApp() {
                     editedAt: row.editedAt ? String(row.editedAt) : null,
                     deletedAt: row.deletedAt ? String(row.deletedAt) : null,
                     pinnedAt: row.pinnedAt ? String(row.pinnedAt) : null,
+                    linkPreview: (row.linkPreview as ChatMessageDTO['linkPreview']) ?? null,
                   }
                 : m,
             ),

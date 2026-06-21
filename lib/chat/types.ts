@@ -21,8 +21,11 @@ export interface ChatMessageDTO {
   conversationId: string
   senderId: string | null
   kind: ChatMessageKind
-  type: 'TEXT' | 'IMAGE' | 'FILE'
+  type: 'TEXT' | 'IMAGE' | 'FILE' | 'AUDIO'
   content: string
+  fileName?: string | null
+  fileSize?: number | null
+  linkPreview?: { url: string; title?: string; description?: string; image?: string } | null
   replyToId?: string | null
   deliveredAt?: string | null
   editedAt?: string | null
