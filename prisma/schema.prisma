@@ -117,6 +117,7 @@ model User {
   chatMemberships      ConversationMember[] @relation("ChatMemberships")
   sentChatMessages     ChatMessage[]        @relation("ChatSentMessages")
   createdConversations Conversation[]       @relation("ChatCreatedBy")
+  chatReactions        MessageReaction[]
 }
 
 model Project {
@@ -588,7 +589,23 @@ model ChatMessage {
   sender       User?         @relation("ChatSentMessages", fields: [senderId], references: [id], onDelete: SetNull)
   replyTo      ChatMessage?  @relation("ChatReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies      ChatMessage[] @relation("ChatReplies")
+  reactions    MessageReaction[]
 
   @@index([conversationId, createdAt])
   @@index([organizationId])
+}
+
+// One emoji reaction per user per message (re-reacting replaces; same emoji toggles off).
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
 }

@@ -164,7 +164,7 @@ export async function listMessages(
     orderBy: { createdAt: 'desc' },
     take: limit,
     ...(opts.before ? { cursor: { id: opts.before }, skip: 1 } : {}),
-    include: { sender: { select: memberUserSelect } },
+    include: { sender: { select: memberUserSelect }, reactions: { select: { emoji: true, userId: true } } },
   })
   // Return chronological (oldest → newest) for rendering.
   return messages.reverse()
@@ -406,4 +406,29 @@ export async function deleteForEveryone(messageId: string, userId: string) {
     where: { id: messageId },
     data: { deletedAt: new Date(), content: '' },
   })
+}
+
+// ─── Reactions ───────────────────────────────────────────────────────────────
+
+// One reaction per user per message: same emoji toggles off, a new emoji replaces.
+export async function setReaction(messageId: string, userId: string, emoji: string) {
+  const msg = await prisma.chatMessage.findUnique({ where: { id: messageId }, select: { conversationId: true } })
+  if (!msg) throw new Error('Message not found')
+  await assertMember(msg.conversationId, userId)
+
+  const existing = await prisma.messageReaction.findUnique({
+    where: { messageId_userId: { messageId, userId } },
+  })
+  if (existing) {
+    if (existing.emoji === emoji) {
+      await prisma.messageReaction.delete({ where: { messageId_userId: { messageId, userId } } })
+      return
+    }
+    await prisma.messageReaction.update({
+      where: { messageId_userId: { messageId, userId } },
+      data: { emoji },
+    })
+    return
+  }
+  await prisma.messageReaction.create({ data: { messageId, userId, emoji } })
 }

@@ -65,6 +65,17 @@ export default function ChatApp() {
     }
   }, [])
 
+  const reloadActiveMessages = useCallback(async () => {
+    const id = activeIdRef.current
+    if (!id) return
+    try {
+      const d = await api<{ messages: ChatMessageDTO[] }>(`/api/chat/conversations/${id}/messages`)
+      setMessages(d.messages)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
   useEffect(() => { void refreshConversations() }, [refreshConversations])
 
   useEffect(() => {
@@ -164,9 +175,14 @@ export default function ChatApp() {
           )
         },
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'MessageReaction' },
+        () => { void reloadActiveMessages() },
+      )
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
-  }, [refreshConversations])
+  }, [refreshConversations, reloadActiveMessages])
 
   const handleSend = useCallback(
     async (text: string, replyToId?: string | null) => {
@@ -242,6 +258,35 @@ export default function ChatApp() {
     [refreshConversations],
   )
 
+  const handleReact = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!me) return
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m
+          const reactions = m.reactions ?? []
+          const mine = reactions.find((r) => r.userId === me.id)
+          const next =
+            mine && mine.emoji === emoji
+              ? reactions.filter((r) => r.userId !== me.id)
+              : [...reactions.filter((r) => r.userId !== me.id), { emoji, userId: me.id }]
+          return { ...m, reactions: next }
+        }),
+      )
+      try {
+        await api(`/api/chat/messages/${messageId}/reactions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emoji }),
+        })
+      } catch (err) {
+        console.error('[chat] react', err)
+        void reloadActiveMessages()
+      }
+    },
+    [me, reloadActiveMessages],
+  )
+
   const openConversation = useCallback(
     async (payload: object) => {
       const data = await api<{ conversation: { id: string } }>('/api/chat/conversations', {
@@ -289,6 +334,7 @@ export default function ChatApp() {
         onSendImage={handleSendImage}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onReact={handleReact}
         users={users}
         onlineIds={onlineIds}
         onChanged={refreshConversations}

@@ -56,6 +56,19 @@ function formatText(text: string): ReactNode[] {
   return nodes
 }
 
+function groupReactions(reactions: { emoji: string; userId: string }[], meId: string) {
+  const map = new Map<string, { emoji: string; count: number; mine: boolean }>()
+  for (const r of reactions) {
+    const g = map.get(r.emoji) ?? { emoji: r.emoji, count: 0, mine: false }
+    g.count++
+    if (r.userId === meId) g.mine = true
+    map.set(r.emoji, g)
+  }
+  return Array.from(map.values())
+}
+
+const REACTION_CHOICES = ['👍', '❤️', '😂', '😮', '😢', '🙏']
+
 function TypingDots() {
   return (
     <span className="inline-flex gap-0.5 items-end">
@@ -85,6 +98,7 @@ export default function MessageThread({
   onSendImage,
   onEdit,
   onDelete,
+  onReact,
   users,
   onlineIds,
   onChanged,
@@ -99,6 +113,7 @@ export default function MessageThread({
   onSendImage: (file: File) => void
   onEdit: (messageId: string, text: string) => void
   onDelete: (messageId: string) => void
+  onReact: (messageId: string, emoji: string) => void
   users: ChatUserLite[]
   onlineIds: Set<string>
   onChanged: () => void
@@ -317,10 +332,11 @@ export default function MessageThread({
             const mine = m.senderId === meId
             const isForgie = m.kind === 'FORGIE'
             const quoted = m.replyToId ? messages.find((x) => x.id === m.replyToId) : null
+            const grouped = groupReactions(m.reactions ?? [], meId)
             return (
               <Fragment key={m.id}>
                 {dateSep}
-                <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
                   <div
                     onContextMenu={m.deletedAt ? undefined : (e) => { e.preventDefault(); setCtxMenu({ msg: m, x: e.clientX, y: e.clientY }) }}
                     className={`max-w-[78%] sm:max-w-[70%] rounded-2xl px-3 py-2 ${m.deletedAt ? '' : 'cursor-context-menu'} ${
@@ -364,6 +380,20 @@ export default function MessageThread({
                       {mine && !m.deletedAt && receiptFor(m)}
                     </div>
                   </div>
+                  {grouped.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-0.5 px-1 max-w-[78%]">
+                      {grouped.map((g) => (
+                        <button
+                          key={g.emoji}
+                          type="button"
+                          onClick={() => onReact(m.id, g.emoji)}
+                          className={`text-[11px] leading-none rounded-full px-1.5 py-1 border ${g.mine ? 'bg-[#3F7A0A]/15 border-[#3F7A0A]/40' : 'bg-surface-raised border-border-default'}`}
+                        >
+                          {g.emoji}{g.count > 1 ? ` ${g.count}` : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </Fragment>
             )
@@ -449,6 +479,13 @@ export default function MessageThread({
             style={{ top: ctxMenu.y, left: ctxMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
+            {!ctxMenu.msg.deletedAt && (
+              <div className="flex gap-1 px-2 py-1.5 border-b border-border-default">
+                {REACTION_CHOICES.map((e) => (
+                  <button key={e} type="button" onClick={() => { onReact(ctxMenu.msg.id, e); setCtxMenu(null) }} className="text-lg leading-none hover:scale-125 transition-transform">{e}</button>
+                ))}
+              </div>
+            )}
             <button type="button" onClick={() => { setReplyingTo(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">↩ Reply</button>
             {ctxMenu.msg.type !== 'IMAGE' && !ctxMenu.msg.deletedAt && (
               <button type="button" onClick={() => { void navigator.clipboard?.writeText(ctxMenu.msg.content); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">⧉ Copy</button>

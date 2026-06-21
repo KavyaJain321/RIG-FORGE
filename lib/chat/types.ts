@@ -27,6 +27,7 @@ export interface ChatMessageDTO {
   deliveredAt?: string | null
   editedAt?: string | null
   deletedAt?: string | null
+  reactions?: { emoji: string; userId: string }[]
   createdAt: string
   sender?: ChatUserLite | null
 }
