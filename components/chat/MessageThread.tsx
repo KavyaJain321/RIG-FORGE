@@ -47,6 +47,27 @@ export default function MessageThread({
     return m?.name ?? 'Someone'
   }
 
+  // Read receipt for one of MY messages: ✓ sent, ✓✓ seen (DMs);
+  // "✓✓ N" with a who-saw-it tooltip for groups.
+  function receiptFor(msg: ChatMessageDTO) {
+    if (!conversation || msg.senderId !== meId) return null
+    const others = conversation.members.filter((u) => u.id !== meId)
+    if (others.length === 0) return null
+    const t = new Date(msg.createdAt).getTime()
+    const seenBy = others.filter((u) => u.lastReadAt && new Date(u.lastReadAt).getTime() >= t)
+    const seen = seenBy.length > 0
+    const label =
+      conversation.type === 'GROUP' ? (seen ? `✓✓ ${seenBy.length}` : '✓') : seen ? '✓✓' : '✓'
+    return (
+      <span
+        title={seen ? `Seen by ${seenBy.map((u) => u.name).join(', ')}` : 'Sent'}
+        className={seen ? 'text-sky-300' : 'text-white/50'}
+      >
+        {label}
+      </span>
+    )
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const text = draft.trim()
@@ -97,9 +118,10 @@ export default function MessageThread({
                     </p>
                   )}
                   <p className="text-sm whitespace-pre-wrap break-words">{m.content}</p>
-                  <p className={`text-[10px] mt-0.5 text-right ${mine ? 'text-white/70' : 'text-[#999]'}`}>
-                    {timeLabel(m.createdAt)}
-                  </p>
+                  <div className={`text-[10px] mt-0.5 flex items-center justify-end gap-1 ${mine ? 'text-white/70' : 'text-[#999]'}`}>
+                    <span>{timeLabel(m.createdAt)}</span>
+                    {mine && receiptFor(m)}
+                  </div>
                 </div>
               </div>
             )

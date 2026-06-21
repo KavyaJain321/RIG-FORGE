@@ -6,6 +6,14 @@ export interface ChatUserLite {
   avatarUrl: string | null
 }
 
+export type ChatMemberRole = 'OWNER' | 'ADMIN' | 'MEMBER'
+
+// A conversation member, including when they last read it (drives seen/✓✓).
+export interface ChatMember extends ChatUserLite {
+  lastReadAt: string | null
+  role?: ChatMemberRole
+}
+
 export type ChatMessageKind = 'USER' | 'FORGIE' | 'SYSTEM'
 
 export interface ChatMessageDTO {
@@ -24,7 +32,7 @@ export interface ConversationSummary {
   type: 'DIRECT' | 'GROUP'
   title: string | null
   avatarUrl: string | null
-  members: ChatUserLite[]
+  members: ChatMember[]
   lastMessage: {
     content: string
     createdAt: string

@@ -59,7 +59,13 @@ export async function listConversations(userId: string) {
         type: convo.type,
         title: convo.type === 'GROUP' ? convo.title : others[0]?.name ?? 'Direct message',
         avatarUrl: convo.type === 'GROUP' ? null : others[0]?.avatarUrl ?? null,
-        members: convo.members.map((mm) => mm.user),
+        members: convo.members.map((mm) => ({
+          id: mm.user.id,
+          name: mm.user.name,
+          avatarUrl: mm.user.avatarUrl,
+          lastReadAt: mm.lastReadAt,
+          role: mm.role,
+        })),
         lastMessage: last
           ? { content: last.content, createdAt: last.createdAt, senderId: last.senderId, kind: last.kind }
           : null,

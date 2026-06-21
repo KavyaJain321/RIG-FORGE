@@ -100,6 +100,25 @@ export default function ChatApp() {
           void refreshConversations()
         },
       )
+      // Live "seen" status: when any member's lastReadAt changes (they opened a
+      // conversation), update that member in state so read receipts re-render.
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'ConversationMember' },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>
+          const conversationId = String(row.conversationId)
+          const userId = String(row.userId)
+          const lastReadAt = row.lastReadAt ? String(row.lastReadAt) : null
+          setConversations((cs) =>
+            cs.map((c) =>
+              c.id === conversationId
+                ? { ...c, members: c.members.map((mm) => (mm.id === userId ? { ...mm, lastReadAt } : mm)) }
+                : c,
+            ),
+          )
+        },
+      )
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
   }, [refreshConversations])
