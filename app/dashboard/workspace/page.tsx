@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import MailPanel from '@/components/workspace/MailPanel'
 import CodePanel from '@/components/workspace/CodePanel'
+import MeetPanel from '@/components/workspace/MeetPanel'
 
 const TABS = [
   { key: 'mail', label: '📬 Mail' },
@@ -36,11 +37,7 @@ export default function WorkspacePage() {
 
       {tab === 'mail' && <MailPanel />}
       {tab === 'code' && <CodePanel />}
-      {tab === 'meet' && (
-        <div className="p-10 text-center border border-border-default rounded-xl text-text-secondary text-sm">
-          Google Meet — building next.
-        </div>
-      )}
+      {tab === 'meet' && <MeetPanel />}
     </div>
   )
 }
