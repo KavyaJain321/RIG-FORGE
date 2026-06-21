@@ -96,7 +96,11 @@ export default function ConversationList({
           active ? 'bg-[#3F7A0A]/10' : 'hover:bg-black/[0.03]',
         ].join(' ')}
       >
-        <Avatar name={c.title ?? '?'} avatarUrl={c.avatarUrl} size="sm" />
+        {c.isForgie ? (
+          <div className="h-9 w-9 shrink-0 rounded-full bg-[#EDE7FB] flex items-center justify-center text-base">🤖</div>
+        ) : (
+          <Avatar name={c.title ?? '?'} avatarUrl={c.avatarUrl} size="sm" />
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium text-sm text-text-primary truncate">

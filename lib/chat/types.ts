@@ -66,6 +66,7 @@ export interface ConversationSummary {
   isArchived?: boolean
   isPinned?: boolean
   muted?: boolean
+  isForgie?: boolean
   description?: string | null
   onlyAdminsCanSend?: boolean
   inviteToken?: string | null

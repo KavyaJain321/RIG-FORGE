@@ -31,6 +31,8 @@ const memberUserSelect = { id: true, name: true, avatarUrl: true } as const
 // ─── Conversations ─────────────────────────────────────────────────────────
 
 export async function listConversations(userId: string) {
+  // Make sure every user always has their dedicated Forgie chat.
+  await getOrCreateForgieChat(userId)
   const memberships = await prisma.conversationMember.findMany({
     where: { userId },
     include: {
@@ -69,8 +71,8 @@ export async function listConversations(userId: string) {
       return {
         id: convo.id,
         type: convo.type,
-        title: convo.type === 'GROUP' ? convo.title : others[0]?.name ?? 'Direct message',
-        avatarUrl: convo.type === 'GROUP' ? convo.imageUrl ?? null : others[0]?.avatarUrl ?? null,
+        title: convo.isForgie ? 'Forgie' : convo.type === 'GROUP' ? convo.title : others[0]?.name ?? 'Direct message',
+        avatarUrl: convo.isForgie ? null : convo.type === 'GROUP' ? convo.imageUrl ?? null : others[0]?.avatarUrl ?? null,
         members: convo.members.map((mm) => ({
           id: mm.user.id,
           name: mm.user.name,
@@ -86,6 +88,7 @@ export async function listConversations(userId: string) {
         isArchived: m.isArchived,
         isPinned: m.isPinned,
         muted: m.muteUntil ? m.muteUntil > new Date() : false,
+        isForgie: convo.isForgie,
         description: convo.description,
         onlyAdminsCanSend: convo.onlyAdminsCanSend,
         inviteToken: convo.inviteToken,
@@ -159,6 +162,52 @@ export async function createGroup(userId: string, title: string, memberIds: stri
       },
     },
   })
+}
+
+const FORGIE_WELCOME =
+  "Hi! I'm Forgie 🤖 — your RIG FORGE assistant. Ask me about your projects, tasks, tickets, standups, or team. I can take actions too (create tasks, log standups), and you can @Forgie me in any group."
+
+// The dedicated 1:1 Forgie (AI) chat for a user. Idempotent via the synthetic
+// dmKey "forgie:<userId>" + the (organizationId, dmKey) unique constraint.
+export async function getOrCreateForgieChat(userId: string) {
+  const dmKey = `forgie:${userId}`
+  const existing = await prisma.conversation.findFirst({ where: { organizationId: ORG, dmKey } })
+  if (existing) return existing
+  try {
+    const convo = await prisma.conversation.create({
+      data: {
+        organizationId: ORG,
+        type: 'DIRECT',
+        isForgie: true,
+        title: 'Forgie',
+        dmKey,
+        createdById: userId,
+        lastMessageAt: new Date(),
+        members: { create: [{ organizationId: ORG, userId, role: 'OWNER', isPinned: true }] },
+      },
+    })
+    await prisma.chatMessage.create({
+      data: { organizationId: ORG, conversationId: convo.id, senderId: null, kind: 'FORGIE', type: 'TEXT', content: FORGIE_WELCOME },
+    })
+    return convo
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      const convo = await prisma.conversation.findFirst({ where: { organizationId: ORG, dmKey } })
+      if (convo) return convo
+    }
+    throw err
+  }
+}
+
+// Proactively post a Forgie message into a user's Forgie chat (nudges, alerts…).
+export async function forgieDmToUser(userId: string, content: string) {
+  const convo = await getOrCreateForgieChat(userId)
+  await prisma.$transaction([
+    prisma.chatMessage.create({
+      data: { organizationId: ORG, conversationId: convo.id, senderId: null, kind: 'FORGIE', type: 'TEXT', content },
+    }),
+    prisma.conversation.update({ where: { id: convo.id }, data: { lastMessageAt: new Date() } }),
+  ])
 }
 
 // ─── Messages ──────────────────────────────────────────────────────────────
@@ -278,7 +327,7 @@ export async function sendMessage(
   const member = await assertMember(conversationId, userId)
   const convo = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { type: true, onlyAdminsCanSend: true },
+    select: { type: true, onlyAdminsCanSend: true, isForgie: true },
   })
   if (convo?.type === 'GROUP' && convo.onlyAdminsCanSend && member.role !== 'OWNER' && member.role !== 'ADMIN') {
     throw new Error('Only admins can send messages in this group')
@@ -320,9 +369,10 @@ export async function sendMessage(
   ])
   // Fire-and-forget Open-Graph preview; delivered live via the ChatMessage UPDATE sub.
   void enrichLinkPreview(message.id, text)
-  // If the message addresses @Forgie, generate + post a reply (fire-and-forget).
-  if (mentionsForgie(text)) void replyAsForgieInChat(conversationId, userId)
-  void notifyNewMessage(conversationId, userId, text)
+  // In the dedicated Forgie chat every message is for Forgie; elsewhere only when @mentioned.
+  if (convo?.isForgie || mentionsForgie(text)) void replyAsForgieInChat(conversationId, userId)
+  // No push for the Forgie chat (you're talking to a bot); otherwise notify members.
+  if (!convo?.isForgie) void notifyNewMessage(conversationId, userId, text)
   return message
 }
 
@@ -761,7 +811,7 @@ export async function createPoll(
   const member = await assertMember(conversationId, userId)
   const convo = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { type: true, onlyAdminsCanSend: true },
+    select: { type: true, onlyAdminsCanSend: true, isForgie: true },
   })
   if (convo?.type === 'GROUP' && convo.onlyAdminsCanSend && member.role !== 'OWNER' && member.role !== 'ADMIN') {
     throw new Error('Only admins can send messages in this group')

@@ -509,7 +509,11 @@ export default function MessageThread({
         >
           ‹
         </button>
-        <Avatar name={conversation.title ?? '?'} avatarUrl={conversation.avatarUrl} size="sm" />
+        {conversation.isForgie ? (
+          <div className="h-9 w-9 shrink-0 rounded-full bg-[#EDE7FB] flex items-center justify-center text-base">🤖</div>
+        ) : (
+          <Avatar name={conversation.title ?? '?'} avatarUrl={conversation.avatarUrl} size="sm" />
+        )}
         <div className="min-w-0">
           <p className="font-medium text-sm text-text-primary truncate">
             {conversation.type === 'GROUP' ? '# ' : ''}{conversation.title}

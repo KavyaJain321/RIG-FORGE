@@ -545,6 +545,7 @@ model Conversation {
   onlyAdminsCanSend Boolean       @default(false)    // group permission: only admins may send
   inviteToken    String?          @unique             // invite-link token (null = no active link)
   disappearingSeconds Int?                            // disappearing-messages TTL in seconds (null = off)
+  isForgie       Boolean          @default(false)     // the dedicated 1:1 Forgie (AI bot) chat
   // For DIRECT convos, dmKey = the two user ids sorted + joined "a:b", so the
   // unique constraint guarantees exactly ONE DM thread per pair. Null for groups.
   dmKey          String?
