@@ -9,6 +9,33 @@ function preview(c: ConversationSummary): string {
   return prefix + c.lastMessage.content
 }
 
+// WhatsApp-style row time: today → HH:MM, yesterday → "Yesterday",
+// this week → weekday, older → date.
+function compactTime(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const now = new Date()
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const dayOf = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const dayMs = 86_400_000
+  if (dayOf === startToday) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (dayOf === startToday - dayMs) return 'Yesterday'
+  if (dayOf > startToday - 7 * dayMs) return d.toLocaleDateString([], { weekday: 'short' })
+  return d.toLocaleDateString([], { day: '2-digit', month: 'short' })
+}
+
+function SkeletonRow() {
+  return (
+    <div className="px-3 py-2.5 flex items-center gap-3 animate-pulse">
+      <div className="h-9 w-9 rounded-full bg-black/[0.08] shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3 w-1/2 rounded bg-black/[0.08]" />
+        <div className="h-2.5 w-3/4 rounded bg-black/[0.06]" />
+      </div>
+    </div>
+  )
+}
+
 export default function ConversationList({
   conversations,
   activeId,
@@ -37,7 +64,7 @@ export default function ConversationList({
 
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <p className="p-4 font-mono text-xs text-[#888]">Loading…</p>
+          <>{Array.from({ length: 7 }).map((_, i) => <SkeletonRow key={i} />)}</>
         ) : conversations.length === 0 ? (
           <p className="p-4 font-mono text-xs text-[#888]">
             No conversations yet. Tap <span className="text-[#3F7A0A]">＋ New</span> to start one.
@@ -45,6 +72,7 @@ export default function ConversationList({
         ) : (
           conversations.map((c) => {
             const active = c.id === activeId
+            const time = compactTime(c.lastMessageAt ?? c.lastMessage?.createdAt ?? null)
             return (
               <button
                 key={c.id}
@@ -61,13 +89,18 @@ export default function ConversationList({
                     <span className="font-medium text-sm text-text-primary truncate">
                       {c.type === 'GROUP' ? '# ' : ''}{c.title}
                     </span>
+                    <span className={`shrink-0 text-[10px] ${c.unread > 0 ? 'text-[#3F7A0A] font-medium' : 'text-text-secondary'}`}>
+                      {time}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <p className="text-xs text-[#777] truncate">{preview(c)}</p>
                     {c.unread > 0 && (
                       <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-[#3F7A0A] text-white text-[10px] font-mono flex items-center justify-center">
                         {c.unread}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[#777] truncate">{preview(c)}</p>
                 </div>
               </button>
             )
