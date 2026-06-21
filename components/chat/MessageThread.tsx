@@ -665,9 +665,9 @@ export default function MessageThread({
                           : 'bg-surface-raised text-text-primary rounded-bl-sm border border-border-subtle'
                     }`}
                   >
-                    {!mine && conversation.type === 'GROUP' && (
+                    {!mine && (isForgie || conversation.type === 'GROUP') && (
                       <p className="text-[10px] font-mono uppercase tracking-wide opacity-70 mb-0.5">
-                        {nameFor(m.senderId)}
+                        {isForgie ? '🤖 Forgie' : nameFor(m.senderId)}
                       </p>
                     )}
                     {m.deletedAt ? (

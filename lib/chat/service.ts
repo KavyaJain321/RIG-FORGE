@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/db'
+import { mentionsForgie, replyAsForgieInChat } from './forgie'
 
 const ORG = 'rig360'
 
@@ -295,6 +296,8 @@ export async function sendMessage(
   ])
   // Fire-and-forget Open-Graph preview; delivered live via the ChatMessage UPDATE sub.
   void enrichLinkPreview(message.id, text)
+  // If the message addresses @Forgie, generate + post a reply (fire-and-forget).
+  if (mentionsForgie(text)) void replyAsForgieInChat(conversationId, userId)
   return message
 }
 

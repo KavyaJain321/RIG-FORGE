@@ -1,7 +1,8 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Bodoni_Moda, Outfit } from 'next/font/google'
 import './globals.css'
 import OfflineBanner from '@/components/shared/OfflineBanner'
+import ServiceWorkerRegister from '@/components/shared/ServiceWorkerRegister'
 
 // ── Global fonts (loaded on every page) ─────────────────────────────────────
 // Only load what the app shell actually needs. Instrument Serif, Inter, and
@@ -27,11 +28,17 @@ const sans = Outfit({
 export const metadata: Metadata = {
   title: 'Rig Forge',
   description: 'Internal employee monitoring and project tracking platform',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'Rig Forge', statusBarStyle: 'default' },
   icons: {
-    icon: '/icon.svg',
-    shortcut: '/icon.svg',
-    apple: '/icon.svg',
+    icon: '/logo.svg',
+    shortcut: '/logo.svg',
+    apple: '/logo.svg',
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#3F7A0A',
 }
 
 export default function RootLayout({
@@ -40,7 +47,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Set theme class before paint to avoid a flash of the wrong theme. */}
         <script
@@ -54,6 +61,7 @@ export default function RootLayout({
         className={`${sans.variable} ${display.variable} bg-background-primary text-text-primary min-h-screen antialiased`}
       >
         <OfflineBanner />
+        <ServiceWorkerRegister />
         {children}
       </body>
     </html>
