@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
+import { useAuthStore } from '@/store/authStore'
+import JitsiCall from './JitsiCall'
+
 interface Evt {
   id: string
   title: string
@@ -12,8 +15,8 @@ interface Evt {
   isAllDay: boolean
 }
 
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(url, { credentials: 'include', ...init })
+async function api<T>(url: string): Promise<T> {
+  const r = await fetch(url, { credentials: 'include' })
   const j = await r.json()
   if (!r.ok || j.error) throw new Error(j.error || 'Request failed')
   return j.data as T
@@ -28,24 +31,34 @@ function when(iso: string | null, allDay: boolean): string {
 }
 
 export default function MeetPanel() {
-  const [connected, setConnected] = useState<boolean | null>(null)
+  const user = useAuthStore((s) => s.user)
+  const displayName = user?.name ?? 'Guest'
+
+  const [activeRoom, setActiveRoom] = useState<string | null>(null)
+  const [topic, setTopic] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [calConnected, setCalConnected] = useState<boolean | null>(null)
   const [events, setEvents] = useState<Evt[]>([])
   const [loading, setLoading] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [newMeet, setNewMeet] = useState<string | null>(null)
+
+  // Join straight into a call when arriving via an invite link (?call=<room>).
+  useEffect(() => {
+    const room = new URLSearchParams(window.location.search).get('call')
+    if (room) setActiveRoom(room)
+  }, [])
 
   useEffect(() => {
     void (async () => {
       try {
         const s = await api<{ features: { calendar: boolean } }>('/api/auth/google/status')
-        setConnected(s.features?.calendar ?? false)
+        setCalConnected(s.features?.calendar ?? false)
       } catch {
-        setConnected(false)
+        setCalConnected(false)
       }
     })()
   }, [])
 
-  const load = useCallback(async () => {
+  const loadEvents = useCallback(async () => {
     setLoading(true)
     try {
       const r = await api<{ events: Evt[] }>('/api/google/calendar/events')
@@ -58,58 +71,74 @@ export default function MeetPanel() {
   }, [])
 
   useEffect(() => {
-    if (connected) void load()
-  }, [connected, load])
+    if (calConnected) void loadEvents()
+  }, [calConnected, loadEvents])
 
-  async function newMeeting() {
-    setCreating(true)
-    setNewMeet(null)
-    try {
-      const r = await api<{ meetLink: string | null; eventUrl: string | null }>('/api/google/meet/new', { method: 'POST' })
-      const link = r.meetLink || r.eventUrl
-      if (link) {
-        setNewMeet(link)
-        window.open(link, '_blank', 'noopener')
-      }
-      void load()
-    } catch (e) {
-      alert('Failed to create meeting: ' + (e as Error).message)
-    } finally {
-      setCreating(false)
-    }
+  function startCall() {
+    const slug = topic.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 24)
+    const rand = Math.random().toString(36).slice(2, 8)
+    setActiveRoom(`rigforge-${slug ? slug + '-' : ''}${rand}`)
   }
 
-  if (connected === null) return <div className="p-8 font-mono text-sm text-text-secondary">Loading…</div>
-  if (!connected) {
+  function leave() {
+    setActiveRoom(null)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('call')
+    window.history.replaceState({}, '', url.toString())
+  }
+
+  function copyInvite() {
+    if (!activeRoom) return
+    const link = `${window.location.origin}/dashboard/workspace?call=${activeRoom}`
+    void navigator.clipboard?.writeText(link)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  // ── Active call: Jitsi embedded right here ──────────────────────────────────
+  if (activeRoom) {
     return (
-      <div className="p-10 text-center border border-border-default rounded-xl">
-        <p className="text-2xl mb-2">📹</p>
-        <p className="text-lg font-medium text-text-primary mb-1">Connect Google Calendar</p>
-        <p className="text-sm text-text-secondary mb-5">Start Meet calls and see your upcoming events inside RIG FORGE.</p>
-        <a href="/api/auth/google/connect" className="inline-block h-9 leading-9 px-4 rounded-full bg-[#3F7A0A] text-white font-mono text-xs hover:bg-[#356a08]">
-          Connect Google
-        </a>
+      <div className="border border-border-default rounded-xl overflow-hidden flex flex-col h-[calc(100vh-9rem)]">
+        <div className="h-12 px-4 flex items-center justify-between gap-2 border-b border-border-default shrink-0">
+          <span className="font-mono text-xs uppercase tracking-widest text-text-secondary truncate">📹 {activeRoom}</span>
+          <div className="flex gap-2 shrink-0">
+            <button type="button" onClick={copyInvite} className="h-8 px-3 rounded-full border border-border-default text-xs font-mono text-text-primary">
+              {copied ? 'Copied!' : 'Copy invite'}
+            </button>
+            <button type="button" onClick={leave} className="h-8 px-3 rounded-full bg-status-danger text-white text-xs font-mono">Leave</button>
+          </div>
+        </div>
+        <div className="flex-1 min-h-0 bg-black">
+          <JitsiCall room={activeRoom} displayName={displayName} onLeave={leave} />
+        </div>
       </div>
     )
   }
 
+  // ── Lobby ──────────────────────────────────────────────────────────────────
   return (
     <div className="border border-border-default rounded-xl overflow-hidden">
-      {/* New meeting */}
-      <div className="p-5 border-b border-border-default flex flex-wrap items-center gap-3">
-        <button type="button" onClick={() => void newMeeting()} disabled={creating} className="h-10 px-5 rounded-full bg-[#3F7A0A] text-white font-mono text-xs hover:bg-[#356a08] disabled:opacity-40">
-          {creating ? 'Creating…' : '📹 New meeting'}
-        </button>
-        <span className="text-xs text-text-secondary">Creates a Google Meet + opens it in a new tab.</span>
-        {newMeet && (
-          <a href={newMeet} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-[#3F7A0A] break-all">{newMeet}</a>
-        )}
+      <div className="p-5 border-b border-border-default">
+        <p className="text-sm font-medium text-text-primary mb-2">Start a video call</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            placeholder="Topic (optional)"
+            className="h-10 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A] w-56"
+          />
+          <button type="button" onClick={startCall} className="h-10 px-5 rounded-full bg-[#3F7A0A] text-white font-mono text-xs hover:bg-[#356a08]">
+            📹 Start call
+          </button>
+          <span className="text-xs text-text-secondary">Runs right here in RF — share the invite link to bring teammates in.</span>
+        </div>
       </div>
 
-      {/* Upcoming events */}
       <div className="p-3">
         <p className="px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-text-secondary">Upcoming (7 days)</p>
-        {loading ? (
+        {calConnected === false ? (
+          <p className="px-2 py-2 text-xs text-text-secondary">Connect Google in your profile to see your calendar here.</p>
+        ) : loading || calConnected === null ? (
           <p className="p-3 text-sm text-text-secondary">Loading…</p>
         ) : events.length === 0 ? (
           <p className="p-3 text-sm text-text-secondary">Nothing scheduled.</p>

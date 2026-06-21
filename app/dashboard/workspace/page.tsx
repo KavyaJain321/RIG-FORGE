@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import MailPanel from '@/components/workspace/MailPanel'
 import CodePanel from '@/components/workspace/CodePanel'
@@ -16,6 +16,11 @@ type TabKey = (typeof TABS)[number]['key']
 
 export default function WorkspacePage() {
   const [tab, setTab] = useState<TabKey>('mail')
+
+  // An invite link (?call=<room>) drops the user straight onto the Meet tab.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('call')) setTab('meet')
+  }, [])
 
   return (
     <div className="p-4 sm:p-6 max-w-[1400px] mx-auto">
