@@ -440,6 +440,52 @@ function buildChatTools(caller: ToolUser): ToolSet {
         }
       },
     }),
+    start_video_call: tool({
+      description:
+        'Start an instant RIG FORGE video call and get a shareable in-app invite link (opens the call inside RF, no Google/Jitsi login). Optionally deliver the link to a teammate (name/id) or a group (title) so they can join.',
+      inputSchema: z.object({
+        topic: z.string().optional().describe('Short topic for the call'),
+        sendTo: z.string().optional().describe('A teammate name/id OR a group title to send the invite link to'),
+      }),
+      execute: async ({ topic, sendTo }) => {
+        try {
+          const slug = (topic ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 24)
+          const rand = Math.random().toString(36).slice(2, 8)
+          const room = `rigforge-${slug ? slug + '-' : ''}${rand}`
+          const base = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/+$/, '')
+          const link = `${base}/dashboard/workspace?call=${room}`
+
+          let sentTo: string | null = null
+          if (sendTo) {
+            const { prisma } = await import('@/lib/db')
+            const { getOrCreateDm, sendMessage } = await import('@/lib/chat/service')
+            const meUser = await prisma.user.findUnique({ where: { id: caller.userId }, select: { name: true } })
+            const who = meUser?.name ?? 'Someone'
+            const text = `📹 ${who} started a video call${topic ? `: ${topic}` : ''} — join: ${link}`
+
+            const group = await prisma.conversation.findFirst({
+              where: { type: 'GROUP', title: { contains: sendTo, mode: 'insensitive' }, members: { some: { userId: caller.userId } } },
+              select: { id: true, title: true },
+            })
+            if (group) {
+              await sendMessage(group.id, caller.userId, text)
+              sentTo = group.title
+            } else {
+              let u = await prisma.user.findFirst({ where: { id: sendTo, isActive: true }, select: { id: true, name: true } })
+              if (!u) u = await prisma.user.findFirst({ where: { isActive: true, name: { contains: sendTo, mode: 'insensitive' } }, select: { id: true, name: true } })
+              if (u && u.id !== caller.userId) {
+                const dm = await getOrCreateDm(caller.userId, u.id)
+                await sendMessage(dm.id, caller.userId, text)
+                sentTo = u.name
+              }
+            }
+          }
+          return { room, link, sentTo }
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : 'Failed to start the call' }
+        }
+      },
+    }),
   }
 }
 

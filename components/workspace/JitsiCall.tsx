@@ -2,7 +2,11 @@
 
 import { useEffect, useRef } from 'react'
 
-type JitsiApi = { dispose: () => void; addEventListener: (event: string, cb: () => void) => void }
+type JitsiApi = {
+  dispose: () => void
+  addEventListener: (event: string, cb: () => void) => void
+  executeCommand: (command: string, ...args: unknown[]) => void
+}
 
 declare global {
   interface Window {
@@ -21,22 +25,39 @@ function loadJitsiScript(): Promise<void> {
     s.onload = () => resolve()
     s.onerror = () => {
       loadPromise = null
-      reject(new Error('Failed to load Jitsi'))
+      reject(new Error('Failed to load video'))
     }
     document.body.appendChild(s)
   })
   return loadPromise
 }
 
-// Embeds a live Jitsi call inside RF (no new tab). meet.jit.si is the free public
-// instance — no account needed; anyone with the same room joins the same call.
-export default function JitsiCall({ room, displayName, onLeave }: { room: string; displayName: string; onLeave: () => void }) {
+// Embeds a live call inside RF. The user joins instantly with their RF identity
+// (name + email + avatar) — no prejoin/login screen — and the provider branding
+// is hidden so it reads as RIG FORGE.
+export default function JitsiCall({
+  room,
+  displayName,
+  email,
+  avatarUrl,
+  onLeave,
+}: {
+  room: string
+  displayName: string
+  email?: string | null
+  avatarUrl?: string | null
+  onLeave: () => void
+}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const apiRef = useRef<JitsiApi | null>(null)
   const onLeaveRef = useRef(onLeave)
   onLeaveRef.current = onLeave
   const nameRef = useRef(displayName)
   nameRef.current = displayName
+  const emailRef = useRef(email)
+  emailRef.current = email
+  const avatarRef = useRef(avatarUrl)
+  avatarRef.current = avatarUrl
 
   useEffect(() => {
     let cancelled = false
@@ -49,13 +70,44 @@ export default function JitsiCall({ room, displayName, onLeave }: { room: string
           parentNode: containerRef.current,
           width: '100%',
           height: '100%',
-          userInfo: { displayName: nameRef.current },
-          configOverwrite: { prejoinPageEnabled: false },
+          userInfo: { displayName: nameRef.current, email: emailRef.current || undefined },
+          configOverwrite: {
+            // Drop straight into the call with the RF identity — no name/login screen.
+            prejoinPageEnabled: false,
+            prejoinConfig: { enabled: false },
+            disableDeepLinking: true,
+            disableProfile: true,
+            disableThirdPartyRequests: true,
+          },
+          interfaceConfigOverwrite: {
+            // Hide the provider's logos / watermarks / promos so it reads as RF.
+            SHOW_JITSI_WATERMARK: false,
+            SHOW_WATERMARK_FOR_GUESTS: false,
+            SHOW_BRAND_WATERMARK: false,
+            SHOW_POWERED_BY: false,
+            JITSI_WATERMARK_LINK: '',
+            BRAND_WATERMARK_LINK: '',
+            HIDE_DEEP_LINKING_LOGO: true,
+            DEFAULT_LOGO_URL: '',
+            DEFAULT_WELCOME_PAGE_LOGO_URL: '',
+            MOBILE_APP_PROMO: false,
+            APP_NAME: 'RIG FORGE',
+            NATIVE_APP_NAME: 'RIG FORGE',
+            PROVIDER_NAME: 'RIG FORGE',
+          },
         })
         apiRef.current = api
         api.addEventListener('readyToClose', () => onLeaveRef.current())
+        api.addEventListener('videoConferenceJoined', () => {
+          try {
+            api.executeCommand('displayName', nameRef.current)
+            if (avatarRef.current) api.executeCommand('avatarUrl', avatarRef.current)
+          } catch {
+            /* ignore */
+          }
+        })
       } catch (err) {
-        console.error('[jitsi] init failed', err)
+        console.error('[call] init failed', err)
       }
     })()
     return () => {

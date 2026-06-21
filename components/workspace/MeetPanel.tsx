@@ -8,6 +8,8 @@ import JitsiCall from './JitsiCall'
 export default function MeetPanel() {
   const user = useAuthStore((s) => s.user)
   const displayName = user?.name ?? 'Guest'
+  const email = user?.email ?? null
+  const avatarUrl = user?.avatarUrl ?? null
 
   const [activeRoom, setActiveRoom] = useState<string | null>(null)
   const [topic, setTopic] = useState('')
@@ -55,7 +57,7 @@ export default function MeetPanel() {
           </div>
         </div>
         <div className="flex-1 min-h-0 bg-black">
-          <JitsiCall room={activeRoom} displayName={displayName} onLeave={leave} />
+          <JitsiCall room={activeRoom} displayName={displayName} email={email} avatarUrl={avatarUrl} onLeave={leave} />
         </div>
       </div>
     )
