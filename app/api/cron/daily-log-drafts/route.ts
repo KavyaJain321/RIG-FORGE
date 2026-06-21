@@ -28,6 +28,7 @@ import {
   collectActivity,
   draftLogForActivity,
 } from '@/lib/assistant/daily-log-draft'
+import { forgieDmToUser } from '@/lib/chat/service'
 
 interface Counters {
   processed: number
@@ -120,6 +121,12 @@ export async function POST(request: NextRequest) {
           },
         })
         .catch(() => {})
+
+      // Nudge them in their Forgie chat too.
+      await forgieDmToUser(
+        user.id,
+        '📝 I drafted your daily log for today from your activity. Review & approve it on your dashboard.',
+      ).catch(() => {})
 
       counters.drafted += 1
     } catch (err) {

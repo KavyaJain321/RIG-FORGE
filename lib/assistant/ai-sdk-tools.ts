@@ -413,6 +413,33 @@ function buildChatTools(caller: ToolUser): ToolSet {
         }
       },
     }),
+    send_group_message: tool({
+      description:
+        'Post a message into a RIG FORGE group chat that you are a member of. Name the group by its title. Sends as you (fails if the group only allows admins and you are not one).',
+      inputSchema: z.object({
+        group: z.string().describe('The group chat name/title'),
+        message: z.string().describe('The message text to post'),
+      }),
+      execute: async ({ group, message }) => {
+        try {
+          const { prisma } = await import('@/lib/db')
+          const convo = await prisma.conversation.findFirst({
+            where: {
+              type: 'GROUP',
+              title: { contains: group, mode: 'insensitive' },
+              members: { some: { userId: caller.userId } },
+            },
+            select: { id: true, title: true },
+          })
+          if (!convo) return { delivered: false, error: `No group named "${group}" that you're a member of.` }
+          const { sendMessage } = await import('@/lib/chat/service')
+          await sendMessage(convo.id, caller.userId, message)
+          return { delivered: true, group: convo.title }
+        } catch (err) {
+          return { delivered: false, error: err instanceof Error ? err.message : 'Failed to post the message.' }
+        }
+      },
+    }),
   }
 }
 
