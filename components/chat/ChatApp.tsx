@@ -92,6 +92,30 @@ export default function ChatApp() {
       .catch(() => {})
   }, [])
 
+  // Honour an invite link (?join=<token>) — join the group then open it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const token = new URLSearchParams(window.location.search).get('join')
+    if (!token) return
+    void (async () => {
+      try {
+        const data = await api<{ conversationId: string }>('/api/chat/invite/join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        })
+        await refreshConversations()
+        setActiveId(data.conversationId)
+      } catch (err) {
+        console.error('[chat] join via invite', err)
+      } finally {
+        const url = new URL(window.location.href)
+        url.searchParams.delete('join')
+        window.history.replaceState({}, '', url.toString())
+      }
+    })()
+  }, [refreshConversations])
+
   // Load messages + mark read whenever the active conversation changes.
   useEffect(() => {
     if (!activeId) { setMessages([]); return }

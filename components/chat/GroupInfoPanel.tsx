@@ -37,6 +37,13 @@ export default function GroupInfoPanel({
   const [selectedAdd, setSelectedAdd] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [descInput, setDescInput] = useState(conversation.description ?? '')
+  const [inviteLink, setInviteLink] = useState<string | null>(
+    conversation.inviteToken && typeof window !== 'undefined'
+      ? `${window.location.origin}/dashboard/messages?join=${conversation.inviteToken}`
+      : null,
+  )
 
   const memberIds = new Set(conversation.members.map((m) => m.id))
   const addable = users.filter((u) => !memberIds.has(u.id))
@@ -96,6 +103,53 @@ export default function GroupInfoPanel({
 
   const setRole = (userId: string, role: 'ADMIN' | 'MEMBER') =>
     run(() => patch({ userId, role }, '/members'))
+
+  async function saveDescription() {
+    await run(() => patch({ description: descInput.trim() }))
+    setEditingDesc(false)
+  }
+
+  function toggleOnlyAdmins() {
+    void run(() => patch({ onlyAdminsCanSend: !conversation.onlyAdminsCanSend }))
+  }
+
+  async function createInviteLink() {
+    setBusy(true)
+    try {
+      const data = await api<{ inviteToken: string | null }>(`/api/chat/conversations/${id}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create' }),
+      })
+      if (data.inviteToken) setInviteLink(`${window.location.origin}/dashboard/messages?join=${data.inviteToken}`)
+      onChanged()
+    } catch {
+      alert('Failed to create invite link')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function revokeInviteLink() {
+    setBusy(true)
+    try {
+      await api(`/api/chat/conversations/${id}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'revoke' }),
+      })
+      setInviteLink(null)
+      onChanged()
+    } catch {
+      alert('Failed to revoke link')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function copyInviteLink() {
+    if (inviteLink) void navigator.clipboard?.writeText(inviteLink)
+  }
 
   async function leave() {
     if (!confirm('Leave this group?')) return
@@ -169,6 +223,60 @@ export default function GroupInfoPanel({
             )}
             <p className="text-[11px] text-text-secondary">{conversation.members.length} members</p>
           </div>
+
+          {/* Description */}
+          <div className="px-4 py-3 border-b border-border-default">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-text-secondary mb-1">Description</p>
+            {editingDesc ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={descInput}
+                  onChange={(e) => setDescInput(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-lg border border-border-default bg-surface-raised text-sm p-2 outline-none focus:border-[#3F7A0A] resize-none"
+                />
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => void saveDescription()} disabled={busy} className="text-[#3F7A0A] text-xs font-mono">SAVE</button>
+                  <button type="button" onClick={() => { setEditingDesc(false); setDescInput(conversation.description ?? '') }} className="text-text-secondary text-xs font-mono">CANCEL</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2">
+                <p className="flex-1 text-sm text-text-primary whitespace-pre-wrap">
+                  {conversation.description || <span className="text-text-secondary italic">No description</span>}
+                </p>
+                {isAdmin && (
+                  <button type="button" onClick={() => setEditingDesc(true)} className="text-text-secondary hover:text-text-primary text-sm" title="Edit description">✎</button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Admin settings */}
+          {isAdmin && (
+            <div className="px-4 py-3 border-b border-border-default space-y-3">
+              <label className="flex items-center justify-between gap-2 cursor-pointer">
+                <span className="text-sm text-text-primary">Only admins can send messages</span>
+                <input type="checkbox" checked={!!conversation.onlyAdminsCanSend} onChange={toggleOnlyAdmins} disabled={busy} className="accent-[#3F7A0A]" />
+              </label>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-text-secondary mb-1">Invite link</p>
+                {inviteLink ? (
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[11px] text-text-secondary break-all bg-black/[0.04] rounded px-2 py-1">{inviteLink}</p>
+                    <div className="flex gap-3">
+                      <button type="button" onClick={copyInviteLink} className="text-[#3F7A0A] text-xs font-mono">COPY</button>
+                      <button type="button" onClick={() => void revokeInviteLink()} disabled={busy} className="text-status-danger text-xs font-mono">REVOKE</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => void createInviteLink()} disabled={busy} className="text-[#3F7A0A] text-xs font-mono hover:underline">
+                    Create invite link
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Members */}
           <div className="py-2">

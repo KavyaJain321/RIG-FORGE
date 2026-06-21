@@ -537,6 +537,9 @@ model Conversation {
   type           ConversationType
   title          String?                              // group name; null for DMs (UI derives from the other member)
   imageUrl       String?                              // group photo (Supabase Storage public URL); null for DMs
+  description    String?                              // group description / about
+  onlyAdminsCanSend Boolean       @default(false)    // group permission: only admins may send
+  inviteToken    String?          @unique             // invite-link token (null = no active link)
   // For DIRECT convos, dmKey = the two user ids sorted + joined "a:b", so the
   // unique constraint guarantees exactly ONE DM thread per pair. Null for groups.
   dmKey          String?

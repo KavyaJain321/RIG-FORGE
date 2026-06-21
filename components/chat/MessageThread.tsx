@@ -38,7 +38,7 @@ function dayLabel(iso: string): string {
 // WhatsApp-style inline formatting: *bold* _italic_ ~strike~ `mono` (non-nested).
 function formatText(text: string): ReactNode[] {
   const nodes: ReactNode[] = []
-  const regex = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|`[^`\n]+`)/g
+  const regex = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|`[^`\n]+`|@[A-Za-z][A-Za-z0-9_]*)/g
   let last = 0
   let key = 0
   let m: RegExpExecArray | null
@@ -49,6 +49,7 @@ function formatText(text: string): ReactNode[] {
     if (tok[0] === '*') nodes.push(<strong key={key++}>{inner}</strong>)
     else if (tok[0] === '_') nodes.push(<em key={key++}>{inner}</em>)
     else if (tok[0] === '~') nodes.push(<s key={key++}>{inner}</s>)
+    else if (tok[0] === '@') nodes.push(<span key={key++} className="text-[#3F7A0A] font-medium">{tok}</span>)
     else nodes.push(<code key={key++} className="font-mono text-[0.92em] bg-black/10 rounded px-1">{inner}</code>)
     last = m.index + tok.length
   }

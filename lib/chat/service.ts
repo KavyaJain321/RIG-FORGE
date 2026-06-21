@@ -9,6 +9,8 @@
  * `ORG` is the single-org tenancy anchor stamped on every row. When real
  * multi-tenancy lands, this becomes the caller's organizationId.
  */
+import { randomUUID } from 'node:crypto'
+
 import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/db'
@@ -78,6 +80,9 @@ export async function listConversations(userId: string) {
         isArchived: m.isArchived,
         isPinned: m.isPinned,
         muted: m.muteUntil ? m.muteUntil > new Date() : false,
+        description: convo.description,
+        onlyAdminsCanSend: convo.onlyAdminsCanSend,
+        inviteToken: convo.inviteToken,
       }
     }),
   )
@@ -228,7 +233,14 @@ export async function sendMessage(
   content: string,
   replyToId?: string | null,
 ) {
-  await assertMember(conversationId, userId)
+  const member = await assertMember(conversationId, userId)
+  const convo = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { type: true, onlyAdminsCanSend: true },
+  })
+  if (convo?.type === 'GROUP' && convo.onlyAdminsCanSend && member.role !== 'OWNER' && member.role !== 'ADMIN') {
+    throw new Error('Only admins can send messages in this group')
+  }
   const text = content.trim()
   if (!text) throw new Error('Message is empty')
 
@@ -584,4 +596,52 @@ export async function setChatFlags(
     where: { conversationId_userId: { conversationId, userId } },
     data,
   })
+}
+
+// ─── Group settings + invite links ───────────────────────────────────────────
+
+export async function setGroupSettings(
+  conversationId: string,
+  userId: string,
+  settings: { description?: string; onlyAdminsCanSend?: boolean },
+) {
+  await requireGroupAdmin(conversationId, userId)
+  const data: Prisma.ConversationUpdateInput = {}
+  if (settings.description !== undefined) data.description = settings.description.trim() || null
+  if (settings.onlyAdminsCanSend !== undefined) data.onlyAdminsCanSend = settings.onlyAdminsCanSend
+  await prisma.conversation.update({ where: { id: conversationId }, data })
+  const actor = await userName(userId)
+  if (settings.description !== undefined) await postSystemMessage(conversationId, `${actor} updated the group description`)
+  if (settings.onlyAdminsCanSend !== undefined) {
+    await postSystemMessage(
+      conversationId,
+      settings.onlyAdminsCanSend ? `${actor} restricted sending to admins only` : `${actor} allowed everyone to send messages`,
+    )
+  }
+}
+
+export async function createInvite(conversationId: string, userId: string): Promise<string> {
+  await requireGroupAdmin(conversationId, userId)
+  const existing = await prisma.conversation.findUnique({ where: { id: conversationId }, select: { inviteToken: true } })
+  if (existing?.inviteToken) return existing.inviteToken
+  const token = randomUUID().replace(/-/g, '')
+  await prisma.conversation.update({ where: { id: conversationId }, data: { inviteToken: token } })
+  return token
+}
+
+export async function revokeInvite(conversationId: string, userId: string) {
+  await requireGroupAdmin(conversationId, userId)
+  await prisma.conversation.update({ where: { id: conversationId }, data: { inviteToken: null } })
+}
+
+export async function joinViaInvite(token: string, userId: string): Promise<string> {
+  const convo = await prisma.conversation.findUnique({ where: { inviteToken: token }, select: { id: true, type: true } })
+  if (!convo || convo.type !== 'GROUP') throw new Error('Invalid or expired invite link')
+  const existing = await prisma.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId: convo.id, userId } },
+  })
+  if (existing) return convo.id
+  await prisma.conversationMember.create({ data: { organizationId: ORG, conversationId: convo.id, userId, role: 'MEMBER' } })
+  await postSystemMessage(convo.id, `${await userName(userId)} joined via invite link`)
+  return convo.id
 }

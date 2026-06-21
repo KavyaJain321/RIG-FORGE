@@ -2,7 +2,7 @@ import { type NextRequest } from 'next/server'
 
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
-import { renameGroup, setGroupImage } from '@/lib/chat/service'
+import { renameGroup, setGroupImage, setGroupSettings } from '@/lib/chat/service'
 
 function statusFor(message: string): number {
   return /admin|Not a member/i.test(message) ? 403 : 400
@@ -32,6 +32,12 @@ export async function PATCH(
     }
     if (typeof body.imageUrl === 'string') {
       await setGroupImage(params.id, payload.userId, body.imageUrl)
+    }
+    if (typeof body.description === 'string' || typeof body.onlyAdminsCanSend === 'boolean') {
+      await setGroupSettings(params.id, payload.userId, {
+        description: typeof body.description === 'string' ? body.description : undefined,
+        onlyAdminsCanSend: typeof body.onlyAdminsCanSend === 'boolean' ? body.onlyAdminsCanSend : undefined,
+      })
     }
     return successResponse({ ok: true })
   } catch (error) {
