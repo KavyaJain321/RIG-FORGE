@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 import Avatar from '@/components/ui/Avatar'
@@ -33,6 +33,27 @@ function dayLabel(iso: string): string {
   if (dayOf === startToday - dayMs) return 'Yesterday'
   if (dayOf > startToday - 7 * dayMs) return d.toLocaleDateString([], { weekday: 'long' })
   return d.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+// WhatsApp-style inline formatting: *bold* _italic_ ~strike~ `mono` (non-nested).
+function formatText(text: string): ReactNode[] {
+  const nodes: ReactNode[] = []
+  const regex = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|`[^`\n]+`)/g
+  let last = 0
+  let key = 0
+  let m: RegExpExecArray | null
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index))
+    const tok = m[0]
+    const inner = tok.slice(1, -1)
+    if (tok[0] === '*') nodes.push(<strong key={key++}>{inner}</strong>)
+    else if (tok[0] === '_') nodes.push(<em key={key++}>{inner}</em>)
+    else if (tok[0] === '~') nodes.push(<s key={key++}>{inner}</s>)
+    else nodes.push(<code key={key++} className="font-mono text-[0.92em] bg-black/10 rounded px-1">{inner}</code>)
+    last = m.index + tok.length
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+  return nodes
 }
 
 function TypingDots() {
@@ -333,7 +354,7 @@ export default function MessageThread({
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={m.content} alt="" className="rounded-lg max-w-full max-h-72 object-cover" />
                         ) : (
-                          <p className="text-sm whitespace-pre-wrap break-words">{m.content}</p>
+                          <p className="text-sm whitespace-pre-wrap break-words">{formatText(m.content)}</p>
                         )}
                       </>
                     )}
