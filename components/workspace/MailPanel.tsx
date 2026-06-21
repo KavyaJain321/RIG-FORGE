@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
+import { APP_NAME_UPPER } from '@/lib/branding'
+
 interface MailMsg {
   id: string
   threadId?: string | null
@@ -153,7 +155,7 @@ export default function MailPanel() {
       <div className="p-10 text-center border border-border-default rounded-xl">
         <p className="text-2xl mb-2">📬</p>
         <p className="text-lg font-medium text-text-primary mb-1">Connect Gmail</p>
-        <p className="text-sm text-text-secondary mb-5">Read and send mail without leaving RIG FORGE.</p>
+        <p className="text-sm text-text-secondary mb-5">Read and send mail without leaving {APP_NAME_UPPER}.</p>
         <a href="/api/auth/google/connect" className="inline-block h-9 leading-9 px-4 rounded-full bg-[#3F7A0A] text-white font-mono text-xs hover:bg-[#356a08]">
           Connect Google
         </a>
@@ -166,12 +168,12 @@ export default function MailPanel() {
       {/* Inbox list */}
       <div className={`w-full sm:w-80 shrink-0 sm:border-r border-border-default flex-col bg-surface-raised/40 ${selected ? 'hidden sm:flex' : 'flex'}`}>
         <div className="h-12 px-3 flex items-center justify-between gap-2 border-b border-border-default">
-          <div className="flex items-center gap-0.5 bg-black/[0.04] rounded-full p-0.5">
+          <div className="flex items-center gap-0.5 bg-text-primary//[0.04] rounded-full p-0.5">
             <button type="button" onClick={() => setScope('work')} title="Team & company mail only" className={`px-2.5 py-1 rounded-full text-[11px] font-mono ${scope === 'work' ? 'bg-[#3F7A0A] text-white' : 'text-text-secondary'}`}>Work</button>
             <button type="button" onClick={() => setScope('all')} title="Everything in your inbox" className={`px-2.5 py-1 rounded-full text-[11px] font-mono ${scope === 'all' ? 'bg-[#3F7A0A] text-white' : 'text-text-secondary'}`}>All</button>
           </div>
           <div className="flex gap-3 items-center">
-            <button type="button" onClick={() => setCompose({ to: '', subject: '', body: '' })} className="text-[#3F7A0A] text-sm" title="Compose">✎</button>
+            <button type="button" onClick={() => setCompose({ to: '', subject: '', body: '' })} className="text-accent-ink text-sm" title="Compose">✎</button>
             <button type="button" onClick={() => void loadInbox()} className="text-text-secondary text-sm" title="Refresh">⟳</button>
           </div>
         </div>
@@ -188,7 +190,7 @@ export default function MailPanel() {
                 key={m.id}
                 type="button"
                 onClick={() => void openMsg(m.id)}
-                className={`w-full text-left px-3 py-2.5 border-b border-black/[0.05] hover:bg-black/[0.03] ${selected?.id === m.id ? 'bg-[#3F7A0A]/10' : ''}`}
+                className={`w-full text-left px-3 py-2.5 border-b border-border-subtle hover:bg-text-primary//[0.03] ${selected?.id === m.id ? 'bg-[#3F7A0A]/10' : ''}`}
               >
                 <div className="flex justify-between gap-2">
                   <span className={`text-sm truncate text-text-primary ${m.isUnread ? 'font-semibold' : ''}`}>{fromName(m.from)}</span>
@@ -219,8 +221,8 @@ export default function MailPanel() {
                 <button type="button" onClick={() => void runForgie('summarize')} disabled={forgieBusy} className="h-8 px-3 rounded-full border border-border-default text-xs font-mono text-text-primary disabled:opacity-40">✨ Summarize</button>
                 <button type="button" onClick={() => void runForgie('reply')} disabled={forgieBusy} className="h-8 px-3 rounded-full border border-border-default text-xs font-mono text-text-primary disabled:opacity-40">✨ Draft reply</button>
               </div>
-              {forgieBusy && <p className="text-xs text-[#3F7A0A] mt-2">Forgie is thinking…</p>}
-              {forgieOut && <div className="mt-2 p-2.5 rounded-lg bg-[#EDE7FB] text-[#2A1A4A] text-sm whitespace-pre-wrap">🤖 {forgieOut}</div>}
+              {forgieBusy && <p className="text-xs text-accent-ink mt-2">Forgie is thinking…</p>}
+              {forgieOut && <div className="mt-2 p-2.5 rounded-lg bg-bubble-mine text-bubble-mine-ink text-sm whitespace-pre-wrap">🤖 {forgieOut}</div>}
             </div>
             <div className="flex-1 overflow-y-auto p-5 text-sm text-text-primary whitespace-pre-wrap break-words">{selected.body}</div>
           </>
@@ -236,9 +238,9 @@ export default function MailPanel() {
               <button type="button" onClick={() => setCompose(null)} className="text-text-secondary hover:text-text-primary">✕</button>
             </div>
             <div className="p-4 space-y-2">
-              <input value={compose.to} onChange={(e) => setCompose({ ...compose, to: e.target.value })} placeholder="To" className="w-full h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A]" />
-              <input value={compose.subject} onChange={(e) => setCompose({ ...compose, subject: e.target.value })} placeholder="Subject" className="w-full h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A]" />
-              <textarea value={compose.body} onChange={(e) => setCompose({ ...compose, body: e.target.value })} rows={10} placeholder="Write your message…" className="w-full p-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A] resize-none" />
+              <input value={compose.to} onChange={(e) => setCompose({ ...compose, to: e.target.value })} placeholder="To" className="w-full h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink" />
+              <input value={compose.subject} onChange={(e) => setCompose({ ...compose, subject: e.target.value })} placeholder="Subject" className="w-full h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink" />
+              <textarea value={compose.body} onChange={(e) => setCompose({ ...compose, body: e.target.value })} rows={10} placeholder="Write your message…" className="w-full p-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink resize-none" />
             </div>
             <div className="p-4 border-t border-border-default flex justify-between items-center">
               <span className="text-[11px] text-text-secondary truncate">{email ? `From ${email}` : ''}</span>

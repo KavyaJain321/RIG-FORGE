@@ -1,11 +1,13 @@
 import type { MetadataRoute } from 'next'
 
-// Web App Manifest — served at /manifest.webmanifest. Makes Rig Forge installable
+import { APP_NAME, APP_SHORT } from '@/lib/branding'
+
+// Web App Manifest — served at /manifest.webmanifest. Makes the app installable
 // as a PWA (home-screen icon, standalone window) so the chat feels app-native.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Rig Forge',
-    short_name: 'RigForge',
+    name: APP_NAME,
+    short_name: APP_SHORT,
     description: 'Team chat, projects, and the Forgie assistant — all in one place.',
     start_url: '/dashboard/messages',
     scope: '/',

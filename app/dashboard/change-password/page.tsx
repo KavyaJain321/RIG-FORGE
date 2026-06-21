@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import type { AuthUser, ApiResponse } from '@/lib/types'
+import { APP_NAME_UPPER } from '@/lib/branding'
 
 export default function ChangePasswordPage() {
   const { setUser } = useAuthStore()
@@ -161,7 +162,7 @@ export default function ChangePasswordPage() {
         </div>
 
         <p className="font-mono text-[10px] text-muted text-center mt-4 tracking-wide">
-          RIG FORGE — INTERNAL USE ONLY
+          {APP_NAME_UPPER} — INTERNAL USE ONLY
         </p>
       </div>
     </div>

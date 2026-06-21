@@ -43,7 +43,7 @@ export default function StarredModal({
                 key={m.id}
                 type="button"
                 onClick={() => { onOpenChat(m.conversationId); onClose() }}
-                className="w-full text-left px-3 py-2 rounded-lg hover:bg-black/[0.03]"
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-text-primary//[0.03]"
               >
                 <p className="text-[11px] text-text-secondary">
                   {m.conversationTitle ?? 'Direct chat'} · {m.senderName ?? 'Forgie'}

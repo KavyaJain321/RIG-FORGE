@@ -15,6 +15,7 @@ import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/db'
 import { sendPushToUsers } from '@/lib/push/send'
+import { APP_NAME_UPPER } from '@/lib/branding'
 import { mentionsForgie, replyAsForgieInChat } from './forgie'
 
 const ORG = 'rig360'
@@ -165,7 +166,7 @@ export async function createGroup(userId: string, title: string, memberIds: stri
 }
 
 const FORGIE_WELCOME =
-  "Hi! I'm Forgie 🤖 — your RIG FORGE assistant. Ask me about your projects, tasks, tickets, standups, or team. I can take actions too (create tasks, log standups), and you can @Forgie me in any group."
+  `Hi! I'm Forgie 🤖 — your ${APP_NAME_UPPER} assistant. Ask me about your projects, tasks, tickets, standups, or team. I can take actions too (create tasks, log standups), and you can @Forgie me in any group.`
 
 // The dedicated 1:1 Forgie (AI) chat for a user. Idempotent via the synthetic
 // dmKey "forgie:<userId>" + the (organizationId, dmKey) unique constraint.

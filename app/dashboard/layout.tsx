@@ -2,11 +2,12 @@ import type { Metadata } from 'next'
 
 import Topbar from '@/components/shared/Topbar'
 import ForgieDock from '@/components/assistant/ForgieDock'
+import { APP_NAME } from '@/lib/branding'
 
 export const metadata: Metadata = {
   title: {
-    template: '%s — Rig Forge',
-    default: 'Rig Forge',
+    template: `%s — ${APP_NAME}`,
+    default: APP_NAME,
   },
 }
 

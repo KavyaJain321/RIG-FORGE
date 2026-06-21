@@ -110,7 +110,7 @@ export default function CodePanel() {
                 key={r.fullName}
                 type="button"
                 onClick={() => openRepo(r)}
-                className={`w-full text-left px-3 py-2.5 border-b border-black/[0.05] hover:bg-black/[0.03] ${active?.name === r.name ? 'bg-[#3F7A0A]/10' : ''}`}
+                className={`w-full text-left px-3 py-2.5 border-b border-border-subtle hover:bg-text-primary//[0.03] ${active?.name === r.name ? 'bg-[#3F7A0A]/10' : ''}`}
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-text-primary truncate">{r.name}</span>
@@ -134,7 +134,7 @@ export default function CodePanel() {
               <button type="button" onClick={() => setActive(null)} className="sm:hidden text-text-secondary text-sm mb-2">‹ Repos</button>
               <div className="flex items-center justify-between gap-2">
                 <p className="text-lg font-medium text-text-primary truncate">{active.name}</p>
-                <a href={active.url} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-[#3F7A0A] shrink-0">Open ↗</a>
+                <a href={active.url} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-accent-ink shrink-0">Open ↗</a>
               </div>
               <div className="flex gap-2 mt-3">
                 {subTab('commits', 'Commits')}
@@ -149,21 +149,21 @@ export default function CodePanel() {
                 <p className="p-5 text-sm text-text-secondary">Nothing here.</p>
               ) : view === 'commits' ? (
                 (items as Commit[]).map((c) => (
-                  <a key={c.sha} href={c.url} target="_blank" rel="noopener noreferrer" className="block px-5 py-2.5 border-b border-black/[0.05] hover:bg-black/[0.03]">
+                  <a key={c.sha} href={c.url} target="_blank" rel="noopener noreferrer" className="block px-5 py-2.5 border-b border-border-subtle hover:bg-text-primary//[0.03]">
                     <p className="text-sm text-text-primary truncate">{c.message}</p>
                     <p className="text-[11px] text-text-secondary mt-0.5"><span className="font-mono">{c.sha}</span> · {c.authorLogin || c.authorName} · {shortDate(c.date)}</p>
                   </a>
                 ))
               ) : view === 'prs' ? (
                 (items as PR[]).map((p) => (
-                  <a key={p.number} href={p.url} target="_blank" rel="noopener noreferrer" className="block px-5 py-2.5 border-b border-black/[0.05] hover:bg-black/[0.03]">
+                  <a key={p.number} href={p.url} target="_blank" rel="noopener noreferrer" className="block px-5 py-2.5 border-b border-border-subtle hover:bg-text-primary//[0.03]">
                     <p className="text-sm text-text-primary truncate">{p.draft ? '🚧 ' : ''}{p.title}</p>
                     <p className="text-[11px] text-text-secondary mt-0.5">#{p.number} · {p.authorLogin}{p.labels.length ? ` · ${p.labels.join(', ')}` : ''}</p>
                   </a>
                 ))
               ) : (
                 (items as Issue[]).map((i) => (
-                  <a key={i.number} href={i.url} target="_blank" rel="noopener noreferrer" className="block px-5 py-2.5 border-b border-black/[0.05] hover:bg-black/[0.03]">
+                  <a key={i.number} href={i.url} target="_blank" rel="noopener noreferrer" className="block px-5 py-2.5 border-b border-border-subtle hover:bg-text-primary//[0.03]">
                     <p className="text-sm text-text-primary truncate">{i.title}</p>
                     <p className="text-[11px] text-text-secondary mt-0.5">#{i.number} · {i.authorLogin}{i.assigneeLogin ? ` → ${i.assigneeLogin}` : ''}{i.labels.length ? ` · ${i.labels.join(', ')}` : ''}</p>
                   </a>

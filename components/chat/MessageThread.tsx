@@ -49,8 +49,8 @@ function formatText(text: string): ReactNode[] {
     if (tok[0] === '*') nodes.push(<strong key={key++}>{inner}</strong>)
     else if (tok[0] === '_') nodes.push(<em key={key++}>{inner}</em>)
     else if (tok[0] === '~') nodes.push(<s key={key++}>{inner}</s>)
-    else if (tok[0] === '@') nodes.push(<span key={key++} className="text-[#3F7A0A] font-medium">{tok}</span>)
-    else nodes.push(<code key={key++} className="font-mono text-[0.92em] bg-black/10 rounded px-1">{inner}</code>)
+    else if (tok[0] === '@') nodes.push(<span key={key++} className="text-accent-ink font-medium">{tok}</span>)
+    else nodes.push(<code key={key++} className="font-mono text-[0.92em] bg-text-primary/10 rounded px-1">{inner}</code>)
     last = m.index + tok.length
   }
   if (last < text.length) nodes.push(text.slice(last))
@@ -169,7 +169,7 @@ function PollComposer({ onClose, onCreate }: { onClose: () => void; onCreate: (q
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Ask a question…"
-            className="w-full h-10 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A]"
+            className="w-full h-10 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink"
           />
           <div className="space-y-2">
             {options.map((opt, i) => (
@@ -178,7 +178,7 @@ function PollComposer({ onClose, onCreate }: { onClose: () => void; onCreate: (q
                   value={opt}
                   onChange={(e) => setOptions((os) => os.map((o, j) => (j === i ? e.target.value : o)))}
                   placeholder={`Option ${i + 1}`}
-                  className="flex-1 h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A]"
+                  className="flex-1 h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink"
                 />
                 {options.length > 2 && (
                   <button type="button" onClick={() => setOptions((os) => os.filter((_, j) => j !== i))} className="text-text-secondary hover:text-status-danger">✕</button>
@@ -186,7 +186,7 @@ function PollComposer({ onClose, onCreate }: { onClose: () => void; onCreate: (q
               </div>
             ))}
             {options.length < 12 && (
-              <button type="button" onClick={() => setOptions((os) => [...os, ''])} className="text-[#3F7A0A] text-xs font-mono hover:underline">＋ Add option</button>
+              <button type="button" onClick={() => setOptions((os) => [...os, ''])} className="text-accent-ink text-xs font-mono hover:underline">＋ Add option</button>
             )}
           </div>
           <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
@@ -452,8 +452,8 @@ export default function MessageThread({
 
   if (!conversation) {
     return (
-      <section className="hidden md:flex flex-1 min-w-0 items-center justify-center bg-[#F4F4EE]">
-        <p className="font-mono text-sm text-[#999]">Select a conversation to start chatting</p>
+      <section className="hidden md:flex flex-1 min-w-0 items-center justify-center bg-surface-mid">
+        <p className="font-mono text-sm text-text-muted">Select a conversation to start chatting</p>
       </section>
     )
   }
@@ -510,7 +510,7 @@ export default function MessageThread({
           ‹
         </button>
         {conversation.isForgie ? (
-          <div className="h-9 w-9 shrink-0 rounded-full bg-[#EDE7FB] flex items-center justify-center text-base">🤖</div>
+          <div className="h-9 w-9 shrink-0 rounded-full bg-bubble-mine flex items-center justify-center text-base">🤖</div>
         ) : (
           <Avatar name={conversation.title ?? '?'} avatarUrl={conversation.avatarUrl} size="sm" />
         )}
@@ -519,15 +519,15 @@ export default function MessageThread({
             {conversation.type === 'GROUP' ? '# ' : ''}{conversation.title}
           </p>
           {typingName ? (
-            <span className="text-[11px] text-[#3F7A0A] flex items-center gap-1">
+            <span className="text-[11px] text-accent-ink flex items-center gap-1">
               {conversation.type === 'GROUP' ? `${typingName} is ` : ''}typing <TypingDots />
             </span>
           ) : conversation.type === 'GROUP' ? (
-            <p className="text-[11px] text-[#888] truncate">
+            <p className="text-[11px] text-text-muted truncate">
               {conversation.members.length} members{groupOnline > 0 ? ` · ${groupOnline} online` : ''}
             </p>
           ) : dmOnline ? (
-            <p className="text-[11px] text-[#3F7A0A]">online</p>
+            <p className="text-[11px] text-accent-ink">online</p>
           ) : null}
         </div>
         <button
@@ -555,7 +555,7 @@ export default function MessageThread({
               key={key}
               type="button"
               onClick={() => { onSetWallpaper(conversation.id, key === 'default' ? null : key); setWallpaperOpen(false) }}
-              className={`h-7 w-7 rounded-full border ${(conversation.wallpaper ?? 'default') === key ? 'border-[#3F7A0A] ring-2 ring-[#3F7A0A]/30' : 'border-border-default'}`}
+              className={`h-7 w-7 rounded-full border ${(conversation.wallpaper ?? 'default') === key ? 'border-accent-ink ring-2 ring-[#3F7A0A]/30' : 'border-border-default'}`}
               style={{ backgroundColor: color }}
               title={key}
             />
@@ -570,7 +570,7 @@ export default function MessageThread({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search in this chat…"
-            className="w-full h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A]"
+            className="w-full h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink"
           />
           {searchResults.length > 0 && (
             <div className="mt-2 max-h-60 overflow-y-auto">
@@ -579,7 +579,7 @@ export default function MessageThread({
                   key={r.id}
                   type="button"
                   onClick={() => { scrollToMessage(r.id); setSearchOpen(false) }}
-                  className="w-full text-left px-2 py-1.5 rounded hover:bg-black/[0.04]"
+                  className="w-full text-left px-2 py-1.5 rounded hover:bg-text-primary//[0.04]"
                 >
                   <p className="text-[11px] text-text-secondary">{r.senderId === meId ? 'You' : nameFor(r.senderId)} · {timeLabel(r.createdAt)}</p>
                   <p className="text-sm text-text-primary truncate">{r.content}</p>
@@ -599,7 +599,7 @@ export default function MessageThread({
           onClick={() => scrollToMessage(pinnedMessages[pinnedMessages.length - 1].id)}
           className="shrink-0 w-full text-left px-3 py-2 border-b border-border-default bg-[#3F7A0A]/5 flex items-center gap-2"
         >
-          <span className="text-[#3F7A0A]">📌</span>
+          <span className="text-accent-ink">📌</span>
           <span className="text-xs text-text-secondary truncate flex-1">
             {pinnedMessages[pinnedMessages.length - 1].type === 'IMAGE' ? '📷 Photo' : pinnedMessages[pinnedMessages.length - 1].content}
           </span>
@@ -613,18 +613,18 @@ export default function MessageThread({
           <div className="space-y-3 animate-pulse pt-2">
             {SKELETON.map(([side, w], i) => (
               <div key={i} className={`flex ${side}`}>
-                <div className="h-9 rounded-2xl bg-black/[0.07]" style={{ width: w }} />
+                <div className="h-9 rounded-2xl bg-text-primary//[0.07]" style={{ width: w }} />
               </div>
             ))}
           </div>
         ) : messages.length === 0 ? (
-          <p className="font-mono text-xs text-[#999]">No messages yet — say hello 👋</p>
+          <p className="font-mono text-xs text-text-muted">No messages yet — say hello 👋</p>
         ) : (
           messages.map((m, i) => {
             const prev = messages[i - 1]
             const dateSep = !prev || !sameDay(prev.createdAt, m.createdAt) ? (
               <div className="flex justify-center my-2">
-                <span className="text-[10px] font-mono uppercase tracking-wide text-text-secondary bg-black/[0.05] rounded-full px-3 py-1">
+                <span className="text-[10px] font-mono uppercase tracking-wide text-text-secondary bg-text-primary//[0.05] rounded-full px-3 py-1">
                   {dayLabel(m.createdAt)}
                 </span>
               </div>
@@ -635,7 +635,7 @@ export default function MessageThread({
                 <Fragment key={m.id}>
                   {dateSep}
                   <div className="flex justify-center my-1">
-                    <span className="text-[11px] text-text-secondary bg-black/[0.05] rounded-full px-3 py-1 text-center">
+                    <span className="text-[11px] text-text-secondary bg-text-primary//[0.05] rounded-full px-3 py-1 text-center">
                       {m.content}
                     </span>
                   </div>
@@ -665,7 +665,7 @@ export default function MessageThread({
                       mine
                         ? 'bg-[#3F7A0A] text-white rounded-br-sm'
                         : isForgie
-                          ? 'bg-[#EDE7FB] text-[#2A1A4A] rounded-bl-sm'
+                          ? 'bg-bubble-mine text-bubble-mine-ink rounded-bl-sm'
                           : 'bg-surface-raised text-text-primary rounded-bl-sm border border-border-subtle'
                     }`}
                   >
@@ -679,7 +679,7 @@ export default function MessageThread({
                     ) : (
                       <>
                         {m.replyToId && (
-                          <div className={`mb-1 rounded px-2 py-1 border-l-2 text-xs ${mine ? 'border-white/60 bg-black/10 text-white/80' : 'border-[#3F7A0A] bg-black/[0.05] text-text-secondary'}`}>
+                          <div className={`mb-1 rounded px-2 py-1 border-l-2 text-xs ${mine ? 'border-white/60 bg-text-primary/10 text-white/80' : 'border-accent-ink bg-text-primary//[0.05] text-text-secondary'}`}>
                             <span className="block font-medium">
                               {quoted ? (quoted.senderId === meId ? 'You' : nameFor(quoted.senderId)) : 'Message'}
                             </span>
@@ -692,7 +692,7 @@ export default function MessageThread({
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={m.content} alt="" className="rounded-lg max-w-full max-h-72 object-cover" />
                         ) : m.type === 'FILE' ? (
-                          <a href={m.content} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${mine ? 'bg-black/15' : 'bg-black/[0.04]'}`}>
+                          <a href={m.content} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${mine ? 'bg-text-primary/[0.15]' : 'bg-text-primary//[0.04]'}`}>
                             <span className="text-lg shrink-0">📄</span>
                             <span className="min-w-0">
                               <span className="block text-sm truncate underline">{m.fileName ?? 'Download file'}</span>
@@ -728,7 +728,7 @@ export default function MessageThread({
                         )}
                       </>
                     )}
-                    <div className={`text-[10px] mt-0.5 flex items-center justify-end gap-1 ${mine ? 'text-white/70' : 'text-[#999]'}`}>
+                    <div className={`text-[10px] mt-0.5 flex items-center justify-end gap-1 ${mine ? 'text-white/70' : 'text-text-muted'}`}>
                       {m.starred && <span title="Starred">⭐</span>}
                       {m.editedAt && !m.deletedAt && <span className="opacity-60">edited</span>}
                       <span>{timeLabel(m.createdAt)}</span>
@@ -773,15 +773,15 @@ export default function MessageThread({
       <div className="shrink-0 border-t border-border-default bg-surface-raised/60">
         {editing && (
           <div className="px-3 pt-2 flex items-center gap-2">
-            <span className="text-[11px] text-[#3F7A0A] font-medium shrink-0">Editing</span>
+            <span className="text-[11px] text-accent-ink font-medium shrink-0">Editing</span>
             <span className="flex-1 text-xs text-text-secondary truncate">{editing.content}</span>
             <button type="button" onClick={() => { setEditing(null); setDraft('') }} className="text-text-secondary hover:text-text-primary">✕</button>
           </div>
         )}
         {replyingTo && (
           <div className="px-3 pt-2 flex items-start gap-2">
-            <div className="flex-1 min-w-0 border-l-2 border-[#3F7A0A] bg-black/[0.04] rounded px-2 py-1">
-              <p className="text-[11px] text-[#3F7A0A] font-medium">
+            <div className="flex-1 min-w-0 border-l-2 border-accent-ink bg-text-primary//[0.04] rounded px-2 py-1">
+              <p className="text-[11px] text-accent-ink font-medium">
                 {replyingTo.senderId === meId ? 'You' : nameFor(replyingTo.senderId)}
               </p>
               <p className="text-xs text-text-secondary truncate">
@@ -850,7 +850,7 @@ export default function MessageThread({
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
             rows={1}
             placeholder="Type a message…  (Shift+Enter for new line)"
-            className="flex-1 max-h-[120px] py-2 px-4 rounded-2xl border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A] resize-none leading-5"
+            className="flex-1 max-h-[120px] py-2 px-4 rounded-2xl border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink resize-none leading-5"
           />
           <button
             type="submit"
@@ -877,27 +877,27 @@ export default function MessageThread({
                 ))}
               </div>
             )}
-            <button type="button" onClick={() => { setReplyingTo(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">↩ Reply</button>
+            <button type="button" onClick={() => { setReplyingTo(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-text-primary//[0.05]">↩ Reply</button>
             {!ctxMenu.msg.deletedAt && ctxMenu.msg.type !== 'IMAGE' && (
-              <button type="button" onClick={() => { onForward(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">↪ Forward</button>
+              <button type="button" onClick={() => { onForward(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-text-primary//[0.05]">↪ Forward</button>
             )}
             {!ctxMenu.msg.deletedAt && (
-              <button type="button" onClick={() => { onStar(ctxMenu.msg.id); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">{ctxMenu.msg.starred ? '★ Unstar' : '☆ Star'}</button>
+              <button type="button" onClick={() => { onStar(ctxMenu.msg.id); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-text-primary//[0.05]">{ctxMenu.msg.starred ? '★ Unstar' : '☆ Star'}</button>
             )}
             {!ctxMenu.msg.deletedAt && (
-              <button type="button" onClick={() => { onPin(ctxMenu.msg.id, !ctxMenu.msg.pinnedAt); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">{ctxMenu.msg.pinnedAt ? '📌 Unpin' : '📌 Pin'}</button>
+              <button type="button" onClick={() => { onPin(ctxMenu.msg.id, !ctxMenu.msg.pinnedAt); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-text-primary//[0.05]">{ctxMenu.msg.pinnedAt ? '📌 Unpin' : '📌 Pin'}</button>
             )}
             {ctxMenu.msg.type !== 'IMAGE' && !ctxMenu.msg.deletedAt && (
-              <button type="button" onClick={() => { void navigator.clipboard?.writeText(ctxMenu.msg.content); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">⧉ Copy</button>
+              <button type="button" onClick={() => { void navigator.clipboard?.writeText(ctxMenu.msg.content); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-text-primary//[0.05]">⧉ Copy</button>
             )}
             {ctxMenu.msg.senderId === meId && ctxMenu.msg.type !== 'IMAGE' && !ctxMenu.msg.deletedAt && (
-              <button type="button" onClick={() => { startEdit(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">✎ Edit</button>
+              <button type="button" onClick={() => { startEdit(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-text-primary//[0.05]">✎ Edit</button>
             )}
             {ctxMenu.msg.senderId === meId && !ctxMenu.msg.deletedAt && (
-              <button type="button" onClick={() => { const id = ctxMenu.msg.id; setCtxMenu(null); if (confirm('Delete this message for everyone?')) onDelete(id) }} className="w-full text-left px-3 py-2 text-sm text-status-danger hover:bg-black/[0.05]">🗑 Delete</button>
+              <button type="button" onClick={() => { const id = ctxMenu.msg.id; setCtxMenu(null); if (confirm('Delete this message for everyone?')) onDelete(id) }} className="w-full text-left px-3 py-2 text-sm text-status-danger hover:bg-text-primary//[0.05]">🗑 Delete</button>
             )}
             {ctxMenu.msg.senderId === meId && (
-              <button type="button" onClick={() => { setInfoMsg(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">ⓘ Info</button>
+              <button type="button" onClick={() => { setInfoMsg(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-text-primary//[0.05]">ⓘ Info</button>
             )}
           </div>
         </div>

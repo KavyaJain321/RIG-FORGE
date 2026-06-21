@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
 import { isAdminRole } from '@/lib/auth'
 import LogoutLogModal from '@/components/shared/LogoutLogModal'
+import { APP_NAME } from '@/lib/branding'
 
 // ─── Nav definitions ──────────────────────────────────────────────────────────
 
@@ -111,7 +112,7 @@ function SidebarContent({ onNavClick, onLogoutClick }: SidebarContentProps) {
         <p className="text-xs font-semibold tracking-widest text-accent-ink uppercase">
           Governance Platform
         </p>
-        <p className="text-xl font-bold mt-1 tracking-tight">Rig Forge</p>
+        <p className="text-xl font-bold mt-1 tracking-tight">{APP_NAME}</p>
         <hr className="border-border-default mt-4" />
       </div>
 
@@ -232,7 +233,7 @@ export default function Sidebar() {
           <p className="text-[10px] font-semibold tracking-widest text-accent-ink uppercase leading-none">
             Governance Platform
           </p>
-          <p className="text-base font-bold tracking-tight leading-tight">Rig Forge</p>
+          <p className="text-base font-bold tracking-tight leading-tight">{APP_NAME}</p>
         </div>
         <button
           type="button"

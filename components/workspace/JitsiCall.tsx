@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from 'react'
 
+import { APP_NAME_UPPER as BRAND } from '@/lib/branding'
+
 type JitsiApi = {
   dispose: () => void
   addEventListener: (event: string, cb: () => void) => void
@@ -91,9 +93,9 @@ export default function JitsiCall({
             DEFAULT_LOGO_URL: '',
             DEFAULT_WELCOME_PAGE_LOGO_URL: '',
             MOBILE_APP_PROMO: false,
-            APP_NAME: 'RIG FORGE',
-            NATIVE_APP_NAME: 'RIG FORGE',
-            PROVIDER_NAME: 'RIG FORGE',
+            APP_NAME: BRAND,
+            NATIVE_APP_NAME: BRAND,
+            PROVIDER_NAME: BRAND,
           },
         })
         apiRef.current = api

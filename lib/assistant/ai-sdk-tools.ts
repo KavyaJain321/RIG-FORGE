@@ -24,6 +24,7 @@ import * as gmail from './tools/gmail'
 import * as gdrive from './tools/gdrive'
 import * as whatsapp from './tools/whatsapp'
 import { isAdminRole } from '@/lib/auth'
+import { APP_NAME_UPPER } from '@/lib/branding'
 import type { ToolUser } from './tools/projects'
 
 // ─── Read tools — safe to auto-execute ───────────────────────────────────────
@@ -286,7 +287,7 @@ export function buildProposeTools(): ToolSet {
 
     propose_create_project: tool({
       description: [
-        'Propose creating a new RIG FORGE project. NOT CREATED until the user',
+        `Propose creating a new ${APP_NAME_UPPER} project. NOT CREATED until the user`,
         'taps Confirm. Admin-only at the execute layer — refuse politely if the',
         'caller is an EMPLOYEE.',
         '',
@@ -383,7 +384,7 @@ function buildChatTools(caller: ToolUser): ToolSet {
   return {
     send_chat_message: tool({
       description:
-        'Send a message to a teammate inside RIG FORGE native chat. Delivers into your 1:1 DM with them — they get it instantly with a notification. Prefer this over WhatsApp for reaching teammates. Accepts a name or member id.',
+        `Send a message to a teammate inside ${APP_NAME_UPPER} native chat. Delivers into your 1:1 DM with them — they get it instantly with a notification. Prefer this over WhatsApp for reaching teammates. Accepts a name or member id.`,
       inputSchema: z.object({
         recipient: z.string().describe('The teammate to message — their name or member id'),
         message: z.string().describe('The message text to send'),
@@ -415,7 +416,7 @@ function buildChatTools(caller: ToolUser): ToolSet {
     }),
     send_group_message: tool({
       description:
-        'Post a message into a RIG FORGE group chat that you are a member of. Name the group by its title. Sends as you (fails if the group only allows admins and you are not one).',
+        `Post a message into a ${APP_NAME_UPPER} group chat that you are a member of. Name the group by its title. Sends as you (fails if the group only allows admins and you are not one).`,
       inputSchema: z.object({
         group: z.string().describe('The group chat name/title'),
         message: z.string().describe('The message text to post'),
@@ -442,7 +443,7 @@ function buildChatTools(caller: ToolUser): ToolSet {
     }),
     start_video_call: tool({
       description:
-        'Start an instant RIG FORGE video call and get a shareable in-app invite link (opens the call inside RF, no Google/Jitsi login). Optionally deliver the link to a teammate (name/id) or a group (title) so they can join.',
+        `Start an instant ${APP_NAME_UPPER} video call and get a shareable in-app invite link (opens the call inside RF, no Google/Jitsi login). Optionally deliver the link to a teammate (name/id) or a group (title) so they can join.`,
       inputSchema: z.object({
         topic: z.string().optional().describe('Short topic for the call'),
         sendTo: z.string().optional().describe('A teammate name/id OR a group title to send the invite link to'),
@@ -699,7 +700,7 @@ function buildGmailTools(caller: ToolUser): ToolSet {
         '',
         '  4. SIGN-OFF — exactly these two lines:',
         '       "Catch you then!"',
-        '       "— Forgie 🤖 (AI assistant in RIG FORGE, sending this for <CallerFirstName>)"',
+        `       "— Forgie 🤖 (AI assistant in ${APP_NAME_UPPER}, sending this for <CallerFirstName>)"`,
         '     Vary "Catch you then!" only when it doesn\'t fit the context',
         '     (e.g. no meeting → use "Hope that helps!" or "Have a good one!"',
         '     instead). The "— Forgie 🤖" line stays exactly as shown.',
@@ -1001,7 +1002,7 @@ If contactEmail is null, tell the user there's no email on file.
 
 # Vague or informal requests
 
-RIG FORGE is used in a fast-paced team setting. Users will be informal:
+${APP_NAME_UPPER} is used in a fast-paced team setting. Users will be informal:
 "set up a meet with rohit sir and radhesh for tmrw", "ping pranav about the
 deadline", "check if anyone's free at 3". Handle these gracefully:
 - Parse intent, don't ask for clarification unless truly ambiguous.

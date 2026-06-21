@@ -28,10 +28,10 @@ function compactTime(iso: string | null): string {
 function SkeletonRow() {
   return (
     <div className="px-3 py-2.5 flex items-center gap-3 animate-pulse">
-      <div className="h-9 w-9 rounded-full bg-black/[0.08] shrink-0" />
+      <div className="h-9 w-9 rounded-full bg-text-primary//[0.08] shrink-0" />
       <div className="flex-1 space-y-2">
-        <div className="h-3 w-1/2 rounded bg-black/[0.08]" />
-        <div className="h-2.5 w-3/4 rounded bg-black/[0.06]" />
+        <div className="h-3 w-1/2 rounded bg-text-primary//[0.08]" />
+        <div className="h-2.5 w-3/4 rounded bg-text-primary//[0.06]" />
       </div>
     </div>
   )
@@ -92,12 +92,12 @@ export default function ConversationList({
         onClick={() => onSelect(c.id)}
         onContextMenu={(e) => openMenu(e, c)}
         className={[
-          'w-full text-left px-3 py-2.5 flex items-center gap-3 border-b border-black/[0.05] transition-colors',
-          active ? 'bg-[#3F7A0A]/10' : 'hover:bg-black/[0.03]',
+          'w-full text-left px-3 py-2.5 flex items-center gap-3 border-b border-border-subtle transition-colors',
+          active ? 'bg-[#3F7A0A]/10' : 'hover:bg-text-primary//[0.03]',
         ].join(' ')}
       >
         {c.isForgie ? (
-          <div className="h-9 w-9 shrink-0 rounded-full bg-[#EDE7FB] flex items-center justify-center text-base">🤖</div>
+          <div className="h-9 w-9 shrink-0 rounded-full bg-bubble-mine flex items-center justify-center text-base">🤖</div>
         ) : (
           <Avatar name={c.title ?? '?'} avatarUrl={c.avatarUrl} size="sm" />
         )}
@@ -106,7 +106,7 @@ export default function ConversationList({
             <span className="font-medium text-sm text-text-primary truncate">
               {c.isPinned ? '📌 ' : ''}{c.type === 'GROUP' ? '# ' : ''}{c.title}
             </span>
-            <span className={`shrink-0 text-[10px] ${c.unread > 0 ? 'text-[#3F7A0A] font-medium' : 'text-text-secondary'}`}>
+            <span className={`shrink-0 text-[10px] ${c.unread > 0 ? 'text-accent-ink font-medium' : 'text-text-secondary'}`}>
               {time}
             </span>
           </div>
@@ -114,9 +114,9 @@ export default function ConversationList({
             {(() => {
               const d = typeof window !== 'undefined' ? localStorage.getItem(`rf-chat-draft-${c.id}`) || '' : ''
               return d ? (
-                <p className="text-xs truncate"><span className="text-status-danger">Draft: </span><span className="text-[#777]">{d}</span></p>
+                <p className="text-xs truncate"><span className="text-status-danger">Draft: </span><span className="text-text-muted">{d}</span></p>
               ) : (
-                <p className="text-xs text-[#777] truncate">{preview(c)}</p>
+                <p className="text-xs text-text-muted truncate">{preview(c)}</p>
               )
             })()}
             <span className="flex items-center gap-1 shrink-0">
@@ -133,7 +133,7 @@ export default function ConversationList({
     )
   }
 
-  const menuBtn = 'w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]'
+  const menuBtn = 'w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-text-primary//[0.05]'
 
   return (
     <aside className={`w-full md:w-72 shrink-0 border-r border-border-default bg-surface-raised/60 flex-col ${activeId ? 'hidden md:flex' : 'flex'}`}>
@@ -158,8 +158,8 @@ export default function ConversationList({
         {loading ? (
           <>{Array.from({ length: 7 }).map((_, i) => <SkeletonRow key={i} />)}</>
         ) : conversations.length === 0 ? (
-          <p className="p-4 font-mono text-xs text-[#888]">
-            No conversations yet. Tap <span className="text-[#3F7A0A]">＋ New</span> to start one.
+          <p className="p-4 font-mono text-xs text-text-muted">
+            No conversations yet. Tap <span className="text-accent-ink">＋ New</span> to start one.
           </p>
         ) : (
           <>
@@ -169,7 +169,7 @@ export default function ConversationList({
                 <button
                   type="button"
                   onClick={() => setShowArchived((s) => !s)}
-                  className="w-full text-left px-3 py-2 text-[11px] font-mono uppercase tracking-wide text-text-secondary border-b border-black/[0.05] hover:bg-black/[0.03]"
+                  className="w-full text-left px-3 py-2 text-[11px] font-mono uppercase tracking-wide text-text-secondary border-b border-border-subtle hover:bg-text-primary//[0.03]"
                 >
                   🗄 Archived ({archivedChats.length}) {showArchived ? '▾' : '▸'}
                 </button>
@@ -202,14 +202,14 @@ export default function ConversationList({
               return (
                 <button
                   type="button"
-                  className="w-full text-left px-3 py-2 text-sm text-status-danger hover:bg-black/[0.05]"
+                  className="w-full text-left px-3 py-2 text-sm text-status-danger hover:bg-text-primary//[0.05]"
                   onClick={() => { onBlockUser(other.id, !chatMenu.conv.blocked); setChatMenu(null) }}
                 >
                   {chatMenu.conv.blocked ? '✅ Unblock' : '🚫 Block'}
                 </button>
               )
             })()}
-            <button type="button" className="w-full text-left px-3 py-2 text-sm text-status-danger hover:bg-black/[0.05]" onClick={() => { const id = chatMenu.conv.id; setChatMenu(null); if (confirm('Clear all messages in this chat for you?')) onChatSettings(id, { cleared: true }) }}>
+            <button type="button" className="w-full text-left px-3 py-2 text-sm text-status-danger hover:bg-text-primary//[0.05]" onClick={() => { const id = chatMenu.conv.id; setChatMenu(null); if (confirm('Clear all messages in this chat for you?')) onChatSettings(id, { cleared: true }) }}>
               🧹 Clear chat
             </button>
           </div>

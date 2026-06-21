@@ -46,19 +46,19 @@ export default function NewChatModal({
           <span className="font-mono text-xs uppercase tracking-widest text-text-secondary">
             New message
           </span>
-          <button type="button" onClick={onClose} className="text-[#888] hover:text-text-primary">
+          <button type="button" onClick={onClose} className="text-text-muted hover:text-text-primary">
             ✕
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-2">
           {users.length === 0 ? (
-            <p className="p-3 text-xs text-[#888]">No teammates found.</p>
+            <p className="p-3 text-xs text-text-muted">No teammates found.</p>
           ) : (
             users.map((u) => (
               <label
                 key={u.id}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-black/[0.03] cursor-pointer"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-text-primary//[0.03] cursor-pointer"
               >
                 <input
                   type="checkbox"
@@ -79,7 +79,7 @@ export default function NewChatModal({
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               placeholder="Group name…"
-              className="w-full h-10 px-3 rounded-lg border border-border-default text-sm outline-none focus:border-[#3F7A0A]"
+              className="w-full h-10 px-3 rounded-lg border border-border-default text-sm outline-none focus:border-accent-ink"
             />
           </div>
         )}
@@ -88,7 +88,7 @@ export default function NewChatModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-full border border-border-default font-mono text-xs text-text-secondary hover:bg-black/[0.03]"
+            className="h-10 px-4 rounded-full border border-border-default font-mono text-xs text-text-secondary hover:bg-text-primary//[0.03]"
           >
             CANCEL
           </button>

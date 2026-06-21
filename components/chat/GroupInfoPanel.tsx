@@ -195,7 +195,7 @@ export default function GroupInfoPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => fileRef.current?.click()}
-                  className="font-mono text-[11px] text-[#3F7A0A] hover:underline disabled:opacity-40"
+                  className="font-mono text-[11px] text-accent-ink hover:underline disabled:opacity-40"
                 >
                   Change photo
                 </button>
@@ -218,9 +218,9 @@ export default function GroupInfoPanel({
                 <input
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
-                  className="h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A]"
+                  className="h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink"
                 />
-                <button type="button" onClick={() => void saveName()} disabled={busy} className="text-[#3F7A0A] text-sm font-mono">SAVE</button>
+                <button type="button" onClick={() => void saveName()} disabled={busy} className="text-accent-ink text-sm font-mono">SAVE</button>
                 <button type="button" onClick={() => { setEditingName(false); setNameInput(conversation.title ?? '') }} className="text-text-secondary text-sm font-mono">✕</button>
               </div>
             ) : (
@@ -243,10 +243,10 @@ export default function GroupInfoPanel({
                   value={descInput}
                   onChange={(e) => setDescInput(e.target.value)}
                   rows={2}
-                  className="w-full rounded-lg border border-border-default bg-surface-raised text-sm p-2 outline-none focus:border-[#3F7A0A] resize-none"
+                  className="w-full rounded-lg border border-border-default bg-surface-raised text-sm p-2 outline-none focus:border-accent-ink resize-none"
                 />
                 <div className="flex gap-3">
-                  <button type="button" onClick={() => void saveDescription()} disabled={busy} className="text-[#3F7A0A] text-xs font-mono">SAVE</button>
+                  <button type="button" onClick={() => void saveDescription()} disabled={busy} className="text-accent-ink text-xs font-mono">SAVE</button>
                   <button type="button" onClick={() => { setEditingDesc(false); setDescInput(conversation.description ?? '') }} className="text-text-secondary text-xs font-mono">CANCEL</button>
                 </div>
               </div>
@@ -273,14 +273,14 @@ export default function GroupInfoPanel({
                 <p className="font-mono text-[10px] uppercase tracking-widest text-text-secondary mb-1">Invite link</p>
                 {inviteLink ? (
                   <div className="flex flex-col gap-1">
-                    <p className="text-[11px] text-text-secondary break-all bg-black/[0.04] rounded px-2 py-1">{inviteLink}</p>
+                    <p className="text-[11px] text-text-secondary break-all bg-text-primary//[0.04] rounded px-2 py-1">{inviteLink}</p>
                     <div className="flex gap-3">
-                      <button type="button" onClick={copyInviteLink} className="text-[#3F7A0A] text-xs font-mono">COPY</button>
+                      <button type="button" onClick={copyInviteLink} className="text-accent-ink text-xs font-mono">COPY</button>
                       <button type="button" onClick={() => void revokeInviteLink()} disabled={busy} className="text-status-danger text-xs font-mono">REVOKE</button>
                     </div>
                   </div>
                 ) : (
-                  <button type="button" onClick={() => void createInviteLink()} disabled={busy} className="text-[#3F7A0A] text-xs font-mono hover:underline">
+                  <button type="button" onClick={() => void createInviteLink()} disabled={busy} className="text-accent-ink text-xs font-mono hover:underline">
                     Create invite link
                   </button>
                 )}
@@ -291,7 +291,7 @@ export default function GroupInfoPanel({
                   value={conversation.disappearingSeconds ?? 0}
                   onChange={(e) => void changeDisappearing(Number(e.target.value) || null)}
                   disabled={busy}
-                  className="w-full h-8 rounded-lg border border-border-default bg-surface-raised text-sm px-2 outline-none focus:border-[#3F7A0A]"
+                  className="w-full h-8 rounded-lg border border-border-default bg-surface-raised text-sm px-2 outline-none focus:border-accent-ink"
                 >
                   <option value={0}>Off</option>
                   <option value={86400}>24 hours</option>
@@ -309,7 +309,7 @@ export default function GroupInfoPanel({
                 Members
               </span>
               {isAdmin && addable.length > 0 && (
-                <button type="button" onClick={() => setAdding((v) => !v)} className="font-mono text-[11px] text-[#3F7A0A] hover:underline">
+                <button type="button" onClick={() => setAdding((v) => !v)} className="font-mono text-[11px] text-accent-ink hover:underline">
                   {adding ? 'Cancel' : '＋ Add'}
                 </button>
               )}
@@ -319,7 +319,7 @@ export default function GroupInfoPanel({
               <div className="mx-3 mb-2 rounded-xl border border-border-default p-2">
                 <div className="max-h-44 overflow-y-auto">
                   {addable.map((u) => (
-                    <label key={u.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-black/[0.03] cursor-pointer">
+                    <label key={u.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-text-primary//[0.03] cursor-pointer">
                       <input
                         type="checkbox"
                         checked={selectedAdd.includes(u.id)}
@@ -346,13 +346,13 @@ export default function GroupInfoPanel({
               const isMe = m.id === meId
               const canManage = isAdmin && !isMe && m.role !== 'OWNER'
               return (
-                <div key={m.id} className="flex items-center gap-3 px-4 py-2 hover:bg-black/[0.02]">
+                <div key={m.id} className="flex items-center gap-3 px-4 py-2 hover:bg-text-primary//[0.02]">
                   <Avatar name={m.name} avatarUrl={m.avatarUrl} size="sm" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-text-primary truncate">{m.name}{isMe ? ' (You)' : ''}</p>
                   </div>
                   {(m.role === 'OWNER' || m.role === 'ADMIN') && (
-                    <span className="font-mono text-[9px] uppercase tracking-wide text-[#3F7A0A] border border-[#3F7A0A]/40 rounded px-1.5 py-0.5">
+                    <span className="font-mono text-[9px] uppercase tracking-wide text-accent-ink border border-[#3F7A0A]/40 rounded px-1.5 py-0.5">
                       {m.role === 'OWNER' ? 'Owner' : 'Admin'}
                     </span>
                   )}
@@ -361,7 +361,7 @@ export default function GroupInfoPanel({
                       {m.role === 'ADMIN' ? (
                         <button type="button" disabled={busy} onClick={() => void setRole(m.id, 'MEMBER')} className="text-[10px] font-mono text-text-secondary hover:text-text-primary">Demote</button>
                       ) : (
-                        <button type="button" disabled={busy} onClick={() => void setRole(m.id, 'ADMIN')} className="text-[10px] font-mono text-[#3F7A0A] hover:underline">Make&nbsp;admin</button>
+                        <button type="button" disabled={busy} onClick={() => void setRole(m.id, 'ADMIN')} className="text-[10px] font-mono text-accent-ink hover:underline">Make&nbsp;admin</button>
                       )}
                       <button type="button" disabled={busy} onClick={() => void removeMember(m.id)} className="text-[10px] font-mono text-status-danger hover:underline">Remove</button>
                     </div>

@@ -38,7 +38,7 @@ export default function ForwardModal({
             <p className="p-3 text-xs text-text-secondary">No chats to forward to.</p>
           ) : (
             conversations.map((c) => (
-              <label key={c.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-black/[0.03] cursor-pointer">
+              <label key={c.id} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-text-primary//[0.03] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={selected.includes(c.id)}
@@ -57,7 +57,7 @@ export default function ForwardModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-4 rounded-full border border-border-default font-mono text-xs text-text-secondary hover:bg-black/[0.03]"
+            className="h-10 px-4 rounded-full border border-border-default font-mono text-xs text-text-secondary hover:bg-text-primary//[0.03]"
           >
             CANCEL
           </button>

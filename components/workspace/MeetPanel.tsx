@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 
 import { useAuthStore } from '@/store/authStore'
+import { APP_NAME_UPPER } from '@/lib/branding'
 import JitsiCall from './JitsiCall'
 
 export default function MeetPanel() {
@@ -68,13 +69,13 @@ export default function MeetPanel() {
     <div className="border border-border-default rounded-xl overflow-hidden">
       <div className="p-6">
         <p className="text-sm font-medium text-text-primary mb-1">Start a video call</p>
-        <p className="text-xs text-text-secondary mb-4">Runs entirely inside RIG FORGE — share the invite link to bring teammates into the same call.</p>
+        <p className="text-xs text-text-secondary mb-4">Runs entirely inside {APP_NAME_UPPER} — share the invite link to bring teammates into the same call.</p>
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             placeholder="Topic (optional)"
-            className="h-10 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A] w-56"
+            className="h-10 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink w-56"
           />
           <button type="button" onClick={startCall} className="h-10 px-5 rounded-full bg-[#3F7A0A] text-white font-mono text-xs hover:bg-[#356a08]">
             📹 Start call
