@@ -112,6 +112,11 @@ model User {
   auditLogs       AssistantAuditLog[]
   dailyLogDrafts  DailyLogDraft[]
   googleIntegration GoogleIntegration?
+
+  // ── Native chat (Phase 1) ──
+  chatMemberships      ConversationMember[] @relation("ChatMemberships")
+  sentChatMessages     ChatMessage[]        @relation("ChatSentMessages")
+  createdConversations Conversation[]       @relation("ChatCreatedBy")
 }
 
 model Project {
@@ -492,4 +497,96 @@ model StandupDigest {
   generatedAt     DateTime @default(now())
 
   @@index([date(sort: Desc)])
+}
+
+// ─── Native chat (Phase 1) ────────────────────────────────────────────────────
+// In-app messaging to replace WhatsApp: 1:1 DMs + group chats between RF users,
+// with Forgie available inline. `organizationId` is stamped on every row now
+// (single-org default "rig360") to future-proof multi-tenancy without a later
+// backfill. Live updates are delivered via Supabase Realtime on these tables.
+
+enum ConversationType {
+  DIRECT   // 1:1 DM between exactly two users
+  GROUP    // named group chat, 2+ members
+}
+
+enum ConversationMemberRole {
+  OWNER    // group creator
+  ADMIN    // can rename + add/remove members
+  MEMBER
+}
+
+enum ChatMessageKind {
+  USER     // sent by a human (senderId set)
+  FORGIE   // AI reply (senderId null)
+  SYSTEM   // system notice, e.g. "X added Y" (senderId null)
+}
+
+enum ChatMessageType {
+  TEXT
+  IMAGE
+  FILE
+}
+
+model Conversation {
+  id             String           @id @default(cuid())
+  organizationId String           @default("rig360")  // tenancy anchor (single-org for now)
+  type           ConversationType
+  title          String?                              // group name; null for DMs (UI derives from the other member)
+  // For DIRECT convos, dmKey = the two user ids sorted + joined "a:b", so the
+  // unique constraint guarantees exactly ONE DM thread per pair. Null for groups.
+  dmKey          String?
+  createdById    String?
+  isArchived     Boolean          @default(false)
+  lastMessageAt  DateTime?                            // denormalized for fast conversation-list sorting
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  createdBy User?                @relation("ChatCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  members   ConversationMember[]
+  messages  ChatMessage[]
+
+  @@unique([organizationId, dmKey])
+  @@index([organizationId])
+  @@index([lastMessageAt])
+}
+
+model ConversationMember {
+  id             String                 @id @default(cuid())
+  organizationId String                 @default("rig360")
+  conversationId String
+  userId         String
+  role           ConversationMemberRole @default(MEMBER)
+  lastReadAt     DateTime?                                 // drives unread counts
+  isMuted        Boolean                @default(false)
+  joinedAt       DateTime               @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation("ChatMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+}
+
+model ChatMessage {
+  id             String          @id @default(cuid())
+  organizationId String          @default("rig360")
+  conversationId String
+  senderId       String?                                  // null for FORGIE / SYSTEM messages
+  kind           ChatMessageKind @default(USER)
+  type           ChatMessageType @default(TEXT)
+  content        String
+  replyToId      String?                                  // optional threaded reply
+  editedAt       DateTime?
+  deletedAt      DateTime?                                // soft delete
+  createdAt      DateTime        @default(now())
+
+  conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?         @relation("ChatSentMessages", fields: [senderId], references: [id], onDelete: SetNull)
+  replyTo      ChatMessage?  @relation("ChatReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      ChatMessage[] @relation("ChatReplies")
+
+  @@index([conversationId, createdAt])
+  @@index([organizationId])
 }
