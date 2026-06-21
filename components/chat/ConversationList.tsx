@@ -50,7 +50,7 @@ export default function ConversationList({
   onNewChat: () => void
 }) {
   return (
-    <aside className="w-72 shrink-0 border-r border-border-default bg-surface-raised/60 flex flex-col">
+    <aside className={`w-full md:w-72 shrink-0 border-r border-border-default bg-surface-raised/60 flex-col ${activeId ? 'hidden md:flex' : 'flex'}`}>
       <div className="h-14 px-4 flex items-center justify-between border-b border-border-default">
         <span className="font-mono text-xs uppercase tracking-widest text-text-secondary">Messages</span>
         <button

@@ -21,6 +21,20 @@ async function api<T = unknown>(path: string, opts?: RequestInit): Promise<T> {
   return json.data as T
 }
 
+function rowToMsg(row: Record<string, unknown>): ChatMessageDTO {
+  return {
+    id: String(row.id),
+    conversationId: String(row.conversationId),
+    senderId: row.senderId ? String(row.senderId) : null,
+    kind: row.kind as ChatMessageDTO['kind'],
+    type: row.type as ChatMessageDTO['type'],
+    content: String(row.content),
+    replyToId: row.replyToId ? String(row.replyToId) : null,
+    deliveredAt: row.deliveredAt ? String(row.deliveredAt) : null,
+    createdAt: String(row.createdAt),
+  }
+}
+
 export default function ChatApp() {
   const me = useAuthStore((s) => s.user)
 
@@ -28,13 +42,15 @@ export default function ChatApp() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessageDTO[]>([])
   const [users, setUsers] = useState<ChatUserLite[]>([])
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set())
   const [loadingConvos, setLoadingConvos] = useState(true)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [newChatOpen, setNewChatOpen] = useState(false)
 
-  // Ref so the realtime callback always sees the currently-open conversation.
   const activeIdRef = useRef<string | null>(null)
   activeIdRef.current = activeId
+  const meIdRef = useRef<string | null>(null)
+  meIdRef.current = me?.id ?? null
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -49,7 +65,6 @@ export default function ChatApp() {
 
   useEffect(() => { void refreshConversations() }, [refreshConversations])
 
-  // Roster for the new-chat picker (once).
   useEffect(() => {
     void api<{ users: ChatUserLite[] }>('/api/chat/users')
       .then((d) => setUsers(d.users))
@@ -72,8 +87,21 @@ export default function ChatApp() {
     return () => { cancelled = true }
   }, [activeId])
 
-  // Realtime: one channel for ALL new chat messages. Append to the open thread
-  // and refresh the conversation list (last message / unread / order).
+  // Presence — who's online right now (drives the "online" header state).
+  useEffect(() => {
+    const supabase = getSupabaseClient()
+    if (!supabase || !me?.id) return
+    const ch = supabase.channel('presence:online', { config: { presence: { key: me.id } } })
+    ch.on('presence', { event: 'sync' }, () => {
+      setOnlineIds(new Set(Object.keys(ch.presenceState())))
+    })
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED') void ch.track({ at: Date.now() })
+    })
+    return () => { void supabase.removeChannel(ch) }
+  }, [me?.id])
+
+  // Realtime: new messages, message updates (delivered tick), and read receipts.
   useEffect(() => {
     const supabase = getSupabaseClient()
     if (!supabase) return
@@ -83,25 +111,34 @@ export default function ChatApp() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'ChatMessage' },
         (payload) => {
-          const row = payload.new as Record<string, unknown>
-          const msg: ChatMessageDTO = {
-            id: String(row.id),
-            conversationId: String(row.conversationId),
-            senderId: row.senderId ? String(row.senderId) : null,
-            kind: row.kind as ChatMessageDTO['kind'],
-            type: row.type as ChatMessageDTO['type'],
-            content: String(row.content),
-            createdAt: String(row.createdAt),
-          }
+          const msg = rowToMsg(payload.new as Record<string, unknown>)
           if (msg.conversationId === activeIdRef.current) {
             setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
             void api(`/api/chat/conversations/${msg.conversationId}/read`, { method: 'POST' }).catch(() => {})
           }
+          // Ack delivery for messages from someone else (double-grey tick).
+          if (msg.senderId && msg.senderId !== meIdRef.current) {
+            void api(`/api/chat/messages/${msg.id}/delivered`, { method: 'POST' }).catch(() => {})
+          }
           void refreshConversations()
         },
       )
-      // Live "seen" status: when any member's lastReadAt changes (they opened a
-      // conversation), update that member in state so read receipts re-render.
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'ChatMessage' },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>
+          if (String(row.conversationId) !== activeIdRef.current) return
+          const id = String(row.id)
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === id
+                ? { ...m, content: String(row.content), deliveredAt: row.deliveredAt ? String(row.deliveredAt) : null }
+                : m,
+            ),
+          )
+        },
+      )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'ConversationMember' },
@@ -124,7 +161,7 @@ export default function ChatApp() {
   }, [refreshConversations])
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, replyToId?: string | null) => {
       if (!activeId) return
       try {
         const data = await api<{ message: ChatMessageDTO }>(
@@ -132,7 +169,7 @@ export default function ChatApp() {
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: text }),
+            body: JSON.stringify({ content: text, replyToId: replyToId ?? undefined }),
           },
         )
         const msg = data.message
@@ -140,6 +177,27 @@ export default function ChatApp() {
         void refreshConversations()
       } catch (err) {
         console.error('[chat] send', err)
+      }
+    },
+    [activeId, refreshConversations],
+  )
+
+  const handleSendImage = useCallback(
+    async (file: File) => {
+      if (!activeId) return
+      const fd = new FormData()
+      fd.append('file', file)
+      try {
+        const data = await api<{ message: ChatMessageDTO }>(
+          `/api/chat/conversations/${activeId}/media`,
+          { method: 'POST', body: fd },
+        )
+        const msg = data.message
+        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
+        void refreshConversations()
+      } catch (err) {
+        console.error('[chat] image', err)
+        alert(err instanceof Error ? err.message : 'Image upload failed')
       }
     },
     [activeId, refreshConversations],
@@ -189,9 +247,12 @@ export default function ChatApp() {
         meId={me.id}
         loading={loadingMsgs}
         onSend={handleSend}
+        onSendImage={handleSendImage}
         users={users}
+        onlineIds={onlineIds}
         onChanged={refreshConversations}
         onLeft={() => { setActiveId(null); void refreshConversations() }}
+        onBack={() => setActiveId(null)}
       />
       {newChatOpen && (
         <NewChatModal
