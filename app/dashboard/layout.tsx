@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 
 import Topbar from '@/components/shared/Topbar'
+import ForgieDock from '@/components/assistant/ForgieDock'
 
 export const metadata: Metadata = {
   title: {
@@ -15,11 +16,17 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-[#EAEAE4]">
-      <Topbar />
-      <main className="min-h-screen pt-14 overflow-y-auto">
-        {children}
-      </main>
+    // Top-level split: main column flexes to fill width, ForgieDock is a
+    // fixed-width persistent pane on the right (desktop only). min-w-0 lets the
+    // main column shrink below its content width so the dock can't be pushed off.
+    <div className="flex min-h-screen bg-[#EAEAE4]">
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Topbar />
+        <main className="flex-1 min-w-0">
+          {children}
+        </main>
+      </div>
+      <ForgieDock />
     </div>
   )
 }

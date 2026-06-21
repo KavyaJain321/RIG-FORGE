@@ -3,8 +3,11 @@
 import { useAssistantStore } from '@/store/assistantStore'
 
 /**
- * Topbar button that opens Forgie's chat panel.
+ * Topbar button that opens Forgie's mobile chat overlay.
  * Sits to the LEFT of the notification bell.
+ *
+ * Hidden on desktop (`lg:hidden`): at ≥1024px Forgie is a persistent docked
+ * pane (ForgieDock), so a toggle would be a no-op there.
  */
 export default function AskForgieButton() {
   const { isOpen, toggle } = useAssistantStore()
@@ -16,7 +19,7 @@ export default function AskForgieButton() {
       aria-label={isOpen ? 'Close Forgie' : 'Ask Forgie'}
       title="Ask Forgie (AI assistant)"
       className={[
-        'flex items-center gap-1.5 h-9 px-3',
+        'lg:hidden flex items-center gap-1.5 h-9 px-3',
         'border border-black/10 rounded-full',
         'font-mono text-xs tracking-widest uppercase',
         'transition-colors duration-150',

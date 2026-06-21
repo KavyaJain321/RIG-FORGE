@@ -282,8 +282,11 @@ body {
    ══════════════════════════════════════════════════════════════════════════ */
 
 .topbar {
-  position: fixed;
-  top: 0; left: 0; right: 0;
+  /* sticky (not fixed) so the bar spans only its flex column — to the left of
+     the persistent Forgie dock — and pins to the viewport top as the page
+     scrolls, instead of overlaying the full viewport width. */
+  position: sticky;
+  top: 0;
   height: 56px;
   display: flex;
   align-items: center;
