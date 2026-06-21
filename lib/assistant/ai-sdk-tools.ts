@@ -374,12 +374,54 @@ export function buildProposeTools(): ToolSet {
   }
 }
 
+// Native RIG FORGE chat: let Forgie deliver a message to a teammate over the
+// in-app chat (the caller's own 1:1 DM with them). Unlike WhatsApp this isn't
+// admin-gated — it sends from the caller's identity, exactly as if they typed
+// it themselves, so any user can use it. Dynamic imports avoid a load-time
+// cycle (chat/service → chat/forgie → this module).
+function buildChatTools(caller: ToolUser): ToolSet {
+  return {
+    send_chat_message: tool({
+      description:
+        'Send a message to a teammate inside RIG FORGE native chat. Delivers into your 1:1 DM with them — they get it instantly with a notification. Prefer this over WhatsApp for reaching teammates. Accepts a name or member id.',
+      inputSchema: z.object({
+        recipient: z.string().describe('The teammate to message — their name or member id'),
+        message: z.string().describe('The message text to send'),
+      }),
+      execute: async ({ recipient, message }) => {
+        try {
+          const { prisma } = await import('@/lib/db')
+          let user = await prisma.user.findFirst({
+            where: { id: recipient, isActive: true },
+            select: { id: true, name: true },
+          })
+          if (!user) {
+            user = await prisma.user.findFirst({
+              where: { isActive: true, name: { contains: recipient, mode: 'insensitive' } },
+              select: { id: true, name: true },
+            })
+          }
+          if (!user) return { delivered: false, error: `No active teammate matching "${recipient}".` }
+          if (user.id === caller.userId) return { delivered: false, error: 'That recipient is you — pick a teammate.' }
+
+          const { getOrCreateDm, sendMessage } = await import('@/lib/chat/service')
+          const dm = await getOrCreateDm(caller.userId, user.id)
+          await sendMessage(dm.id, caller.userId, message)
+          return { delivered: true, to: user.name }
+        } catch (err) {
+          return { delivered: false, error: err instanceof Error ? err.message : 'Failed to send the message.' }
+        }
+      },
+    }),
+  }
+}
+
 // Convenience: read + propose tools combined for the message route.
 // Synchronous version — Calendar tools are NOT included since they need
 // a per-user DB check. Use buildAllToolsAsync from the message route to
 // get the full set.
 export function buildAllTools(caller: ToolUser): ToolSet {
-  const base: ToolSet = { ...buildReadTools(caller), ...buildProposeTools() }
+  const base: ToolSet = { ...buildReadTools(caller), ...buildProposeTools(), ...buildChatTools(caller) }
   if (whatsapp.isWhatsAppEnabled() && isAdminRole(caller.role)) {
     Object.assign(base, buildWhatsappTools())
   }
@@ -390,7 +432,7 @@ export function buildAllTools(caller: ToolUser): ToolSet {
 // (Calendar / Gmail / Drive) when the user has the right scopes granted.
 // Use this from API routes; use buildAllTools from sync contexts.
 export async function buildAllToolsAsync(caller: ToolUser): Promise<ToolSet> {
-  const base: ToolSet = { ...buildReadTools(caller), ...buildProposeTools() }
+  const base: ToolSet = { ...buildReadTools(caller), ...buildProposeTools(), ...buildChatTools(caller) }
 
   // Calendar, Gmail, Drive are independent — a user might have authorized
   // some but not others (e.g. legacy connection from before P8 added
