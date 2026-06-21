@@ -118,6 +118,7 @@ model User {
   sentChatMessages     ChatMessage[]        @relation("ChatSentMessages")
   createdConversations Conversation[]       @relation("ChatCreatedBy")
   chatReactions        MessageReaction[]
+  chatStars            MessageStar[]
 }
 
 model Project {
@@ -583,6 +584,7 @@ model ChatMessage {
   editedAt       DateTime?
   deletedAt      DateTime?                                // soft delete
   deliveredAt    DateTime?                                // recipient device ack → double-grey tick
+  pinnedAt       DateTime?                                // pinned in the chat (null = not pinned)
   createdAt      DateTime        @default(now())
 
   conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -590,6 +592,7 @@ model ChatMessage {
   replyTo      ChatMessage?  @relation("ChatReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies      ChatMessage[] @relation("ChatReplies")
   reactions    MessageReaction[]
+  stars        MessageStar[]
 
   @@index([conversationId, createdAt])
   @@index([organizationId])
@@ -608,4 +611,18 @@ model MessageReaction {
 
   @@unique([messageId, userId])
   @@index([messageId])
+}
+
+// Per-user "starred"/favourite messages (private to each user).
+model MessageStar {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
 }

@@ -13,6 +13,7 @@ import ConversationList from './ConversationList'
 import MessageThread from './MessageThread'
 import NewChatModal from './NewChatModal'
 import ForwardModal from './ForwardModal'
+import StarredModal from './StarredModal'
 
 // Thin fetch wrapper for our { data, error } envelope.
 async function api<T = unknown>(path: string, opts?: RequestInit): Promise<T> {
@@ -34,6 +35,7 @@ function rowToMsg(row: Record<string, unknown>): ChatMessageDTO {
     deliveredAt: row.deliveredAt ? String(row.deliveredAt) : null,
     editedAt: row.editedAt ? String(row.editedAt) : null,
     deletedAt: row.deletedAt ? String(row.deletedAt) : null,
+    pinnedAt: row.pinnedAt ? String(row.pinnedAt) : null,
     createdAt: String(row.createdAt),
   }
 }
@@ -50,6 +52,7 @@ export default function ChatApp() {
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [newChatOpen, setNewChatOpen] = useState(false)
   const [forwardingMsg, setForwardingMsg] = useState<ChatMessageDTO | null>(null)
+  const [starredOpen, setStarredOpen] = useState(false)
 
   const activeIdRef = useRef<string | null>(null)
   activeIdRef.current = activeId
@@ -154,6 +157,7 @@ export default function ChatApp() {
                     deliveredAt: row.deliveredAt ? String(row.deliveredAt) : null,
                     editedAt: row.editedAt ? String(row.editedAt) : null,
                     deletedAt: row.deletedAt ? String(row.deletedAt) : null,
+                    pinnedAt: row.pinnedAt ? String(row.pinnedAt) : null,
                   }
                 : m,
             ),
@@ -307,6 +311,28 @@ export default function ChatApp() {
     [refreshConversations],
   )
 
+  const handleStar = useCallback(async (messageId: string) => {
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, starred: !m.starred } : m)))
+    try {
+      await api(`/api/chat/messages/${messageId}/star`, { method: 'POST' })
+    } catch (err) {
+      console.error('[chat] star', err)
+    }
+  }, [])
+
+  const handlePin = useCallback(async (messageId: string, pin: boolean) => {
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, pinnedAt: pin ? new Date().toISOString() : null } : m)))
+    try {
+      await api(`/api/chat/messages/${messageId}/pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      })
+    } catch (err) {
+      console.error('[chat] pin', err)
+    }
+  }, [])
+
   const openConversation = useCallback(
     async (payload: object) => {
       const data = await api<{ conversation: { id: string } }>('/api/chat/conversations', {
@@ -344,6 +370,7 @@ export default function ChatApp() {
         loading={loadingConvos}
         onSelect={setActiveId}
         onNewChat={() => setNewChatOpen(true)}
+        onOpenStarred={() => setStarredOpen(true)}
       />
       <MessageThread
         conversation={active}
@@ -356,6 +383,8 @@ export default function ChatApp() {
         onDelete={handleDelete}
         onReact={handleReact}
         onForward={(msg) => setForwardingMsg(msg)}
+        onStar={handleStar}
+        onPin={handlePin}
         users={users}
         onlineIds={onlineIds}
         onChanged={refreshConversations}
@@ -377,6 +406,9 @@ export default function ChatApp() {
           onClose={() => setForwardingMsg(null)}
           onForward={(targetIds) => { void handleForward(forwardingMsg.content, targetIds); setForwardingMsg(null) }}
         />
+      )}
+      {starredOpen && (
+        <StarredModal onClose={() => setStarredOpen(false)} onOpenChat={(id) => setActiveId(id)} />
       )}
     </div>
   )

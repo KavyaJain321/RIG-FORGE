@@ -164,10 +164,14 @@ export async function listMessages(
     orderBy: { createdAt: 'desc' },
     take: limit,
     ...(opts.before ? { cursor: { id: opts.before }, skip: 1 } : {}),
-    include: { sender: { select: memberUserSelect }, reactions: { select: { emoji: true, userId: true } } },
+    include: {
+      sender: { select: memberUserSelect },
+      reactions: { select: { emoji: true, userId: true } },
+      stars: { where: { userId }, select: { id: true } },
+    },
   })
-  // Return chronological (oldest → newest) for rendering.
-  return messages.reverse()
+  // Return chronological (oldest → newest); flag whether the caller starred each.
+  return messages.reverse().map((m) => ({ ...m, starred: m.stars.length > 0 }))
 }
 
 export async function sendMessage(
@@ -451,4 +455,54 @@ export async function searchMessages(conversationId: string, userId: string, q: 
     take: 30,
     include: { sender: { select: memberUserSelect } },
   })
+}
+
+// ─── Star + pin ──────────────────────────────────────────────────────────────
+
+export async function toggleStar(messageId: string, userId: string) {
+  const msg = await prisma.chatMessage.findUnique({ where: { id: messageId }, select: { conversationId: true } })
+  if (!msg) throw new Error('Message not found')
+  await assertMember(msg.conversationId, userId)
+  const existing = await prisma.messageStar.findUnique({ where: { messageId_userId: { messageId, userId } } })
+  if (existing) {
+    await prisma.messageStar.delete({ where: { messageId_userId: { messageId, userId } } })
+    return { starred: false }
+  }
+  await prisma.messageStar.create({ data: { messageId, userId } })
+  return { starred: true }
+}
+
+export async function listStarred(userId: string) {
+  const stars = await prisma.messageStar.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+    include: {
+      message: {
+        include: {
+          sender: { select: memberUserSelect },
+          conversation: { select: { id: true, type: true, title: true } },
+        },
+      },
+    },
+  })
+  return stars
+    .filter((s) => !s.message.deletedAt)
+    .map((s) => ({
+      id: s.message.id,
+      conversationId: s.message.conversationId,
+      conversationTitle: s.message.conversation.title,
+      content: s.message.content,
+      senderId: s.message.senderId,
+      senderName: s.message.sender?.name ?? null,
+      type: s.message.type,
+      createdAt: s.message.createdAt,
+    }))
+}
+
+export async function pinMessage(messageId: string, userId: string, pin: boolean) {
+  const msg = await prisma.chatMessage.findUnique({ where: { id: messageId }, select: { conversationId: true } })
+  if (!msg) throw new Error('Message not found')
+  await assertMember(msg.conversationId, userId)
+  await prisma.chatMessage.update({ where: { id: messageId }, data: { pinnedAt: pin ? new Date() : null } })
 }

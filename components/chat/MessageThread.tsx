@@ -100,6 +100,8 @@ export default function MessageThread({
   onDelete,
   onReact,
   onForward,
+  onStar,
+  onPin,
   users,
   onlineIds,
   onChanged,
@@ -116,6 +118,8 @@ export default function MessageThread({
   onDelete: (messageId: string) => void
   onReact: (messageId: string, emoji: string) => void
   onForward: (msg: ChatMessageDTO) => void
+  onStar: (messageId: string) => void
+  onPin: (messageId: string, pin: boolean) => void
   users: ChatUserLite[]
   onlineIds: Set<string>
   onChanged: () => void
@@ -286,6 +290,7 @@ export default function MessageThread({
   const dmOther = conversation.type === 'DIRECT' ? others[0] : null
   const dmOnline = dmOther ? onlineIds.has(dmOther.id) : false
   const groupOnline = conversation.type === 'GROUP' ? others.filter((u) => onlineIds.has(u.id)).length : 0
+  const pinnedMessages = messages.filter((m) => m.pinnedAt && !m.deletedAt)
 
   return (
     <section className="relative flex-1 min-w-0 flex flex-col bg-[#F4F4EE]">
@@ -358,6 +363,20 @@ export default function MessageThread({
             <p className="mt-2 text-xs text-text-secondary px-2">No matches</p>
           )}
         </div>
+      )}
+
+      {pinnedMessages.length > 0 && (
+        <button
+          type="button"
+          onClick={() => scrollToMessage(pinnedMessages[pinnedMessages.length - 1].id)}
+          className="shrink-0 w-full text-left px-3 py-2 border-b border-border-default bg-[#3F7A0A]/5 flex items-center gap-2"
+        >
+          <span className="text-[#3F7A0A]">📌</span>
+          <span className="text-xs text-text-secondary truncate flex-1">
+            {pinnedMessages[pinnedMessages.length - 1].type === 'IMAGE' ? '📷 Photo' : pinnedMessages[pinnedMessages.length - 1].content}
+          </span>
+          {pinnedMessages.length > 1 && <span className="text-[10px] text-text-secondary shrink-0">{pinnedMessages.length} pinned</span>}
+        </button>
       )}
 
       {/* Messages */}
@@ -442,6 +461,7 @@ export default function MessageThread({
                       </>
                     )}
                     <div className={`text-[10px] mt-0.5 flex items-center justify-end gap-1 ${mine ? 'text-white/70' : 'text-[#999]'}`}>
+                      {m.starred && <span title="Starred">⭐</span>}
                       {m.editedAt && !m.deletedAt && <span className="opacity-60">edited</span>}
                       <span>{timeLabel(m.createdAt)}</span>
                       {mine && !m.deletedAt && receiptFor(m)}
@@ -556,6 +576,12 @@ export default function MessageThread({
             <button type="button" onClick={() => { setReplyingTo(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">↩ Reply</button>
             {!ctxMenu.msg.deletedAt && ctxMenu.msg.type !== 'IMAGE' && (
               <button type="button" onClick={() => { onForward(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">↪ Forward</button>
+            )}
+            {!ctxMenu.msg.deletedAt && (
+              <button type="button" onClick={() => { onStar(ctxMenu.msg.id); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">{ctxMenu.msg.starred ? '★ Unstar' : '☆ Star'}</button>
+            )}
+            {!ctxMenu.msg.deletedAt && (
+              <button type="button" onClick={() => { onPin(ctxMenu.msg.id, !ctxMenu.msg.pinnedAt); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">{ctxMenu.msg.pinnedAt ? '📌 Unpin' : '📌 Pin'}</button>
             )}
             {ctxMenu.msg.type !== 'IMAGE' && !ctxMenu.msg.deletedAt && (
               <button type="button" onClick={() => { void navigator.clipboard?.writeText(ctxMenu.msg.content); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">⧉ Copy</button>

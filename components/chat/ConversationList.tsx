@@ -42,24 +42,31 @@ export default function ConversationList({
   loading,
   onSelect,
   onNewChat,
+  onOpenStarred,
 }: {
   conversations: ConversationSummary[]
   activeId: string | null
   loading: boolean
   onSelect: (id: string) => void
   onNewChat: () => void
+  onOpenStarred: () => void
 }) {
   return (
     <aside className={`w-full md:w-72 shrink-0 border-r border-border-default bg-surface-raised/60 flex-col ${activeId ? 'hidden md:flex' : 'flex'}`}>
       <div className="h-14 px-4 flex items-center justify-between border-b border-border-default">
         <span className="font-mono text-xs uppercase tracking-widest text-text-secondary">Messages</span>
-        <button
-          type="button"
-          onClick={onNewChat}
-          className="h-8 px-3 rounded-full bg-[#3F7A0A] text-white font-mono text-xs hover:bg-[#356a08] transition-colors"
-        >
-          ＋ New
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onOpenStarred} title="Starred messages" className="text-text-secondary hover:text-text-primary">
+            ⭐
+          </button>
+          <button
+            type="button"
+            onClick={onNewChat}
+            className="h-8 px-3 rounded-full bg-[#3F7A0A] text-white font-mono text-xs hover:bg-[#356a08] transition-colors"
+          >
+            ＋ New
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">

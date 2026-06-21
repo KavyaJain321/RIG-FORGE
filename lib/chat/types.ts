@@ -27,9 +27,22 @@ export interface ChatMessageDTO {
   deliveredAt?: string | null
   editedAt?: string | null
   deletedAt?: string | null
+  pinnedAt?: string | null
+  starred?: boolean
   reactions?: { emoji: string; userId: string }[]
   createdAt: string
   sender?: ChatUserLite | null
+}
+
+export interface StarredMessage {
+  id: string
+  conversationId: string
+  conversationTitle: string | null
+  content: string
+  senderId: string | null
+  senderName: string | null
+  type: 'TEXT' | 'IMAGE' | 'FILE'
+  createdAt: string
 }
 
 export interface ConversationSummary {
