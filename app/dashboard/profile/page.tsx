@@ -10,6 +10,7 @@ import type { ApiResponse } from '@/lib/types'
 import type { ProfileResponse } from '@/app/api/users/me/profile/route'
 import GoogleConnectCard from '@/components/assistant/GoogleConnectCard'
 import WhatsappVerifyCard from '@/components/profile/WhatsappVerifyCard'
+import PersonalEmailCard from '@/components/profile/PersonalEmailCard'
 
 // ─── Day labels ────────────────────────────────────────────────────────────
 
@@ -263,6 +264,7 @@ export default function ProfilePage() {
     user: profileUser,
     whatsappNumber,
     whatsappVerified,
+    personalEmail,
     projects,
     activityThisWeek,
     dailyLogsThisWeek,
@@ -348,6 +350,19 @@ export default function ProfilePage() {
             Used by Forgie when admins ask it to WhatsApp you, and to recognise
             you when you message Forgie on WhatsApp. We verify it with a one-time
             code. Not shown to teammates.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <label className="font-mono text-[10px] text-text-muted tracking-widest block mb-2">
+            PERSONAL EMAIL
+          </label>
+
+          <PersonalEmailCard initial={personalEmail} onSaved={() => void fetchProfile()} />
+
+          <p className="font-mono text-[10px] text-text-muted mt-3">
+            If you sometimes email the team from a personal address, add it here so
+            those messages show up under Workspace → Mail “Work”. Not shown to teammates.
           </p>
         </div>
       </div>

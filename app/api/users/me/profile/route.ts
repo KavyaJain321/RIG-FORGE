@@ -30,6 +30,7 @@ export interface ProfileResponse {
   user: AuthUser
   whatsappNumber: string | null
   whatsappVerified: boolean
+  personalEmail: string | null
   projects: ProjectEntry[]
   activityThisWeek: ActivityEntry[]
   dailyLogsThisWeek: DailyLogEntry[]
@@ -69,6 +70,7 @@ export async function PATCH(request: NextRequest) {
       name?: string
       avatarUrl?: string
       whatsappNumber?: string | null
+      personalEmail?: string | null
     }
     const updateData: {
       name?: string
@@ -79,7 +81,14 @@ export async function PATCH(request: NextRequest) {
       waVerifyCodeHash?: string | null
       waVerifyExpiresAt?: Date | null
       waVerifyAttempts?: number
+      personalEmail?: string | null
     } = {}
+
+    if (body.personalEmail !== undefined) {
+      const pe = body.personalEmail === null ? '' : String(body.personalEmail).trim().toLowerCase()
+      if (pe && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(pe)) return errorResponse('Enter a valid email address', 400)
+      updateData.personalEmail = pe || null
+    }
 
     if (body.name !== undefined) {
       const name = String(body.name).trim()
@@ -184,6 +193,7 @@ export async function GET(request: NextRequest) {
           createdAt: true,
           whatsappNumber: true,
           whatsappVerified: true,
+          personalEmail: true,
         },
       }),
       prisma.projectMember.findMany({
@@ -250,6 +260,7 @@ export async function GET(request: NextRequest) {
       user,
       whatsappNumber: userRecord.whatsappNumber ?? null,
       whatsappVerified: userRecord.whatsappVerified,
+      personalEmail: userRecord.personalEmail ?? null,
       projects,
       activityThisWeek,
       dailyLogsThisWeek,
