@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useEffect, useRef } from 'react'
 import { Instrument_Serif, Inter, Playfair_Display } from 'next/font/google'
 
+import { APP_NAME_UPPER } from '@/lib/branding'
+
 // ── Landing-page-only fonts ─────────────────────────────────────────────────
 // These are scoped here so they don't bloat the global CSS bundle loaded on
 // every dashboard page. They were previously in the root layout.
@@ -174,7 +176,7 @@ export default function LandingPage() {
           className="font-instrument font-black tracking-tight select-none"
           style={{ fontSize: '2rem', color: '#000000', letterSpacing: '-0.03em' }}
         >
-          RIG FORGE
+          {APP_NAME_UPPER}
         </span>
       </header>
 

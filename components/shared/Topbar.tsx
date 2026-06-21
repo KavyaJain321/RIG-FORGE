@@ -16,6 +16,7 @@ import NotificationDropdown from '@/components/notifications/NotificationDropdow
 import AskForgieButton from '@/components/assistant/AskForgieButton'
 import ChatPanel from '@/components/assistant/ChatPanel'
 import ThemeToggle from '@/components/shared/ThemeToggle'
+import { APP_NAME, APP_SHORT } from '@/lib/branding'
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
@@ -141,8 +142,8 @@ export default function Topbar() {
       <header className="topbar">
 
         {/* ── Logo mark ───────────────────────────────────────────────────── */}
-        <Link href="/dashboard" className="topbar-brand" title="Rig Forge">
-          RF
+        <Link href="/dashboard" className="topbar-brand" title={APP_NAME}>
+          {APP_SHORT}
         </Link>
 
         {/* ── Mobile nav (hamburger) ─────────────────────────────────────── */}

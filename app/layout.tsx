@@ -3,6 +3,7 @@ import { Bodoni_Moda, Outfit } from 'next/font/google'
 import './globals.css'
 import OfflineBanner from '@/components/shared/OfflineBanner'
 import ServiceWorkerRegister from '@/components/shared/ServiceWorkerRegister'
+import { APP_NAME } from '@/lib/branding'
 
 // ── Global fonts (loaded on every page) ─────────────────────────────────────
 // Only load what the app shell actually needs. Instrument Serif, Inter, and
@@ -26,10 +27,10 @@ const sans = Outfit({
 })
 
 export const metadata: Metadata = {
-  title: 'Rig Forge',
+  title: APP_NAME,
   description: 'Internal employee monitoring and project tracking platform',
   manifest: '/manifest.webmanifest',
-  appleWebApp: { capable: true, title: 'Rig Forge', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: 'default' },
   icons: {
     icon: '/logo.svg',
     shortcut: '/logo.svg',

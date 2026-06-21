@@ -3,6 +3,11 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
 
+  // Allow a per-deployment build dir so a second instance (e.g. a white-label
+  // TRIJYA FORGE) can run from the same repo on another port without clashing
+  // with the default .next of the primary instance.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
+
   // Skip type-checking AND linting during `next build`.
   //
   // WHY: on Render's free tier the build OOMs (JS heap > 2 GB) specifically

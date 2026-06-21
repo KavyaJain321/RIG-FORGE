@@ -10,6 +10,7 @@ import Input from '@/components/ui/Input'
 import { SmokeBackground } from '@/components/ui/spooky-smoke-animation'
 import { useAuthStore } from '@/store/authStore'
 import { fetchWithRetry } from '@/lib/fetch-with-retry'
+import { APP_NAME, APP_NAME_UPPER } from '@/lib/branding'
 import type { AuthUser, ApiResponse } from '@/lib/types'
 
 export default function LoginPage() {
@@ -71,7 +72,7 @@ export default function LoginPage() {
       <Card className="relative z-10 w-full max-w-[460px] p-8 md:p-10">
         <div className="text-center">
           <p className="type-meta text-accent-ink">WORKFORCE INTELLIGENCE PLATFORM</p>
-          <h1 className="type-h1 mt-2">Rig Forge</h1>
+          <h1 className="type-h1 mt-2">{APP_NAME}</h1>
           <p className="type-body-muted mt-2">Secure operational command access</p>
         </div>
 
@@ -86,7 +87,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
-            placeholder="you@rigforge.com"
+            placeholder="you@company.com"
             autoComplete="email"
           />
 
@@ -126,7 +127,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-10 text-center">
-          <p className="type-meta">RIG FORGE v1.0 — INTERNAL USE ONLY</p>
+          <p className="type-meta">{APP_NAME_UPPER} v1.0 — INTERNAL USE ONLY</p>
           <p className="type-meta mt-1">UNAUTHORIZED ACCESS IS PROHIBITED</p>
         </div>
       </Card>
