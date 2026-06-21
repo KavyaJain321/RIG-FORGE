@@ -42,13 +42,17 @@ export async function listConversations(userId: string) {
   const rows = await Promise.all(
     memberships.map(async (m) => {
       const convo = m.conversation
-      const last = convo.messages[0] ?? null
+      const lastRaw = convo.messages[0] ?? null
+      const last = lastRaw && (!m.clearedAt || new Date(lastRaw.createdAt) > m.clearedAt) ? lastRaw : null
+      const since = [m.lastReadAt, m.clearedAt]
+        .filter((d): d is Date => Boolean(d))
+        .sort((a, b) => b.getTime() - a.getTime())[0]
       const unread = await prisma.chatMessage.count({
         where: {
           conversationId: convo.id,
           senderId: { not: userId },
           deletedAt: null,
-          ...(m.lastReadAt ? { createdAt: { gt: m.lastReadAt } } : {}),
+          ...(since ? { createdAt: { gt: since } } : {}),
         },
       })
       const others = convo.members
@@ -71,6 +75,9 @@ export async function listConversations(userId: string) {
           : null,
         lastMessageAt: convo.lastMessageAt,
         unread,
+        isArchived: m.isArchived,
+        isPinned: m.isPinned,
+        muted: m.muteUntil ? m.muteUntil > new Date() : false,
       }
     }),
   )
@@ -155,12 +162,12 @@ export async function listMessages(
   userId: string,
   opts: { limit?: number; before?: string } = {},
 ) {
-  await assertMember(conversationId, userId)
+  const member = await assertMember(conversationId, userId)
   const limit = Math.min(Math.max(opts.limit ?? 30, 1), 100)
 
   const messages = await prisma.chatMessage.findMany({
-    // Deleted messages are kept as tombstones ("This message was deleted").
-    where: { conversationId },
+    // Deleted messages are kept as tombstones; "clear chat" hides earlier ones.
+    where: { conversationId, ...(member.clearedAt ? { createdAt: { gt: member.clearedAt } } : {}) },
     orderBy: { createdAt: 'desc' },
     take: limit,
     ...(opts.before ? { cursor: { id: opts.before }, skip: 1 } : {}),
@@ -559,4 +566,22 @@ export async function pinMessage(messageId: string, userId: string, pin: boolean
   if (!msg) throw new Error('Message not found')
   await assertMember(msg.conversationId, userId)
   await prisma.chatMessage.update({ where: { id: messageId }, data: { pinnedAt: pin ? new Date() : null } })
+}
+
+// ─── Per-user chat settings (archive / mute / pin-chat / clear) ──────────────
+export async function setChatFlags(
+  conversationId: string,
+  userId: string,
+  flags: { isArchived?: boolean; isPinned?: boolean; muteUntil?: Date | null; cleared?: boolean },
+) {
+  await assertMember(conversationId, userId)
+  const data: Prisma.ConversationMemberUpdateInput = {}
+  if (typeof flags.isArchived === 'boolean') data.isArchived = flags.isArchived
+  if (typeof flags.isPinned === 'boolean') data.isPinned = flags.isPinned
+  if (flags.muteUntil !== undefined) data.muteUntil = flags.muteUntil
+  if (flags.cleared) data.clearedAt = new Date()
+  await prisma.conversationMember.update({
+    where: { conversationId_userId: { conversationId, userId } },
+    data,
+  })
 }

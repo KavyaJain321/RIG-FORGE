@@ -62,4 +62,7 @@ export interface ConversationSummary {
   } | null
   lastMessageAt: string | null
   unread: number
+  isArchived?: boolean
+  isPinned?: boolean
+  muted?: boolean
 }

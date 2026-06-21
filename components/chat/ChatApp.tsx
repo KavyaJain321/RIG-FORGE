@@ -337,6 +337,35 @@ export default function ChatApp() {
     }
   }, [])
 
+  const handleChatSettings = useCallback(
+    async (conversationId: string, flags: { archived?: boolean; pinned?: boolean; muteHours?: number | null; cleared?: boolean }) => {
+      setConversations((cs) =>
+        cs.map((c) =>
+          c.id === conversationId
+            ? {
+                ...c,
+                ...(flags.archived !== undefined ? { isArchived: flags.archived } : {}),
+                ...(flags.pinned !== undefined ? { isPinned: flags.pinned } : {}),
+                ...(flags.muteHours !== undefined ? { muted: (flags.muteHours ?? 0) > 0 } : {}),
+              }
+            : c,
+        ),
+      )
+      try {
+        await api(`/api/chat/conversations/${conversationId}/settings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(flags),
+        })
+      } catch (err) {
+        console.error('[chat] settings', err)
+      }
+      if (flags.cleared && conversationId === activeIdRef.current) void reloadActiveMessages()
+      void refreshConversations()
+    },
+    [refreshConversations, reloadActiveMessages],
+  )
+
   const openConversation = useCallback(
     async (payload: object) => {
       const data = await api<{ conversation: { id: string } }>('/api/chat/conversations', {
@@ -375,6 +404,7 @@ export default function ChatApp() {
         onSelect={setActiveId}
         onNewChat={() => setNewChatOpen(true)}
         onOpenStarred={() => setStarredOpen(true)}
+        onChatSettings={handleChatSettings}
       />
       <MessageThread
         conversation={active}
