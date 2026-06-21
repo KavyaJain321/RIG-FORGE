@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 import Avatar from '@/components/ui/Avatar'
-import type { ConversationSummary, ChatMessageDTO } from '@/lib/chat/types'
+import type { ConversationSummary, ChatMessageDTO, ChatUserLite } from '@/lib/chat/types'
 import MessageInfoModal from './MessageInfoModal'
+import GroupInfoPanel from './GroupInfoPanel'
 
 function timeLabel(iso: string): string {
   try {
@@ -20,15 +21,22 @@ export default function MessageThread({
   meId,
   loading,
   onSend,
+  users,
+  onChanged,
+  onLeft,
 }: {
   conversation: ConversationSummary | null
   messages: ChatMessageDTO[]
   meId: string
   loading: boolean
   onSend: (text: string) => void
+  users: ChatUserLite[]
+  onChanged: () => void
+  onLeft: () => void
 }) {
   const [draft, setDraft] = useState('')
   const [infoMsg, setInfoMsg] = useState<ChatMessageDTO | null>(null)
+  const [groupInfoOpen, setGroupInfoOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -81,7 +89,11 @@ export default function MessageThread({
   return (
     <section className="flex-1 min-w-0 flex flex-col bg-[#F4F4EE]">
       {/* Header */}
-      <div className="h-14 shrink-0 px-4 flex items-center gap-3 border-b border-border-default bg-surface-raised/60">
+      <div
+        className={`h-14 shrink-0 px-4 flex items-center gap-3 border-b border-border-default bg-surface-raised/60 ${conversation.type === 'GROUP' ? 'cursor-pointer hover:bg-surface-raised' : ''}`}
+        onClick={conversation.type === 'GROUP' ? () => setGroupInfoOpen(true) : undefined}
+        title={conversation.type === 'GROUP' ? 'Group info' : undefined}
+      >
         <Avatar name={conversation.title ?? '?'} avatarUrl={conversation.avatarUrl} size="sm" />
         <div className="min-w-0">
           <p className="font-medium text-sm text-text-primary truncate">
@@ -103,6 +115,15 @@ export default function MessageThread({
           <p className="font-mono text-xs text-[#999]">No messages yet — say hello 👋</p>
         ) : (
           messages.map((m) => {
+            if (m.kind === 'SYSTEM') {
+              return (
+                <div key={m.id} className="flex justify-center my-1">
+                  <span className="text-[11px] text-text-secondary bg-black/[0.05] rounded-full px-3 py-1 text-center">
+                    {m.content}
+                  </span>
+                </div>
+              )
+            }
             const mine = m.senderId === meId
             const isForgie = m.kind === 'FORGIE'
             return (
@@ -158,6 +179,17 @@ export default function MessageThread({
           conversation={conversation}
           meId={meId}
           onClose={() => setInfoMsg(null)}
+        />
+      )}
+
+      {groupInfoOpen && conversation.type === 'GROUP' && (
+        <GroupInfoPanel
+          conversation={conversation}
+          meId={meId}
+          users={users}
+          onClose={() => setGroupInfoOpen(false)}
+          onChanged={onChanged}
+          onLeft={() => { setGroupInfoOpen(false); onLeft() }}
         />
       )}
     </section>

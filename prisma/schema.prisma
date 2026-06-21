@@ -533,6 +533,7 @@ model Conversation {
   organizationId String           @default("rig360")  // tenancy anchor (single-org for now)
   type           ConversationType
   title          String?                              // group name; null for DMs (UI derives from the other member)
+  imageUrl       String?                              // group photo (Supabase Storage public URL); null for DMs
   // For DIRECT convos, dmKey = the two user ids sorted + joined "a:b", so the
   // unique constraint guarantees exactly ONE DM thread per pair. Null for groups.
   dmKey          String?

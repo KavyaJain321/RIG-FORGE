@@ -58,7 +58,7 @@ export async function listConversations(userId: string) {
         id: convo.id,
         type: convo.type,
         title: convo.type === 'GROUP' ? convo.title : others[0]?.name ?? 'Direct message',
-        avatarUrl: convo.type === 'GROUP' ? null : others[0]?.avatarUrl ?? null,
+        avatarUrl: convo.type === 'GROUP' ? convo.imageUrl ?? null : others[0]?.avatarUrl ?? null,
         members: convo.members.map((mm) => ({
           id: mm.user.id,
           name: mm.user.name,
@@ -212,4 +212,116 @@ export async function markRead(conversationId: string, userId: string) {
     .catch(() => {
       /* not a member / already gone — nothing to mark */
     })
+}
+
+// ─── Group administration ────────────────────────────────────────────────────
+
+type MemberRole = 'OWNER' | 'ADMIN' | 'MEMBER'
+
+async function userName(userId: string): Promise<string> {
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+  return u?.name ?? 'Someone'
+}
+
+// Post a SYSTEM line ("Kavya added Pranav") into the group and bump its activity
+// so it surfaces in the list — and, via the ChatMessage realtime INSERT, makes
+// every member's client refresh (which is how name/photo/member changes
+// propagate live without a separate subscription).
+async function postSystemMessage(conversationId: string, content: string) {
+  await prisma.$transaction([
+    prisma.chatMessage.create({
+      data: { organizationId: ORG, conversationId, senderId: null, kind: 'SYSTEM', type: 'TEXT', content },
+    }),
+    prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } }),
+  ])
+}
+
+async function requireGroupAdmin(conversationId: string, userId: string) {
+  const member = await prisma.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId, userId } },
+  })
+  if (!member) throw new Error('Not a member of this conversation')
+  if (member.role !== 'OWNER' && member.role !== 'ADMIN') {
+    throw new Error('Only group admins can do this')
+  }
+  return member
+}
+
+export async function renameGroup(conversationId: string, userId: string, title: string) {
+  await requireGroupAdmin(conversationId, userId)
+  const clean = title.trim()
+  if (!clean) throw new Error('Group name cannot be empty')
+  await prisma.conversation.update({ where: { id: conversationId }, data: { title: clean } })
+  await postSystemMessage(conversationId, `${await userName(userId)} changed the group name to "${clean}"`)
+}
+
+export async function setGroupImage(conversationId: string, userId: string, imageUrl: string) {
+  await requireGroupAdmin(conversationId, userId)
+  await prisma.conversation.update({ where: { id: conversationId }, data: { imageUrl } })
+  await postSystemMessage(conversationId, `${await userName(userId)} changed the group photo`)
+}
+
+export async function addGroupMembers(conversationId: string, userId: string, newMemberIds: string[]) {
+  await requireGroupAdmin(conversationId, userId)
+  const existing = await prisma.conversationMember.findMany({
+    where: { conversationId },
+    select: { userId: true },
+  })
+  const existingIds = new Set(existing.map((e) => e.userId))
+  const toAdd = Array.from(new Set(newMemberIds)).filter((id) => id && !existingIds.has(id))
+  if (toAdd.length === 0) return
+  await prisma.conversationMember.createMany({
+    data: toAdd.map((id) => ({ organizationId: ORG, conversationId, userId: id, role: 'MEMBER' as MemberRole })),
+    skipDuplicates: true,
+  })
+  const added = await prisma.user.findMany({ where: { id: { in: toAdd } }, select: { name: true } })
+  await postSystemMessage(conversationId, `${await userName(userId)} added ${added.map((a) => a.name).join(', ')}`)
+}
+
+export async function removeGroupMember(conversationId: string, userId: string, targetUserId: string) {
+  await requireGroupAdmin(conversationId, userId)
+  if (targetUserId === userId) throw new Error('Use "leave" to remove yourself')
+  const target = await prisma.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId, userId: targetUserId } },
+  })
+  if (!target) return
+  if (target.role === 'OWNER') throw new Error('Cannot remove the group owner')
+  const name = await userName(targetUserId)
+  await prisma.conversationMember.delete({
+    where: { conversationId_userId: { conversationId, userId: targetUserId } },
+  })
+  await postSystemMessage(conversationId, `${await userName(userId)} removed ${name}`)
+}
+
+export async function setMemberRole(
+  conversationId: string,
+  userId: string,
+  targetUserId: string,
+  role: 'ADMIN' | 'MEMBER',
+) {
+  await requireGroupAdmin(conversationId, userId)
+  if (role !== 'ADMIN' && role !== 'MEMBER') throw new Error('Invalid role')
+  const target = await prisma.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId, userId: targetUserId } },
+  })
+  if (!target) throw new Error('Not a member of this conversation')
+  if (target.role === 'OWNER') throw new Error('Cannot change the group owner')
+  await prisma.conversationMember.update({
+    where: { conversationId_userId: { conversationId, userId: targetUserId } },
+    data: { role },
+  })
+  const verb = role === 'ADMIN' ? 'is now an admin' : 'is no longer an admin'
+  await postSystemMessage(conversationId, `${await userName(targetUserId)} ${verb}`)
+}
+
+export async function leaveGroup(conversationId: string, userId: string) {
+  const member = await prisma.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId, userId } },
+  })
+  if (!member) return
+  const name = await userName(userId)
+  await prisma.conversationMember.delete({
+    where: { conversationId_userId: { conversationId, userId } },
+  })
+  await postSystemMessage(conversationId, `${name} left`)
 }

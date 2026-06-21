@@ -189,6 +189,9 @@ export default function ChatApp() {
         meId={me.id}
         loading={loadingMsgs}
         onSend={handleSend}
+        users={users}
+        onChanged={refreshConversations}
+        onLeft={() => { setActiveId(null); void refreshConversations() }}
       />
       {newChatOpen && (
         <NewChatModal
