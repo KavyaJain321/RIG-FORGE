@@ -581,6 +581,7 @@ model ChatMessage {
   replyToId      String?                                  // optional threaded reply
   editedAt       DateTime?
   deletedAt      DateTime?                                // soft delete
+  deliveredAt    DateTime?                                // recipient device ack → double-grey tick
   createdAt      DateTime        @default(now())
 
   conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)

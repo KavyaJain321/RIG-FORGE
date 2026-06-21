@@ -23,6 +23,8 @@ export interface ChatMessageDTO {
   kind: ChatMessageKind
   type: 'TEXT' | 'IMAGE' | 'FILE'
   content: string
+  replyToId?: string | null
+  deliveredAt?: string | null
   createdAt: string
   sender?: ChatUserLite | null
 }

@@ -173,6 +173,7 @@ export async function sendMessage(
   conversationId: string,
   userId: string,
   content: string,
+  replyToId?: string | null,
 ) {
   await assertMember(conversationId, userId)
   const text = content.trim()
@@ -187,6 +188,7 @@ export async function sendMessage(
         kind: 'USER',
         type: 'TEXT',
         content: text,
+        ...(replyToId ? { replyToId } : {}),
       },
       include: { sender: { select: memberUserSelect } },
     }),
@@ -324,4 +326,44 @@ export async function leaveGroup(conversationId: string, userId: string) {
     where: { conversationId_userId: { conversationId, userId } },
   })
   await postSystemMessage(conversationId, `${name} left`)
+}
+
+// ─── Delivery acks + media ───────────────────────────────────────────────────
+
+// A recipient's client calls this when it RECEIVES a message (the double-grey
+// "delivered" tick). Set once, by a member who isn't the sender.
+export async function markDelivered(messageId: string, userId: string) {
+  const msg = await prisma.chatMessage.findUnique({
+    where: { id: messageId },
+    select: { senderId: true, deliveredAt: true, conversationId: true },
+  })
+  if (!msg || msg.deliveredAt || msg.senderId === userId) return
+  const member = await prisma.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId: msg.conversationId, userId } },
+    select: { userId: true },
+  })
+  if (!member) return
+  await prisma.chatMessage.update({ where: { id: messageId }, data: { deliveredAt: new Date() } })
+}
+
+// Create an IMAGE/FILE message whose `content` is the uploaded media URL.
+export async function sendMediaMessage(
+  conversationId: string,
+  userId: string,
+  mediaType: 'IMAGE' | 'FILE',
+  url: string,
+) {
+  await assertMember(conversationId, userId)
+  const [message] = await prisma.$transaction([
+    prisma.chatMessage.create({
+      data: { organizationId: ORG, conversationId, senderId: userId, kind: 'USER', type: mediaType, content: url },
+      include: { sender: { select: memberUserSelect } },
+    }),
+    prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } }),
+    prisma.conversationMember.update({
+      where: { conversationId_userId: { conversationId, userId } },
+      data: { lastReadAt: new Date() },
+    }),
+  ])
+  return message
 }

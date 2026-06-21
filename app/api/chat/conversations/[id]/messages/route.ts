@@ -50,8 +50,9 @@ export async function POST(
 
     const content = typeof body.content === 'string' ? body.content : ''
     if (!content.trim()) return errorResponse('content is required', 400)
+    const replyToId = typeof body.replyToId === 'string' ? body.replyToId : undefined
 
-    const message = await sendMessage(params.id, payload.userId, content)
+    const message = await sendMessage(params.id, payload.userId, content, replyToId)
     return successResponse({ message })
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
