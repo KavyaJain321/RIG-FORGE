@@ -531,6 +531,7 @@ enum ChatMessageType {
   IMAGE
   FILE
   AUDIO
+  POLL
 }
 
 model Conversation {
@@ -600,6 +601,7 @@ model ChatMessage {
   fileName       String?                                  // original filename for FILE/AUDIO messages
   fileSize       Int?                                     // size in bytes
   linkPreview    Json?                                    // Open-Graph preview {url,title,description,image} for URLs
+  poll           Json?                                    // POLL payload {options:[{id,text}], multi, votes:{optionId:[userId]}}
   createdAt      DateTime        @default(now())
 
   conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)

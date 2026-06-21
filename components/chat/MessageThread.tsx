@@ -116,6 +116,113 @@ const SKELETON = [
 
 type CtxMenu = { msg: ChatMessageDTO; x: number; y: number } | null
 
+// A poll message: question + options with live vote bars; tap an option to vote.
+function PollCard({ msg, meId, onVote }: { msg: ChatMessageDTO; meId: string; onVote: (messageId: string, optionId: string) => void }) {
+  const poll = msg.poll
+  if (!poll) return null
+  const totals = poll.options.map((o) => poll.votes?.[o.id]?.length ?? 0)
+  const totalVotes = totals.reduce((a, b) => a + b, 0)
+  return (
+    <div className="min-w-[220px] max-w-[300px]">
+      <p className="font-medium text-sm mb-2 flex items-center gap-1">📊 {msg.content}</p>
+      <div className="space-y-1.5">
+        {poll.options.map((o, i) => {
+          const count = totals[i]
+          const pct = totalVotes ? Math.round((count / totalVotes) * 100) : 0
+          const mine = (poll.votes?.[o.id] ?? []).includes(meId)
+          return (
+            <button key={o.id} type="button" onClick={() => onVote(msg.id, o.id)} className="block w-full text-left">
+              <div className="relative rounded-lg border border-border-default overflow-hidden">
+                <div className="absolute inset-y-0 left-0 bg-[#3F7A0A]/15" style={{ width: `${pct}%` }} />
+                <div className="relative flex items-center justify-between gap-2 px-2.5 py-1.5 text-sm">
+                  <span className="flex items-center gap-1.5">{mine ? '☑' : '☐'} {o.text}</span>
+                  <span className="text-[11px] text-text-secondary shrink-0">{count} · {pct}%</span>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-[11px] text-text-secondary mt-1.5">
+        {totalVotes} vote{totalVotes === 1 ? '' : 's'}{poll.multi ? ' · multiple choice' : ''}
+      </p>
+    </div>
+  )
+}
+
+// Modal to compose a poll: a question + 2–12 options + single/multi toggle.
+function PollComposer({ onClose, onCreate }: { onClose: () => void; onCreate: (q: string, opts: string[], multi: boolean) => void }) {
+  const [question, setQuestion] = useState('')
+  const [options, setOptions] = useState<string[]>(['', ''])
+  const [multi, setMulti] = useState(false)
+  const valid = question.trim() && options.filter((o) => o.trim()).length >= 2
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-[400px] bg-surface-raised rounded-2xl shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="p-4 border-b border-border-default flex items-center justify-between">
+          <span className="font-mono text-xs uppercase tracking-widest text-text-secondary">New poll</span>
+          <button type="button" onClick={onClose} className="text-text-secondary hover:text-text-primary">✕</button>
+        </div>
+        <div className="p-4 space-y-3">
+          <input
+            autoFocus
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Ask a question…"
+            className="w-full h-10 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A]"
+          />
+          <div className="space-y-2">
+            {options.map((opt, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  value={opt}
+                  onChange={(e) => setOptions((os) => os.map((o, j) => (j === i ? e.target.value : o)))}
+                  placeholder={`Option ${i + 1}`}
+                  className="flex-1 h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A]"
+                />
+                {options.length > 2 && (
+                  <button type="button" onClick={() => setOptions((os) => os.filter((_, j) => j !== i))} className="text-text-secondary hover:text-status-danger">✕</button>
+                )}
+              </div>
+            ))}
+            {options.length < 12 && (
+              <button type="button" onClick={() => setOptions((os) => [...os, ''])} className="text-[#3F7A0A] text-xs font-mono hover:underline">＋ Add option</button>
+            )}
+          </div>
+          <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+            <input type="checkbox" checked={multi} onChange={(e) => setMulti(e.target.checked)} className="accent-[#3F7A0A]" />
+            Allow multiple answers
+          </label>
+        </div>
+        <div className="p-4 border-t border-border-default flex justify-end">
+          <button
+            type="button"
+            disabled={!valid}
+            onClick={() => { onCreate(question.trim(), options.map((o) => o.trim()).filter(Boolean), multi); onClose() }}
+            className="h-9 px-4 rounded-full bg-[#3F7A0A] text-white font-mono text-xs hover:bg-[#356a08] disabled:opacity-40"
+          >
+            Create poll
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Per-conversation unsent draft, persisted locally (survives tab switches/reloads).
+function draftKey(id: string) {
+  return `rf-chat-draft-${id}`
+}
+function loadDraft(id: string): string {
+  try { return localStorage.getItem(draftKey(id)) || '' } catch { return '' }
+}
+function saveDraft(id: string, text: string) {
+  try {
+    if (text.trim()) localStorage.setItem(draftKey(id), text)
+    else localStorage.removeItem(draftKey(id))
+  } catch { /* ignore */ }
+}
+
 // Per-user chat wallpaper presets (key → background colour). 'default' = no override.
 const WALLPAPERS: Record<string, string> = {
   default: '#F4F4EE',
@@ -145,6 +252,8 @@ export default function MessageThread({
   onLeft,
   onBack,
   onSetWallpaper,
+  onCreatePoll,
+  onVote,
 }: {
   conversation: ConversationSummary | null
   messages: ChatMessageDTO[]
@@ -164,11 +273,14 @@ export default function MessageThread({
   onLeft: () => void
   onBack: () => void
   onSetWallpaper: (conversationId: string, wallpaper: string | null) => void
+  onCreatePoll: (question: string, options: string[], multi: boolean) => void
+  onVote: (messageId: string, optionId: string) => void
 }) {
   const [draft, setDraft] = useState('')
   const [infoMsg, setInfoMsg] = useState<ChatMessageDTO | null>(null)
   const [groupInfoOpen, setGroupInfoOpen] = useState(false)
   const [wallpaperOpen, setWallpaperOpen] = useState(false)
+  const [pollOpen, setPollOpen] = useState(false)
   const [atBottom, setAtBottom] = useState(true)
   const [typingName, setTypingName] = useState<string | null>(null)
   const [replyingTo, setReplyingTo] = useState<ChatMessageDTO | null>(null)
@@ -199,6 +311,11 @@ export default function MessageThread({
   useEffect(() => {
     bottomRef.current?.scrollIntoView()
     setAtBottom(true)
+  }, [convoId])
+
+  // Restore this conversation's saved draft when it opens.
+  useEffect(() => {
+    setDraft(convoId ? loadDraft(convoId) : '')
   }, [convoId])
 
   useEffect(() => {
@@ -288,6 +405,7 @@ export default function MessageThread({
       setReplyingTo(null)
     }
     setDraft('')
+    if (convoId) saveDraft(convoId, '')
     if (taRef.current) taRef.current.style.height = 'auto'
   }
 
@@ -579,6 +697,8 @@ export default function MessageThread({
                           </a>
                         ) : m.type === 'AUDIO' ? (
                           <AudioPlayer src={m.content} />
+                        ) : m.type === 'POLL' ? (
+                          <PollCard msg={m} meId={meId} onVote={onVote} />
                         ) : (
                           <>
                             <p className="text-sm whitespace-pre-wrap break-words">{formatText(m.content)}</p>
@@ -697,6 +817,14 @@ export default function MessageThread({
             hidden
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onSendImage(f); e.target.value = '' }}
           />
+          <button
+            type="button"
+            onClick={() => setPollOpen(true)}
+            title="Create a poll"
+            className="h-10 w-10 shrink-0 rounded-full border border-border-default flex items-center justify-center text-text-secondary hover:text-text-primary"
+          >
+            📊
+          </button>
           {recording ? (
             <>
               <button type="button" onClick={cancelRecording} title="Cancel recording" className="h-10 w-10 shrink-0 rounded-full border border-border-default flex items-center justify-center text-text-secondary hover:text-red-500">
@@ -714,7 +842,7 @@ export default function MessageThread({
           <textarea
             ref={taRef}
             value={draft}
-            onChange={(e) => { setDraft(e.target.value); if (e.target.value.trim()) broadcastTyping(); autoGrow() }}
+            onChange={(e) => { setDraft(e.target.value); if (convoId) saveDraft(convoId, e.target.value); if (e.target.value.trim()) broadcastTyping(); autoGrow() }}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
             rows={1}
             placeholder="Type a message…  (Shift+Enter for new line)"
@@ -784,6 +912,10 @@ export default function MessageThread({
           onChanged={onChanged}
           onLeft={() => { setGroupInfoOpen(false); onLeft() }}
         />
+      )}
+
+      {pollOpen && (
+        <PollComposer onClose={() => setPollOpen(false)} onCreate={(q, opts, multi) => onCreatePoll(q, opts, multi)} />
       )}
     </section>
   )

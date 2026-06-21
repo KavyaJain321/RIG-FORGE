@@ -106,7 +106,14 @@ export default function ConversationList({
             </span>
           </div>
           <div className="flex items-center justify-between gap-2 mt-0.5">
-            <p className="text-xs text-[#777] truncate">{preview(c)}</p>
+            {(() => {
+              const d = typeof window !== 'undefined' ? localStorage.getItem(`rf-chat-draft-${c.id}`) || '' : ''
+              return d ? (
+                <p className="text-xs truncate"><span className="text-status-danger">Draft: </span><span className="text-[#777]">{d}</span></p>
+              ) : (
+                <p className="text-xs text-[#777] truncate">{preview(c)}</p>
+              )
+            })()}
             <span className="flex items-center gap-1 shrink-0">
               {c.muted && <span title="Muted" className="text-[10px]">🔇</span>}
               {c.unread > 0 && (

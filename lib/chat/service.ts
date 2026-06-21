@@ -712,3 +712,83 @@ export async function setDisappearing(conversationId: string, userId: string, se
     ttl ? `${actor} turned on disappearing messages` : `${actor} turned off disappearing messages`,
   )
 }
+
+// ─── Polls ───────────────────────────────────────────────────────────────────
+
+type PollPayload = {
+  options: { id: string; text: string }[]
+  multi: boolean
+  votes: Record<string, string[]>
+}
+
+export async function createPoll(
+  conversationId: string,
+  userId: string,
+  question: string,
+  options: string[],
+  multi: boolean,
+) {
+  const member = await assertMember(conversationId, userId)
+  const convo = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { type: true, onlyAdminsCanSend: true },
+  })
+  if (convo?.type === 'GROUP' && convo.onlyAdminsCanSend && member.role !== 'OWNER' && member.role !== 'ADMIN') {
+    throw new Error('Only admins can send messages in this group')
+  }
+  const q = question.trim()
+  const opts = options.map((t) => t.trim()).filter(Boolean).slice(0, 12)
+  if (!q) throw new Error('Poll question is required')
+  if (opts.length < 2) throw new Error('A poll needs at least 2 options')
+
+  const poll: PollPayload = { options: opts.map((text, i) => ({ id: `o${i}`, text })), multi: !!multi, votes: {} }
+  const [message] = await prisma.$transaction([
+    prisma.chatMessage.create({
+      data: {
+        organizationId: ORG,
+        conversationId,
+        senderId: userId,
+        kind: 'USER',
+        type: 'POLL',
+        content: q,
+        poll: poll as unknown as Prisma.InputJsonValue,
+      },
+      include: { sender: { select: memberUserSelect } },
+    }),
+    prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } }),
+    prisma.conversationMember.update({
+      where: { conversationId_userId: { conversationId, userId } },
+      data: { lastReadAt: new Date() },
+    }),
+  ])
+  return message
+}
+
+export async function votePoll(messageId: string, userId: string, optionId: string) {
+  const msg = await prisma.chatMessage.findUnique({
+    where: { id: messageId },
+    select: { conversationId: true, poll: true, type: true },
+  })
+  if (!msg || msg.type !== 'POLL' || !msg.poll) throw new Error('Poll not found')
+  await assertMember(msg.conversationId, userId)
+
+  const poll = msg.poll as unknown as PollPayload
+  if (!poll.options.some((o) => o.id === optionId)) throw new Error('Invalid option')
+  const votes = poll.votes || {}
+  for (const o of poll.options) if (!Array.isArray(votes[o.id])) votes[o.id] = []
+
+  const already = votes[optionId].includes(userId)
+  if (poll.multi) {
+    votes[optionId] = already ? votes[optionId].filter((u) => u !== userId) : [...votes[optionId], userId]
+  } else {
+    for (const k of Object.keys(votes)) votes[k] = votes[k].filter((u) => u !== userId)
+    if (!already) votes[optionId] = [...votes[optionId], userId]
+  }
+  poll.votes = votes
+
+  return prisma.chatMessage.update({
+    where: { id: messageId },
+    data: { poll: poll as unknown as Prisma.InputJsonValue },
+    include: { sender: { select: memberUserSelect } },
+  })
+}

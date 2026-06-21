@@ -21,11 +21,12 @@ export interface ChatMessageDTO {
   conversationId: string
   senderId: string | null
   kind: ChatMessageKind
-  type: 'TEXT' | 'IMAGE' | 'FILE' | 'AUDIO'
+  type: 'TEXT' | 'IMAGE' | 'FILE' | 'AUDIO' | 'POLL'
   content: string
   fileName?: string | null
   fileSize?: number | null
   linkPreview?: { url: string; title?: string; description?: string; image?: string } | null
+  poll?: { options: { id: string; text: string }[]; multi: boolean; votes: Record<string, string[]> } | null
   replyToId?: string | null
   deliveredAt?: string | null
   editedAt?: string | null

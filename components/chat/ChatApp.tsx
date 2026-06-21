@@ -34,6 +34,7 @@ function rowToMsg(row: Record<string, unknown>): ChatMessageDTO {
     fileName: row.fileName ? String(row.fileName) : null,
     fileSize: typeof row.fileSize === 'number' ? row.fileSize : null,
     linkPreview: (row.linkPreview as ChatMessageDTO['linkPreview']) ?? null,
+    poll: (row.poll as ChatMessageDTO['poll']) ?? null,
     replyToId: row.replyToId ? String(row.replyToId) : null,
     deliveredAt: row.deliveredAt ? String(row.deliveredAt) : null,
     editedAt: row.editedAt ? String(row.editedAt) : null,
@@ -186,6 +187,7 @@ export default function ChatApp() {
                     deletedAt: row.deletedAt ? String(row.deletedAt) : null,
                     pinnedAt: row.pinnedAt ? String(row.pinnedAt) : null,
                     linkPreview: (row.linkPreview as ChatMessageDTO['linkPreview']) ?? null,
+                    poll: (row.poll as ChatMessageDTO['poll']) ?? null,
                   }
                 : m,
             ),
@@ -419,6 +421,33 @@ export default function ChatApp() {
     }
   }, [])
 
+  const handleCreatePoll = useCallback(async (question: string, options: string[], multi: boolean) => {
+    const id = activeIdRef.current
+    if (!id) return
+    try {
+      await api(`/api/chat/conversations/${id}/poll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, options, multi }),
+      })
+    } catch (err) {
+      console.error('[chat] poll', err)
+      alert(err instanceof Error ? err.message : 'Failed to create poll')
+    }
+  }, [])
+
+  const handleVote = useCallback(async (messageId: string, optionId: string) => {
+    try {
+      await api(`/api/chat/messages/${messageId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ optionId }),
+      })
+    } catch (err) {
+      console.error('[chat] vote', err)
+    }
+  }, [])
+
   const openConversation = useCallback(
     async (payload: object) => {
       const data = await api<{ conversation: { id: string } }>('/api/chat/conversations', {
@@ -480,6 +509,8 @@ export default function ChatApp() {
         onLeft={() => { setActiveId(null); void refreshConversations() }}
         onBack={() => setActiveId(null)}
         onSetWallpaper={handleWallpaper}
+        onCreatePoll={handleCreatePoll}
+        onVote={handleVote}
       />
       {newChatOpen && (
         <NewChatModal
