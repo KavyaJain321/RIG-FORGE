@@ -151,6 +151,16 @@ export default function GroupInfoPanel({
     if (inviteLink) void navigator.clipboard?.writeText(inviteLink)
   }
 
+  async function changeDisappearing(seconds: number | null) {
+    await run(() =>
+      api(`/api/chat/conversations/${id}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disappearingSeconds: seconds }),
+      }),
+    )
+  }
+
   async function leave() {
     if (!confirm('Leave this group?')) return
     setBusy(true)
@@ -274,6 +284,20 @@ export default function GroupInfoPanel({
                     Create invite link
                   </button>
                 )}
+              </div>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-text-secondary mb-1">Disappearing messages</p>
+                <select
+                  value={conversation.disappearingSeconds ?? 0}
+                  onChange={(e) => void changeDisappearing(Number(e.target.value) || null)}
+                  disabled={busy}
+                  className="w-full h-8 rounded-lg border border-border-default bg-surface-raised text-sm px-2 outline-none focus:border-[#3F7A0A]"
+                >
+                  <option value={0}>Off</option>
+                  <option value={86400}>24 hours</option>
+                  <option value={604800}>7 days</option>
+                  <option value={7776000}>90 days</option>
+                </select>
               </div>
             </div>
           )}

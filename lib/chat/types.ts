@@ -68,4 +68,7 @@ export interface ConversationSummary {
   description?: string | null
   onlyAdminsCanSend?: boolean
   inviteToken?: string | null
+  disappearingSeconds?: number | null
+  wallpaper?: string | null
+  blocked?: boolean
 }

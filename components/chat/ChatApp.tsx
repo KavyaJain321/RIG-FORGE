@@ -390,6 +390,35 @@ export default function ChatApp() {
     [refreshConversations, reloadActiveMessages],
   )
 
+  const handleBlock = useCallback(
+    async (otherUserId: string, block: boolean) => {
+      try {
+        await api(`/api/chat/users/${otherUserId}/block`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ block }),
+        })
+      } catch (err) {
+        console.error('[chat] block', err)
+      }
+      void refreshConversations()
+    },
+    [refreshConversations],
+  )
+
+  const handleWallpaper = useCallback(async (conversationId: string, wallpaper: string | null) => {
+    setConversations((cs) => cs.map((c) => (c.id === conversationId ? { ...c, wallpaper } : c)))
+    try {
+      await api(`/api/chat/conversations/${conversationId}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallpaper: wallpaper ?? '' }),
+      })
+    } catch (err) {
+      console.error('[chat] wallpaper', err)
+    }
+  }, [])
+
   const openConversation = useCallback(
     async (payload: object) => {
       const data = await api<{ conversation: { id: string } }>('/api/chat/conversations', {
@@ -429,6 +458,8 @@ export default function ChatApp() {
         onNewChat={() => setNewChatOpen(true)}
         onOpenStarred={() => setStarredOpen(true)}
         onChatSettings={handleChatSettings}
+        meId={me.id}
+        onBlockUser={handleBlock}
       />
       <MessageThread
         conversation={active}
@@ -448,6 +479,7 @@ export default function ChatApp() {
         onChanged={refreshConversations}
         onLeft={() => { setActiveId(null); void refreshConversations() }}
         onBack={() => setActiveId(null)}
+        onSetWallpaper={handleWallpaper}
       />
       {newChatOpen && (
         <NewChatModal

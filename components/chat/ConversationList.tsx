@@ -47,6 +47,8 @@ export default function ConversationList({
   onNewChat,
   onOpenStarred,
   onChatSettings,
+  meId,
+  onBlockUser,
 }: {
   conversations: ConversationSummary[]
   activeId: string | null
@@ -55,6 +57,8 @@ export default function ConversationList({
   onNewChat: () => void
   onOpenStarred: () => void
   onChatSettings: (conversationId: string, flags: ChatFlags) => void
+  meId: string
+  onBlockUser: (otherUserId: string, block: boolean) => void
 }) {
   const [chatMenu, setChatMenu] = useState<ChatMenu>(null)
   const [showArchived, setShowArchived] = useState(false)
@@ -179,6 +183,19 @@ export default function ConversationList({
             <button type="button" className={menuBtn} onClick={() => { onChatSettings(chatMenu.conv.id, { archived: !chatMenu.conv.isArchived }); setChatMenu(null) }}>
               {chatMenu.conv.isArchived ? '📥 Unarchive' : '🗄 Archive'}
             </button>
+            {chatMenu.conv.type === 'DIRECT' && (() => {
+              const other = chatMenu.conv.members.find((mm) => mm.id !== meId)
+              if (!other) return null
+              return (
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-2 text-sm text-status-danger hover:bg-black/[0.05]"
+                  onClick={() => { onBlockUser(other.id, !chatMenu.conv.blocked); setChatMenu(null) }}
+                >
+                  {chatMenu.conv.blocked ? '✅ Unblock' : '🚫 Block'}
+                </button>
+              )
+            })()}
             <button type="button" className="w-full text-left px-3 py-2 text-sm text-status-danger hover:bg-black/[0.05]" onClick={() => { const id = chatMenu.conv.id; setChatMenu(null); if (confirm('Clear all messages in this chat for you?')) onChatSettings(id, { cleared: true }) }}>
               🧹 Clear chat
             </button>

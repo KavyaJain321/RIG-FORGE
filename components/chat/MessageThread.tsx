@@ -116,6 +116,16 @@ const SKELETON = [
 
 type CtxMenu = { msg: ChatMessageDTO; x: number; y: number } | null
 
+// Per-user chat wallpaper presets (key → background colour). 'default' = no override.
+const WALLPAPERS: Record<string, string> = {
+  default: '#F4F4EE',
+  sage: '#E7EDE3',
+  sky: '#E2EBF1',
+  sand: '#F1E9DC',
+  rose: '#F3E6E8',
+  graphite: '#E6E7E9',
+}
+
 export default function MessageThread({
   conversation,
   messages,
@@ -134,6 +144,7 @@ export default function MessageThread({
   onChanged,
   onLeft,
   onBack,
+  onSetWallpaper,
 }: {
   conversation: ConversationSummary | null
   messages: ChatMessageDTO[]
@@ -152,10 +163,12 @@ export default function MessageThread({
   onChanged: () => void
   onLeft: () => void
   onBack: () => void
+  onSetWallpaper: (conversationId: string, wallpaper: string | null) => void
 }) {
   const [draft, setDraft] = useState('')
   const [infoMsg, setInfoMsg] = useState<ChatMessageDTO | null>(null)
   const [groupInfoOpen, setGroupInfoOpen] = useState(false)
+  const [wallpaperOpen, setWallpaperOpen] = useState(false)
   const [atBottom, setAtBottom] = useState(true)
   const [typingName, setTypingName] = useState<string | null>(null)
   const [replyingTo, setReplyingTo] = useState<ChatMessageDTO | null>(null)
@@ -363,7 +376,7 @@ export default function MessageThread({
   const pinnedMessages = messages.filter((m) => m.pinnedAt && !m.deletedAt)
 
   return (
-    <section className="relative flex-1 min-w-0 flex flex-col bg-[#F4F4EE]">
+    <section className="relative flex-1 min-w-0 flex flex-col" style={{ backgroundColor: WALLPAPERS[conversation.wallpaper ?? 'default'] ?? WALLPAPERS.default }}>
       {/* Header */}
       <div
         className={`h-14 shrink-0 px-3 sm:px-4 flex items-center gap-2 sm:gap-3 border-b border-border-default bg-surface-raised/60 ${conversation.type === 'GROUP' ? 'cursor-pointer hover:bg-surface-raised' : ''}`}
@@ -403,7 +416,30 @@ export default function MessageThread({
         >
           🔍
         </button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setWallpaperOpen((o) => !o) }}
+          className="text-text-secondary hover:text-text-primary"
+          title="Wallpaper"
+        >
+          🎨
+        </button>
       </div>
+
+      {wallpaperOpen && (
+        <div className="absolute right-3 top-14 z-20 bg-surface-raised border border-border-default rounded-lg shadow-lg p-2 flex gap-2">
+          {Object.entries(WALLPAPERS).map(([key, color]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => { onSetWallpaper(conversation.id, key === 'default' ? null : key); setWallpaperOpen(false) }}
+              className={`h-7 w-7 rounded-full border ${(conversation.wallpaper ?? 'default') === key ? 'border-[#3F7A0A] ring-2 ring-[#3F7A0A]/30' : 'border-border-default'}`}
+              style={{ backgroundColor: color }}
+              title={key}
+            />
+          ))}
+        </div>
+      )}
 
       {searchOpen && (
         <div className="shrink-0 border-b border-border-default bg-surface-raised p-2">

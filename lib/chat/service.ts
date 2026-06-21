@@ -41,6 +41,10 @@ export async function listConversations(userId: string) {
     },
   })
 
+  const blocked = new Set(
+    (await prisma.block.findMany({ where: { blockerId: userId }, select: { blockedId: true } })).map((b) => b.blockedId),
+  )
+
   const rows = await Promise.all(
     memberships.map(async (m) => {
       const convo = m.conversation
@@ -83,6 +87,9 @@ export async function listConversations(userId: string) {
         description: convo.description,
         onlyAdminsCanSend: convo.onlyAdminsCanSend,
         inviteToken: convo.inviteToken,
+        disappearingSeconds: convo.disappearingSeconds,
+        wallpaper: m.wallpaper,
+        blocked: convo.type === 'DIRECT' && others[0] ? blocked.has(others[0].id) : false,
       }
     }),
   )
@@ -168,11 +175,21 @@ export async function listMessages(
   opts: { limit?: number; before?: string } = {},
 ) {
   const member = await assertMember(conversationId, userId)
+  const conv = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { disappearingSeconds: true },
+  })
   const limit = Math.min(Math.max(opts.limit ?? 30, 1), 100)
 
+  // Hide messages before "clear chat" and, if disappearing is on, older than the TTL.
+  const cutoffs: Date[] = []
+  if (member.clearedAt) cutoffs.push(member.clearedAt)
+  if (conv?.disappearingSeconds) cutoffs.push(new Date(Date.now() - conv.disappearingSeconds * 1000))
+  const since = cutoffs.length ? new Date(Math.max(...cutoffs.map((d) => d.getTime()))) : null
+
   const messages = await prisma.chatMessage.findMany({
-    // Deleted messages are kept as tombstones; "clear chat" hides earlier ones.
-    where: { conversationId, ...(member.clearedAt ? { createdAt: { gt: member.clearedAt } } : {}) },
+    // Deleted messages are kept as tombstones; clear-chat / disappearing hide earlier ones.
+    where: { conversationId, ...(since ? { createdAt: { gt: since } } : {}) },
     orderBy: { createdAt: 'desc' },
     take: limit,
     ...(opts.before ? { cursor: { id: opts.before }, skip: 1 } : {}),
@@ -240,6 +257,15 @@ export async function sendMessage(
   })
   if (convo?.type === 'GROUP' && convo.onlyAdminsCanSend && member.role !== 'OWNER' && member.role !== 'ADMIN') {
     throw new Error('Only admins can send messages in this group')
+  }
+  if (convo?.type === 'DIRECT') {
+    const other = await prisma.conversationMember.findFirst({
+      where: { conversationId, userId: { not: userId } },
+      select: { userId: true },
+    })
+    if (other && (await isPairBlocked(userId, other.userId))) {
+      throw new Error('You can no longer message this contact')
+    }
   }
   const text = content.trim()
   if (!text) throw new Error('Message is empty')
@@ -584,7 +610,7 @@ export async function pinMessage(messageId: string, userId: string, pin: boolean
 export async function setChatFlags(
   conversationId: string,
   userId: string,
-  flags: { isArchived?: boolean; isPinned?: boolean; muteUntil?: Date | null; cleared?: boolean },
+  flags: { isArchived?: boolean; isPinned?: boolean; muteUntil?: Date | null; cleared?: boolean; wallpaper?: string | null },
 ) {
   await assertMember(conversationId, userId)
   const data: Prisma.ConversationMemberUpdateInput = {}
@@ -592,6 +618,7 @@ export async function setChatFlags(
   if (typeof flags.isPinned === 'boolean') data.isPinned = flags.isPinned
   if (flags.muteUntil !== undefined) data.muteUntil = flags.muteUntil
   if (flags.cleared) data.clearedAt = new Date()
+  if (flags.wallpaper !== undefined) data.wallpaper = flags.wallpaper || null
   await prisma.conversationMember.update({
     where: { conversationId_userId: { conversationId, userId } },
     data,
@@ -644,4 +671,44 @@ export async function joinViaInvite(token: string, userId: string): Promise<stri
   await prisma.conversationMember.create({ data: { organizationId: ORG, conversationId: convo.id, userId, role: 'MEMBER' } })
   await postSystemMessage(convo.id, `${await userName(userId)} joined via invite link`)
   return convo.id
+}
+
+// ─── Block / unblock ─────────────────────────────────────────────────────────
+
+async function isPairBlocked(a: string, b: string): Promise<boolean> {
+  const n = await prisma.block.count({
+    where: { OR: [{ blockerId: a, blockedId: b }, { blockerId: b, blockedId: a }] },
+  })
+  return n > 0
+}
+
+export async function blockUser(blockerId: string, blockedId: string) {
+  if (blockerId === blockedId) throw new Error('You cannot block yourself')
+  await prisma.block.upsert({
+    where: { blockerId_blockedId: { blockerId, blockedId } },
+    update: {},
+    create: { blockerId, blockedId },
+  })
+}
+
+export async function unblockUser(blockerId: string, blockedId: string) {
+  await prisma.block.deleteMany({ where: { blockerId, blockedId } })
+}
+
+export async function listBlocked(userId: string): Promise<string[]> {
+  const rows = await prisma.block.findMany({ where: { blockerId: userId }, select: { blockedId: true } })
+  return rows.map((r) => r.blockedId)
+}
+
+// ─── Disappearing messages (conversation-level TTL) ──────────────────────────
+
+export async function setDisappearing(conversationId: string, userId: string, seconds: number | null) {
+  await assertMember(conversationId, userId)
+  const ttl = seconds && seconds > 0 ? Math.floor(seconds) : null
+  await prisma.conversation.update({ where: { id: conversationId }, data: { disappearingSeconds: ttl } })
+  const actor = await userName(userId)
+  await postSystemMessage(
+    conversationId,
+    ttl ? `${actor} turned on disappearing messages` : `${actor} turned off disappearing messages`,
+  )
 }

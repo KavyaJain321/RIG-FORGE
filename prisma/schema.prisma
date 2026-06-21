@@ -119,6 +119,8 @@ model User {
   createdConversations Conversation[]       @relation("ChatCreatedBy")
   chatReactions        MessageReaction[]
   chatStars            MessageStar[]
+  blocksMade           Block[]              @relation("Blocker")
+  blocksReceived       Block[]              @relation("Blocked")
 }
 
 model Project {
@@ -540,6 +542,7 @@ model Conversation {
   description    String?                              // group description / about
   onlyAdminsCanSend Boolean       @default(false)    // group permission: only admins may send
   inviteToken    String?          @unique             // invite-link token (null = no active link)
+  disappearingSeconds Int?                            // disappearing-messages TTL in seconds (null = off)
   // For DIRECT convos, dmKey = the two user ids sorted + joined "a:b", so the
   // unique constraint guarantees exactly ONE DM thread per pair. Null for groups.
   dmKey          String?
@@ -570,6 +573,7 @@ model ConversationMember {
   isArchived     Boolean                @default(false)    // archived out of the main list
   isPinned       Boolean                @default(false)    // pinned to the top of the chat list
   clearedAt      DateTime?                                 // "clear chat" — hide messages before this
+  wallpaper      String?                                   // per-user chat background (preset key)
   joinedAt       DateTime               @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -636,4 +640,18 @@ model MessageStar {
 
   @@unique([messageId, userId])
   @@index([userId])
+}
+
+// One-directional block: blocker no longer exchanges DMs with blocked.
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
 }
