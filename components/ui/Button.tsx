@@ -27,15 +27,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const variantClass: Record<ButtonVariant, string> = {
   // Solid black — commanding authority for the primary CTA
   primary:
-    'bg-[#1A1A1A] text-white border-transparent hover:bg-[#2A2A2A]',
+    'bg-primary text-white border-transparent hover:bg-[#2A2A2A]',
 
   // Backward-compatible alias
   'gov-emphasis':
-    'bg-[#1A1A1A] text-white border-transparent hover:bg-[#2A2A2A]',
+    'bg-primary text-white border-transparent hover:bg-[#2A2A2A]',
 
   // Lime with legible black text (contrast 11.97:1 vs prior 1.45:1)
   default:
-    'bg-accent text-[#1A1A1A] border-transparent hover:bg-accent-hover',
+    'bg-accent text-primary border-transparent hover:bg-accent-hover',
 
   // Ghost
   subtle:
@@ -69,7 +69,7 @@ export default function Button({
         'active:scale-[0.97] active:transition-none',
         // Focus ring from globals.css :focus-visible handles the base case,
         // but override here to match the component's surface context
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1A1A1A]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background-primary',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background-primary',
         'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
         variantClass[variant],
         sizeClass[size],

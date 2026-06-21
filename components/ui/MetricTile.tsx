@@ -9,9 +9,9 @@ interface MetricTileProps {
 
 const toneClass: Record<NonNullable<MetricTileProps['tone']>, string> = {
   default: 'text-text-primary',
-  accent: 'text-accent',
+  accent: 'text-accent-ink',
   danger: 'text-status-danger',
-  success: 'text-status-success',
+  success: 'text-accent-ink',
 }
 
 export default function MetricTile({

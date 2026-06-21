@@ -23,7 +23,7 @@ export default function ContributionBar({
             </span>
           )}
           {showPercentage && (
-            <span className={`font-mono text-[10px] text-accent ${textGlow}`}>
+            <span className={`font-mono text-[10px] text-accent-ink ${textGlow}`}>
               {clamped}%
             </span>
           )}

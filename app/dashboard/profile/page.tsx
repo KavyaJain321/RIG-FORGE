@@ -19,9 +19,9 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function projectStatusClass(status: string): string {
   switch (status) {
-    case 'ACTIVE':    return 'text-status-success border-status-success'
+    case 'ACTIVE':    return 'text-accent-ink border-status-success'
     case 'ON_HOLD':   return 'text-status-warning border-status-warning'
-    case 'COMPLETED': return 'text-accent border-accent'
+    case 'COMPLETED': return 'text-accent-ink border-accent'
     default:          return 'text-text-muted border-border-default'
   }
 }
@@ -240,7 +240,7 @@ export default function ProfilePage() {
           <button
             type="button"
             onClick={() => void fetchProfile()}
-            className="mt-4 font-mono text-xs border border-border-default px-4 py-2 text-text-muted hover:border-accent hover:text-accent transition-colors"
+            className="mt-4 font-mono text-xs border border-border-default px-4 py-2 text-text-muted hover:border-accent hover:text-accent-ink transition-colors"
           >
             RETRY
           </button>
@@ -282,7 +282,7 @@ export default function ProfilePage() {
             className="w-16 h-16 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center shrink-0"
             aria-hidden="true"
           >
-            <span className="font-mono text-xl font-bold text-accent">
+            <span className="font-mono text-xl font-bold text-accent-ink">
               {getInitials(profileUser.name)}
             </span>
           </div>
@@ -313,7 +313,7 @@ export default function ProfilePage() {
                   ].join(' ')}
                 />
                 {profileUser.currentStatus === 'WORKING' ? (
-                  <span className="text-status-success">WORKING</span>
+                  <span className="text-accent-ink">WORKING</span>
                 ) : (
                   <span className="text-text-muted">NOT WORKING</span>
                 )}
@@ -392,13 +392,13 @@ export default function ProfilePage() {
               <li key={p.id} className="flex items-center justify-between gap-3">
                 <Link
                   href={`/dashboard/projects/${p.id}`}
-                  className="font-mono text-xs text-text-primary hover:text-accent transition-colors truncate"
+                  className="font-mono text-xs text-text-primary hover:text-accent-ink transition-colors truncate"
                 >
                   {p.name}
                 </Link>
                 <div className="flex items-center gap-2 shrink-0">
                   {p.isLead && (
-                    <span className="font-mono text-[9px] tracking-widest text-accent border border-accent/40 px-1.5 py-0.5">
+                    <span className="font-mono text-[9px] tracking-widest text-accent-ink border border-accent/40 px-1.5 py-0.5">
                       LEAD
                     </span>
                   )}
@@ -465,12 +465,12 @@ export default function ProfilePage() {
               type="button"
               onClick={() => void handleSaveLog()}
               disabled={logSaving || !todayLogText.trim()}
-              className="font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent-ink transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {logSaving ? 'SAVING…' : 'SAVE LOG'}
             </button>
             {logSuccess && (
-              <span className="font-mono text-[10px] text-status-success tracking-widest">
+              <span className="font-mono text-[10px] text-accent-ink tracking-widest">
                 ✓ SAVED
               </span>
             )}
@@ -490,7 +490,7 @@ export default function ProfilePage() {
             setPwError(null)
             setPwSuccess(false)
           }}
-          className="font-mono text-xs tracking-widest text-text-muted hover:text-accent transition-colors"
+          className="font-mono text-xs tracking-widest text-text-muted hover:text-accent-ink transition-colors"
         >
           {showPasswordForm ? '▾ CHANGE PASSWORD' : '▸ CHANGE PASSWORD'}
         </button>
@@ -542,12 +542,12 @@ export default function ProfilePage() {
                 type="button"
                 onClick={() => void handleChangePassword()}
                 disabled={pwSaving}
-                className="font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent-ink transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {pwSaving ? 'UPDATING…' : 'UPDATE PASSWORD'}
               </button>
               {pwSuccess && (
-                <span className="font-mono text-[10px] text-status-success tracking-widest">
+                <span className="font-mono text-[10px] text-accent-ink tracking-widest">
                   ✓ UPDATED
                 </span>
               )}

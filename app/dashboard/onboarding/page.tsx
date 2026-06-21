@@ -61,7 +61,7 @@ export default function OnboardingPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <p className="type-meta text-accent mb-1">ADMIN</p>
+            <p className="type-meta text-accent-ink mb-1">ADMIN</p>
             <h1 className="type-h3">Onboarding</h1>
           </div>
           <button

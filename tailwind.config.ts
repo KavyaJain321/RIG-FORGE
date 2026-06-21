@@ -36,6 +36,9 @@ const config: Config = {
           DEFAULT: '#85D933',
           hover: '#9DED47',
           pressed: '#6EBF20',
+          // Dark lime for accent/success used as TEXT on light surfaces.
+          // Bright #85D933 is ~1.6:1 on white (unreadable); #3F7A0A is ~5.25:1 (AA).
+          ink: '#3F7A0A',
           spark: '#FF6B4A',
           'spark-muted': '#E55A38',
         },

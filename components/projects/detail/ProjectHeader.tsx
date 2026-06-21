@@ -8,7 +8,7 @@ import type { ProjectDetail } from '@/lib/types'
 
 function ProjectStatusBadge({ status }: { status: string }) {
   const classes: Record<string, string> = {
-    ACTIVE: 'border-status-success text-status-success',
+    ACTIVE: 'border-status-success text-accent-ink',
     ON_HOLD: 'border-status-warning text-status-warning',
     COMPLETED: 'border-border-default text-muted',
     ARCHIVED: 'border-border-default text-muted italic',
@@ -26,7 +26,7 @@ function ProjectStatusBadge({ status }: { status: string }) {
 function PriorityBadge({ priority }: { priority: string }) {
   const classes: Record<string, string> = {
     CRITICAL: 'border-status-danger text-status-danger',
-    HIGH: 'border-accent text-accent',
+    HIGH: 'border-accent text-accent-ink',
     MEDIUM: 'border-border-default text-secondary',
     LOW: 'border-border-default text-muted',
   }
@@ -77,7 +77,7 @@ export default function ProjectHeader({
         <button
           type="button"
           onClick={() => router.push('/dashboard/projects')}
-          className="font-mono text-xs text-muted tracking-widest hover:text-accent cursor-pointer text-left"
+          className="font-mono text-xs text-muted tracking-widest hover:text-accent-ink cursor-pointer text-left"
         >
           ← PROJECTS
         </button>
@@ -86,14 +86,14 @@ export default function ProjectHeader({
             <button
               type="button"
               onClick={onEditClick}
-              className="border border-border-default text-secondary font-mono text-xs tracking-widest px-4 py-2 hover:border-accent hover:text-accent transition-colors duration-150"
+              className="border border-border-default text-secondary font-mono text-xs tracking-widest px-4 py-2 hover:border-accent hover:text-accent-ink transition-colors duration-150"
             >
               ✎ EDIT PROJECT
             </button>
             <button
               type="button"
               onClick={onAddMemberClick}
-              className="border border-border-default text-secondary font-mono text-xs tracking-widest px-4 py-2 hover:border-accent hover:text-accent transition-colors duration-150"
+              className="border border-border-default text-secondary font-mono text-xs tracking-widest px-4 py-2 hover:border-accent hover:text-accent-ink transition-colors duration-150"
             >
               ⊕ ADD MEMBER
             </button>

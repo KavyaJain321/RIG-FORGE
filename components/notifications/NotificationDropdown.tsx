@@ -74,7 +74,7 @@ function AdminBroadcastPanel() {
         onClick={() => { setExpanded(v => !v); setFeedback(null) }}
         className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-background-tertiary transition-colors"
       >
-        <span className="font-mono text-[10px] tracking-widest text-accent uppercase">◉ BROADCAST NOTIFICATION</span>
+        <span className="font-mono text-[10px] tracking-widest text-accent-ink uppercase">◉ BROADCAST NOTIFICATION</span>
         <span className="font-mono text-xs text-muted">{expanded ? '▲' : '▼'}</span>
       </button>
 
@@ -84,7 +84,7 @@ function AdminBroadcastPanel() {
             {(['ALL', 'ONE'] as const).map((t) => (
               <button key={t} type="button" onClick={() => setTarget(t)}
                 className={`flex-1 font-mono text-[10px] tracking-widest py-1.5 border transition-colors ${
-                  target === t ? 'border-accent text-accent bg-accent/5' : 'border-border-default text-muted hover:border-accent/50'
+                  target === t ? 'border-accent text-accent-ink bg-accent/5' : 'border-border-default text-muted hover:border-accent/50'
                 }`}>
                 {t === 'ALL' ? 'ALL MEMBERS' : 'ONE MEMBER'}
               </button>
@@ -99,13 +99,13 @@ function AdminBroadcastPanel() {
           <textarea placeholder="Message..." value={body} onChange={e => setBody(e.target.value)} rows={3}
             className="w-full border border-border-default bg-background-primary px-3 py-1.5 font-mono text-xs text-primary placeholder:text-muted focus:outline-none focus:border-accent transition-colors resize-none" />
           {feedback && (
-            <p className={`font-mono text-[10px] tracking-wide ${feedback.ok ? 'text-status-success' : 'text-status-danger'}`}>
+            <p className={`font-mono text-[10px] tracking-wide ${feedback.ok ? 'text-accent-ink' : 'text-status-danger'}`}>
               {feedback.ok ? '✓ ' : '✕ '}{feedback.msg}
             </p>
           )}
           <button type="button" onClick={() => void send()}
             disabled={sending || !title.trim() || !body.trim() || (target === 'ONE' && !userId.trim())}
-            className="w-full border border-accent text-accent font-mono text-[10px] tracking-widest py-2 hover:bg-accent hover:text-background-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            className="w-full border border-accent text-accent-ink font-mono text-[10px] tracking-widest py-2 hover:bg-accent hover:text-background-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             {sending ? 'SENDING...' : target === 'ALL' ? 'SEND TO ALL MEMBERS' : 'SEND TO MEMBER'}
           </button>
         </div>
@@ -286,7 +286,7 @@ export default function NotificationDropdown({ isOpen, onClose, bellRef, isAdmin
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button type="button" onClick={allSelected ? deselectAll : selectAll}
-                className="font-mono text-[10px] tracking-widest text-text-muted hover:text-accent transition-colors">
+                className="font-mono text-[10px] tracking-widest text-text-muted hover:text-accent-ink transition-colors">
                 {allSelected ? 'DESELECT ALL' : 'SELECT ALL'}
               </button>
               {selectedIds.size > 0 && (
@@ -301,7 +301,7 @@ export default function NotificationDropdown({ isOpen, onClose, bellRef, isAdmin
                 </button>
               )}
               <button type="button" onClick={() => { setSelectMode(false); setSelectedIds(new Set()) }}
-                className="font-mono text-[10px] tracking-widest text-text-muted hover:text-accent transition-colors">
+                className="font-mono text-[10px] tracking-widest text-text-muted hover:text-accent-ink transition-colors">
                 CANCEL
               </button>
             </div>
@@ -311,17 +311,17 @@ export default function NotificationDropdown({ isOpen, onClose, bellRef, isAdmin
           <div className="flex items-center justify-between">
             <span className="font-mono text-[10px] text-text-muted tracking-widest">NOTIFICATIONS</span>
             <div className="flex items-center gap-3">
-              <span className={['font-mono text-[10px] tracking-widest', connected ? 'text-status-success' : 'text-text-muted'].join(' ')}>
+              <span className={['font-mono text-[10px] tracking-widest', connected ? 'text-accent-ink' : 'text-text-muted'].join(' ')}>
                 {connected ? '● LIVE' : '○ POLLING'}
               </span>
               {notifications.length > 0 && (
                 <button type="button" onClick={() => setSelectMode(true)}
-                  className="font-mono text-[10px] tracking-widest text-text-muted hover:text-accent transition-colors">
+                  className="font-mono text-[10px] tracking-widest text-text-muted hover:text-accent-ink transition-colors">
                   SELECT
                 </button>
               )}
               <button type="button" onClick={() => void handleMarkAllRead()} disabled={unreadCount === 0}
-                className={['font-mono text-[10px] tracking-widest transition-colors', unreadCount > 0 ? 'text-text-muted hover:text-accent cursor-pointer' : 'text-text-muted opacity-40 cursor-not-allowed'].join(' ')}>
+                className={['font-mono text-[10px] tracking-widest transition-colors', unreadCount > 0 ? 'text-text-muted hover:text-accent-ink cursor-pointer' : 'text-text-muted opacity-40 cursor-not-allowed'].join(' ')}>
                 MARK ALL READ
               </button>
             </div>
@@ -356,7 +356,7 @@ export default function NotificationDropdown({ isOpen, onClose, bellRef, isAdmin
             {hasMore && (
               <div className="flex justify-center mx-4 my-3">
                 <button type="button" onClick={() => void handleLoadMore()} disabled={loadingMore}
-                  className="font-mono text-xs text-text-muted border border-border-default px-4 py-2 tracking-widest hover:border-accent hover:text-accent transition-colors disabled:opacity-40">
+                  className="font-mono text-xs text-text-muted border border-border-default px-4 py-2 tracking-widest hover:border-accent hover:text-accent-ink transition-colors disabled:opacity-40">
                   {loadingMore ? 'LOADING…' : 'LOAD MORE'}
                 </button>
               </div>

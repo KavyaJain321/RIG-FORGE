@@ -74,7 +74,7 @@ export default function MemberCard({ member, isSelected, onClick }: MemberCardPr
       {/* Stats row */}
       <div className="flex gap-6">
         <div>
-          <p className="font-mono text-lg font-bold text-accent forge-text-glow leading-none">
+          <p className="font-mono text-lg font-bold text-accent-ink forge-text-glow leading-none">
             {member.projectCount}
           </p>
           <p className="font-mono text-[10px] text-muted tracking-widest uppercase mt-0.5">

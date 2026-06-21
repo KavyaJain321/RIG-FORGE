@@ -70,7 +70,7 @@ export default function LoginPage() {
       </div>
       <Card className="relative z-10 w-full max-w-[460px] p-8 md:p-10">
         <div className="text-center">
-          <p className="type-meta text-accent">WORKFORCE INTELLIGENCE PLATFORM</p>
+          <p className="type-meta text-accent-ink">WORKFORCE INTELLIGENCE PLATFORM</p>
           <h1 className="type-h1 mt-2">Rig Forge</h1>
           <p className="type-body-muted mt-2">Secure operational command access</p>
         </div>
@@ -106,7 +106,7 @@ export default function LoginPage() {
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
               tabIndex={-1}
-              className="absolute right-3 top-[40px] font-mono text-[10px] tracking-widest text-text-muted hover:text-accent"
+              className="absolute right-3 top-[40px] font-mono text-[10px] tracking-widest text-text-muted hover:text-accent-ink"
             >
               {showPassword ? 'HIDE' : 'SHOW'}
             </button>

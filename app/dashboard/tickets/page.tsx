@@ -62,7 +62,7 @@ function AdminTickets() {
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="type-meta text-accent mb-1">{user.role}</p>
+            <p className="type-meta text-accent-ink mb-1">{user.role}</p>
             <h1 className="type-h3">Tickets</h1>
           </div>
           <button

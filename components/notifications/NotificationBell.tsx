@@ -38,7 +38,7 @@ const NotificationBell = forwardRef<HTMLDivElement, NotificationBellProps>(
             <span
               className={[
                 'font-mono text-xs',
-                hasUnread ? 'text-accent' : 'text-text-muted',
+                hasUnread ? 'text-accent-ink' : 'text-text-muted',
               ].join(' ')}
             >
               ◉

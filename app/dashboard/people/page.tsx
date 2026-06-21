@@ -160,7 +160,7 @@ function PeoplePageInner() {
             </h1>
           </div>
           <div className="forge-card px-4 py-2 text-right">
-            <p className="font-mono font-bold text-2xl text-accent forge-text-glow leading-none">
+            <p className="font-mono font-bold text-2xl text-accent-ink forge-text-glow leading-none">
               {total}
             </p>
             <p className="font-mono text-xs text-muted mt-1">ACTIVE MEMBERS</p>
@@ -283,7 +283,7 @@ function PeoplePageInner() {
           <button
             onClick={() => void handleLoadMore()}
             disabled={loadingMore}
-            className="forge-card px-8 py-3 font-mono text-xs text-secondary hover:text-accent transition-all duration-150 cursor-pointer disabled:opacity-50"
+            className="forge-card px-8 py-3 font-mono text-xs text-secondary hover:text-accent-ink transition-all duration-150 cursor-pointer disabled:opacity-50"
           >
             {loadingMore ? 'LOADING...' : `LOAD MORE — ${remaining}`}
           </button>

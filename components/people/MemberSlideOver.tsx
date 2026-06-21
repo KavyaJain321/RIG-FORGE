@@ -44,13 +44,13 @@ function formatDate(dateStr: string): string {
 
 const PRIORITY_CLASSES: Record<string, string> = {
   CRITICAL: 'border-status-danger text-status-danger',
-  HIGH: 'border-accent text-accent',
+  HIGH: 'border-accent text-accent-ink',
   MEDIUM: 'border-border-default text-secondary',
   LOW: 'border-border-default text-muted',
 }
 
 const STATUS_CLASSES: Record<string, string> = {
-  ACTIVE: 'border-status-success text-status-success',
+  ACTIVE: 'border-status-success text-accent-ink',
   ON_HOLD: 'border-status-warning text-status-warning',
   COMPLETED: 'border-border-default text-muted',
   ARCHIVED: 'border-border-default text-muted',
@@ -260,7 +260,7 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
           <button
             type="button"
             onClick={onClose}
-            className="font-mono text-lg text-muted hover:text-accent transition-colors leading-none"
+            className="font-mono text-lg text-muted hover:text-accent-ink transition-colors leading-none"
             aria-label="Close panel"
           >
             ✕
@@ -283,7 +283,7 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
               <button
                 type="button"
                 onClick={() => memberId && void fetchMember(memberId)}
-                className="mt-4 font-mono text-xs text-accent hover:underline"
+                className="mt-4 font-mono text-xs text-accent-ink hover:underline"
               >
                 RETRY
               </button>
@@ -330,19 +330,19 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
               {/* ── Quick stats ────────────────────────────────── */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="forge-card p-3 text-center">
-                  <p className="font-mono font-bold text-xl text-accent forge-text-glow leading-none">
+                  <p className="font-mono font-bold text-xl text-accent-ink forge-text-glow leading-none">
                     {member.projects.length}
                   </p>
                   <p className="font-mono text-[10px] text-muted tracking-widest mt-1">PROJECTS</p>
                 </div>
                 <div className="forge-card p-3 text-center">
-                  <p className="font-mono font-bold text-xl text-accent forge-text-glow leading-none">
+                  <p className="font-mono font-bold text-xl text-accent-ink forge-text-glow leading-none">
                     {member.ticketsRaisedCount}
                   </p>
                   <p className="font-mono text-[10px] text-muted tracking-widest mt-1">RAISED</p>
                 </div>
                 <div className="forge-card p-3 text-center">
-                  <p className="font-mono font-bold text-xl text-accent forge-text-glow leading-none">
+                  <p className="font-mono font-bold text-xl text-accent-ink forge-text-glow leading-none">
                     {member.ticketsHelpedCount}
                   </p>
                   <p className="font-mono text-[10px] text-muted tracking-widest mt-1">HELPED</p>
@@ -372,12 +372,12 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
                             className="forge-card p-3 block hover:border-accent/40 transition-colors group"
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <p className="font-mono text-sm text-primary font-bold truncate group-hover:text-accent transition-colors">
+                              <p className="font-mono text-sm text-primary font-bold truncate group-hover:text-accent-ink transition-colors">
                                 {p.name}
                               </p>
                               <div className="flex items-center gap-1.5 shrink-0">
                                 {p.isLead && (
-                                  <span className="font-mono text-[9px] tracking-widest text-accent border border-accent/40 px-1 py-0.5">
+                                  <span className="font-mono text-[9px] tracking-widest text-accent-ink border border-accent/40 px-1 py-0.5">
                                     LEAD
                                   </span>
                                 )}
@@ -474,7 +474,7 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
                   <ul className="space-y-2">
                     {member.dailyLogsThisWeek.map((log) => (
                       <li key={log.date} className="forge-card p-3">
-                        <p className="font-mono text-[10px] text-accent tracking-widest mb-1">
+                        <p className="font-mono text-[10px] text-accent-ink tracking-widest mb-1">
                           {formatDate(log.date)}
                         </p>
                         <p className="font-mono text-xs text-primary leading-relaxed">
@@ -517,7 +517,7 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
                             <button
                               type="button"
                               onClick={() => setShowTempPassword((v) => !v)}
-                              className="font-mono text-[10px] text-muted hover:text-accent tracking-widest transition-colors"
+                              className="font-mono text-[10px] text-muted hover:text-accent-ink tracking-widest transition-colors"
                             >
                               {showTempPassword ? 'HIDE' : 'SHOW'}
                             </button>
@@ -528,7 +528,7 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
                       {/* Reset result (new temp password just generated) */}
                       {resetResult && (
                         <div className="bg-status-success/10 border border-status-success/40 px-3 py-2">
-                          <p className="font-mono text-[10px] text-status-success tracking-widest uppercase mb-1">
+                          <p className="font-mono text-[10px] text-accent-ink tracking-widest uppercase mb-1">
                             ✓ New Temp Password — Share with user:
                           </p>
                           <div className="flex items-center gap-2">
@@ -538,7 +538,7 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
                             <button
                               type="button"
                               onClick={() => setShowTempPassword((v) => !v)}
-                              className="font-mono text-[10px] text-muted hover:text-accent tracking-widest"
+                              className="font-mono text-[10px] text-muted hover:text-accent-ink tracking-widest"
                             >
                               {showTempPassword ? 'HIDE' : 'SHOW'}
                             </button>
@@ -638,7 +638,7 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
                       type="button"
                       onClick={() => void handleSendNotification()}
                       disabled={sending || !notifTitle.trim() || !notifBody.trim()}
-                      className="w-full border border-accent text-accent font-mono text-xs tracking-widest py-2 hover:bg-accent hover:text-background-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-full border border-accent text-accent-ink font-mono text-xs tracking-widest py-2 hover:bg-accent hover:text-background-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {sending ? 'SENDING...' : 'SEND NOTIFICATION'}
                     </button>

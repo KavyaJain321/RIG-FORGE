@@ -216,14 +216,14 @@ export default function ProjectsPage() {
     <PageShell className="min-h-full">
       {/* ── Toast ──────────────────────────────────────────────────────────── */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 border border-accent bg-background-secondary px-4 py-3 font-mono text-xs text-accent tracking-widest forge-glow transition-opacity duration-300">
+        <div className="fixed top-4 right-4 z-50 border border-accent bg-background-secondary px-4 py-3 font-mono text-xs text-accent-ink tracking-widest forge-glow transition-opacity duration-300">
           {toast}
         </div>
       )}
 
       {/* ── Page header ────────────────────────────────────────────────────── */}
       <div className="pb-6">
-        <p className="type-meta text-accent">Delivery Portfolio</p>
+        <p className="type-meta text-accent-ink">Delivery Portfolio</p>
         <h1 className="type-h1">{isAdmin ? 'Projects' : 'My Projects'}</h1>
         <p className="type-body-muted mt-1">{total} active projects</p>
       </div>

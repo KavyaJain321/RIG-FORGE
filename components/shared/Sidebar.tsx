@@ -60,7 +60,7 @@ function NavItem({ href, label, active, onClick }: NavItemProps) {
       className={[
         'flex items-center px-4 py-2.5 rounded text-sm font-medium tracking-wide transition-colors',
         active
-          ? 'bg-accent/10 text-accent border-l-2 border-accent'
+          ? 'bg-accent/10 text-accent-ink border-l-2 border-accent'
           : 'text-muted hover:text-foreground hover:bg-surface-raised border-l-2 border-transparent',
       ].join(' ')}
     >
@@ -85,7 +85,7 @@ function AvatarCircle({ name, avatarUrl }: AvatarCircleProps) {
     )
   }
   return (
-    <span className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold shrink-0 select-none">
+    <span className="w-8 h-8 rounded-full bg-accent/20 text-accent-ink flex items-center justify-center text-xs font-bold shrink-0 select-none">
       {getInitials(name)}
     </span>
   )
@@ -108,7 +108,7 @@ function SidebarContent({ onNavClick, onLogoutClick }: SidebarContentProps) {
     <div className="flex flex-col h-full">
       {/* ── Brand ─────────────────────────────────────────────────────── */}
       <div className="px-6 pt-7 pb-6">
-        <p className="text-xs font-semibold tracking-widest text-accent uppercase">
+        <p className="text-xs font-semibold tracking-widest text-accent-ink uppercase">
           Governance Platform
         </p>
         <p className="text-xl font-bold mt-1 tracking-tight">Rig Forge</p>
@@ -145,7 +145,7 @@ function SidebarContent({ onNavClick, onLogoutClick }: SidebarContentProps) {
               <span
                 className={
                   user.currentStatus === 'WORKING'
-                    ? 'text-status-success'
+                    ? 'text-accent-ink'
                     : 'text-muted'
                 }
               >
@@ -229,7 +229,7 @@ export default function Sidebar() {
       {/* ── Mobile Topbar (< lg) ────────────────────────────────────────── */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14 bg-surface-raised border-b border-border-default">
         <div>
-          <p className="text-[10px] font-semibold tracking-widest text-accent uppercase leading-none">
+          <p className="text-[10px] font-semibold tracking-widest text-accent-ink uppercase leading-none">
             Governance Platform
           </p>
           <p className="text-base font-bold tracking-tight leading-tight">Rig Forge</p>

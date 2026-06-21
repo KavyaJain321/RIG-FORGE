@@ -290,7 +290,7 @@ export default function TicketDetailPage() {
                           {c.authorId === user.id ? 'You' : c.authorName}
                         </span>
                         {isAuthorAdmin && (
-                          <span className="font-mono text-[9px] uppercase tracking-widest text-accent">
+                          <span className="font-mono text-[9px] uppercase tracking-widest text-accent-ink">
                             Admin
                           </span>
                         )}

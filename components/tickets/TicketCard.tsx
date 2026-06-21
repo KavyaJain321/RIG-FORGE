@@ -28,7 +28,11 @@ export default function TicketCard({ ticket, currentUserId }: TicketCardProps) {
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ticket: ${ticket.title}`}
       onClick={() => router.push(`/dashboard/tickets/${ticket.id}`)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/dashboard/tickets/${ticket.id}`) } }}
       className="bg-surface-raised border border-border-default rounded-card p-4 cursor-pointer hover:bg-surface-highlight transition-colors"
     >
       <div className="flex items-start justify-between gap-3">
@@ -51,12 +55,12 @@ export default function TicketCard({ ticket, currentUserId }: TicketCardProps) {
               </span>
             )}
             {ticket.commentCount !== undefined && ticket.commentCount > 0 && (
-              <span className="font-mono text-[10px] text-accent">
+              <span className="font-mono text-[10px] text-accent-ink">
                 {ticket.commentCount} {ticket.commentCount === 1 ? 'reply' : 'replies'}
               </span>
             )}
             {ticket.hasResponse && !ticket.helperName && (ticket.commentCount ?? 0) === 0 && (
-              <span className="font-mono text-[10px] text-accent">Responded</span>
+              <span className="font-mono text-[10px] text-accent-ink">Responded</span>
             )}
           </div>
         </div>

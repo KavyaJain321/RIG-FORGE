@@ -80,7 +80,7 @@ export default function SetupPrompt() {
             </div>
             <a
               href="/api/auth/google/connect"
-              className="shrink-0 font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent transition-colors"
+              className="shrink-0 font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent-ink transition-colors"
             >
               CONNECT
             </a>
@@ -103,7 +103,7 @@ export default function SetupPrompt() {
               {!showWa && (
                 <button
                   onClick={() => setShowWa(true)}
-                  className="shrink-0 font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent transition-colors"
+                  className="shrink-0 font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent-ink transition-colors"
                 >
                   {status.whatsapp.hasNumber ? 'VERIFY' : 'ADD'}
                 </button>

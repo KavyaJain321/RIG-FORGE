@@ -50,7 +50,7 @@ export default function PendingPage() {
   return (
     <div className="min-h-screen bg-background-primary flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center">
-        <p className="type-meta text-accent mb-2">FORGE</p>
+        <p className="type-meta text-accent-ink mb-2">FORGE</p>
         <h1 className="type-h3 mb-8">
           {userName ? `Welcome, ${userName}!` : 'Welcome!'}
         </h1>

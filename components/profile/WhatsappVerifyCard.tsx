@@ -111,7 +111,7 @@ export default function WhatsappVerifyCard({ whatsappNumber, verified, onChange 
   }
 
   const btn =
-    'font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
+    'font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent-ink transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
   const inputCls =
     'w-full bg-background-primary border border-border-default font-mono text-xs text-text-primary placeholder:text-text-muted p-3 focus:outline-none focus:border-accent transition-colors'
 
@@ -125,7 +125,7 @@ export default function WhatsappVerifyCard({ whatsappNumber, verified, onChange 
               <>
                 <span className="text-text-primary">{whatsappNumber}</span>
                 {verified ? (
-                  <span className="text-status-success tracking-widest text-[10px]">✓ VERIFIED</span>
+                  <span className="text-accent-ink tracking-widest text-[10px]">✓ VERIFIED</span>
                 ) : (
                   <span className="text-status-warning tracking-widest text-[10px]">UNVERIFIED</span>
                 )}
@@ -160,7 +160,7 @@ export default function WhatsappVerifyCard({ whatsappNumber, verified, onChange 
             )}
           </div>
         </div>
-        {info && <p className="font-mono text-[10px] text-status-success tracking-widest">{info}</p>}
+        {info && <p className="font-mono text-[10px] text-accent-ink tracking-widest">{info}</p>}
         {error && <p className="font-mono text-[10px] text-status-danger">{error}</p>}
       </div>
     )
@@ -212,7 +212,7 @@ export default function WhatsappVerifyCard({ whatsappNumber, verified, onChange 
         maxLength={6}
         className={`${inputCls} tracking-[0.5em] text-center`}
       />
-      {info && <p className="font-mono text-[10px] text-status-success tracking-widest">{info}</p>}
+      {info && <p className="font-mono text-[10px] text-accent-ink tracking-widest">{info}</p>}
       {error && <p className="font-mono text-[10px] text-status-danger">{error}</p>}
       <div className="flex items-center gap-3 pt-1">
         <button type="button" disabled={busy || code.length !== 6} onClick={() => void submitCode()} className={btn}>

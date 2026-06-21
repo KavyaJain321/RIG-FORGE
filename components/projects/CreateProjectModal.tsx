@@ -316,7 +316,7 @@ export default function CreateProjectModal({
                   <button
                     type="button"
                     onClick={addLink}
-                    className="font-mono text-[10px] text-accent tracking-widest hover:text-accent-hover transition-colors duration-150"
+                    className="font-mono text-[10px] text-accent-ink tracking-widest hover:text-accent-ink transition-colors duration-150"
                   >
                     + ADD LINK
                   </button>

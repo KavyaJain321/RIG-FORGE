@@ -26,18 +26,18 @@ function getTypeSymbol(type: string): string {
 
 function getTypeColor(type: string): string {
   switch (type) {
-    case 'WELCOME':                return 'text-accent'
+    case 'WELCOME':                return 'text-accent-ink'
     case 'TICKET_RAISED':
     case 'TICKET_ACCEPTED':
     case 'ONBOARDING_PENDING':    return 'text-status-warning'
     case 'TICKET_COMPLETED':
     case 'TASK_DONE':
-    case 'ONBOARDING_APPROVED':   return 'text-status-success'
+    case 'ONBOARDING_APPROVED':   return 'text-accent-ink'
     case 'TICKET_CANCELLED':
     case 'TASK_OVERDUE':          return 'text-status-danger'
     case 'TASK_ASSIGNED':
     case 'PROJECT_MEMBER_ADDED':
-    case 'PROJECT_LEAD_ASSIGNED': return 'text-accent'
+    case 'PROJECT_LEAD_ASSIGNED': return 'text-accent-ink'
     default:                      return 'text-text-muted'
   }
 }

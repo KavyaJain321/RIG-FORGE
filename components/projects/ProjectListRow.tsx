@@ -11,7 +11,7 @@ import type { ProjectSummary } from '@/lib/types'
 
 function ProjectStatusBadge({ status }: { status: string }) {
   const classes: Record<string, string> = {
-    ACTIVE: 'border-status-success text-status-success',
+    ACTIVE: 'border-status-success text-accent-ink',
     ON_HOLD: 'border-status-warning text-status-warning',
     COMPLETED: 'border-border-default text-muted',
     ARCHIVED: 'border-border-default text-muted italic',
@@ -27,7 +27,7 @@ function ProjectStatusBadge({ status }: { status: string }) {
 function PriorityBadge({ priority }: { priority: string }) {
   const classes: Record<string, string> = {
     CRITICAL: 'border-status-danger text-status-danger',
-    HIGH: 'border-accent text-accent',
+    HIGH: 'border-accent text-accent-ink',
     MEDIUM: 'border-border-default text-secondary',
     LOW: 'border-border-default text-muted',
   }
@@ -210,8 +210,12 @@ export default function ProjectListRow({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open project: ${project.name}`}
       className={`relative flex items-center px-6 gap-6 min-h-[64px] bg-background-secondary border-b border-border-default hover:bg-background-tertiary cursor-pointer transition-all duration-300 ${isRemoving ? 'opacity-0' : 'opacity-100'}`}
       onClick={handleRowClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/dashboard/projects/${project.id}`) } }}
     >
       {/* Left status bar */}
       <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${barColor}`} />
@@ -352,7 +356,7 @@ export default function ProjectListRow({
               <button
                 onClick={(e) => void handleSave(e)}
                 disabled={saving}
-                className="font-mono text-sm text-accent hover:text-accent-hover disabled:opacity-50 transition-colors duration-150"
+                className="font-mono text-sm text-accent-ink hover:text-accent-ink disabled:opacity-50 transition-colors duration-150"
                 title="Save changes"
               >
                 {saving ? '…' : '✓'}
@@ -369,7 +373,7 @@ export default function ProjectListRow({
             <>
               <button
                 onClick={openEdit}
-                className="font-mono text-base text-muted hover:text-accent transition-colors duration-150"
+                className="font-mono text-base text-muted hover:text-accent-ink transition-colors duration-150"
                 title="Edit project"
               >
                 ✎

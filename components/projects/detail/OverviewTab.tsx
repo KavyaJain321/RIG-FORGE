@@ -40,9 +40,9 @@ function formatDate(d: Date | null): string {
 
 function statusClass(status: string): string {
   const map: Record<string, string> = {
-    ACTIVE: 'border-status-success text-status-success',
+    ACTIVE: 'border-status-success text-accent-ink',
     ON_HOLD: 'border-status-warning text-status-warning',
-    COMPLETED: 'border-accent text-accent',
+    COMPLETED: 'border-accent text-accent-ink',
     ARCHIVED: 'border-border-default text-muted',
     CANCELLED: 'border-status-danger text-status-danger',
   }
@@ -53,7 +53,7 @@ function priorityClass(priority: string): string {
   const map: Record<string, string> = {
     CRITICAL: 'border-status-danger text-status-danger',
     HIGH: 'border-status-warning text-status-warning',
-    MEDIUM: 'border-accent text-accent',
+    MEDIUM: 'border-accent text-accent-ink',
     LOW: 'border-border-default text-muted',
   }
   return map[priority] ?? 'border-border-default text-muted'
@@ -61,8 +61,8 @@ function priorityClass(priority: string): string {
 
 function avatarColor(name: string): string {
   const colors = [
-    'bg-accent/20 text-accent',
-    'bg-status-success/20 text-status-success',
+    'bg-accent/20 text-accent-ink',
+    'bg-status-success/20 text-accent-ink',
     'bg-status-warning/20 text-status-warning',
     'bg-status-danger/20 text-status-danger',
   ]
@@ -91,7 +91,7 @@ function BlockerStatusBadge({ status }: { status: string }) {
   const classes: Record<string, string> = {
     OPEN: 'border-status-danger text-status-danger',
     HELP_INCOMING: 'border-status-warning text-status-warning',
-    ESCALATED: 'border-accent text-accent',
+    ESCALATED: 'border-accent text-accent-ink',
   }
   const cls = classes[status] ?? 'border-border-default text-muted'
   return (
@@ -127,7 +127,7 @@ const markdownComponents: React.ComponentProps<typeof ReactMarkdown>['components
   ),
   li: ({ children }) => (
     <li className="flex gap-2 font-mono text-xs text-secondary leading-relaxed">
-      <span className="text-accent shrink-0 mt-0.5">—</span>
+      <span className="text-accent-ink shrink-0 mt-0.5">—</span>
       <span>{children}</span>
     </li>
   ),
@@ -186,7 +186,7 @@ function DescriptionSection({ projectId, description, isAdmin, canEdit, onSaved 
           <button
             type="button"
             onClick={() => { setDraft(description ?? ''); setEditing(true) }}
-            className="font-mono text-[10px] text-muted hover:text-accent tracking-widest transition-colors duration-150"
+            className="font-mono text-[10px] text-muted hover:text-accent-ink tracking-widest transition-colors duration-150"
             aria-label="Edit description"
           >
             ✎ EDIT
@@ -235,7 +235,7 @@ function DescriptionSection({ projectId, description, isAdmin, canEdit, onSaved 
                 <button
                   type="button"
                   onClick={() => { setDraft(''); setEditing(true) }}
-                  className="text-accent hover:text-accent-hover underline transition-colors duration-150"
+                  className="text-accent-ink hover:text-accent-ink underline transition-colors duration-150"
                 >
                   Click here to add one.
                 </button>
@@ -334,7 +334,7 @@ function LinksSection({ projectId, links, canEdit, onSaved }: LinksSectionProps)
           <button
             type="button"
             onClick={startEdit}
-            className="font-mono text-[10px] text-muted hover:text-accent tracking-widest transition-colors duration-150"
+            className="font-mono text-[10px] text-muted hover:text-accent-ink tracking-widest transition-colors duration-150"
           >
             ✎ EDIT
           </button>
@@ -376,7 +376,7 @@ function LinksSection({ projectId, links, canEdit, onSaved }: LinksSectionProps)
             <button
               type="button"
               onClick={addLink}
-              className="self-start font-mono text-[10px] text-accent tracking-widest hover:text-accent-hover transition-colors duration-150 mt-1"
+              className="self-start font-mono text-[10px] text-accent-ink tracking-widest hover:text-accent-ink transition-colors duration-150 mt-1"
             >
               + ADD LINK
             </button>
@@ -410,7 +410,7 @@ function LinksSection({ projectId, links, canEdit, onSaved }: LinksSectionProps)
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-sm text-accent hover:underline"
+                className="font-mono text-sm text-accent-ink hover:underline"
               >
                 {link.label || link.url}
               </a>
@@ -464,7 +464,7 @@ function TeamSection({ project }: { project: ProjectDetail }) {
                 {/* Badges */}
                 <div className="flex flex-wrap gap-1 justify-center">
                   {isProjectLead && (
-                    <span className="font-mono text-[9px] tracking-widest uppercase px-1.5 py-0.5 border border-accent text-accent">
+                    <span className="font-mono text-[9px] tracking-widest uppercase px-1.5 py-0.5 border border-accent text-accent-ink">
                       LEAD
                     </span>
                   )}
@@ -595,7 +595,7 @@ function DetailsPanel({ project, isAdmin, onProjectChange }: DetailsPanelProps) 
               <button
                 type="button"
                 onClick={() => setEditingStatus(true)}
-                className="font-mono text-[10px] text-muted hover:text-accent transition-colors duration-150"
+                className="font-mono text-[10px] text-muted hover:text-accent-ink transition-colors duration-150"
               >
                 ✎
               </button>
@@ -630,7 +630,7 @@ function DetailsPanel({ project, isAdmin, onProjectChange }: DetailsPanelProps) 
               <button
                 type="button"
                 onClick={() => setEditingPriority(true)}
-                className="font-mono text-[10px] text-muted hover:text-accent transition-colors duration-150"
+                className="font-mono text-[10px] text-muted hover:text-accent-ink transition-colors duration-150"
               >
                 ✎
               </button>
@@ -670,7 +670,7 @@ function DetailsPanel({ project, isAdmin, onProjectChange }: DetailsPanelProps) 
               <button
                 type="button"
                 onClick={() => setEditingDeadline(true)}
-                className="font-mono text-[10px] text-muted hover:text-accent transition-colors duration-150"
+                className="font-mono text-[10px] text-muted hover:text-accent-ink transition-colors duration-150"
               >
                 ✎
               </button>
@@ -713,7 +713,7 @@ function DetailsPanel({ project, isAdmin, onProjectChange }: DetailsPanelProps) 
               <button
                 type="button"
                 onClick={() => setEditingLead(true)}
-                className="font-mono text-[10px] text-muted hover:text-accent transition-colors duration-150"
+                className="font-mono text-[10px] text-muted hover:text-accent-ink transition-colors duration-150"
                 title="Change project lead"
               >
                 ✎

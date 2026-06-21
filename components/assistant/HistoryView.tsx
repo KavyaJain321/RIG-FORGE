@@ -43,7 +43,7 @@ export default function HistoryView() {
         <button
           type="button"
           onClick={handleNew}
-          className="font-mono text-[10px] tracking-widest text-[#1A1A1A] hover:text-accent transition-colors"
+          className="font-mono text-[10px] tracking-widest text-[#1A1A1A] hover:text-accent-ink transition-colors"
         >
           + NEW CHAT
         </button>

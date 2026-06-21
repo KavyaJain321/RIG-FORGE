@@ -11,7 +11,7 @@ interface AlertProps {
 
 const variantClass: Record<AlertVariant, string> = {
   error: 'border-status-danger/40 bg-status-danger/10 text-status-danger',
-  success: 'border-status-success/40 bg-status-success/10 text-status-success',
+  success: 'border-status-success/40 bg-status-success/10 text-accent-ink',
   info: 'border-border-strong bg-surface-raised text-text-secondary',
 }
 

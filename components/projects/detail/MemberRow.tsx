@@ -53,7 +53,7 @@ export default function MemberRow({
     >
       <div className="flex items-center gap-3">
         {/* Avatar */}
-        <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold text-accent shrink-0">
+        <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold text-accent-ink shrink-0">
           {getInitials(member.name)}
         </div>
         <div>
@@ -63,7 +63,7 @@ export default function MemberRow({
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">Lead</span>
             )}
             {isOwnRow && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-accent/20 text-accent">YOU</span>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-accent/20 text-accent-ink">YOU</span>
             )}
             <span className={`w-2 h-2 rounded-full shrink-0 ${member.currentStatus === 'WORKING' ? 'bg-emerald-500' : 'bg-gray-300'}`} />
           </div>

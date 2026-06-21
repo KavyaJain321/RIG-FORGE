@@ -159,7 +159,7 @@ export default function MessageRow({
                 <button
                   type="button"
                   onClick={() => setEditing(true)}
-                  className="font-mono text-xs text-muted hover:text-accent leading-none"
+                  className="font-mono text-xs text-muted hover:text-accent-ink leading-none"
                   aria-label="Edit message"
                 >
                   ✎
@@ -204,7 +204,7 @@ export default function MessageRow({
               <button
                 type="button"
                 onClick={() => void submitEdit()}
-                className="font-mono text-[10px] text-accent hover:underline"
+                className="font-mono text-[10px] text-accent-ink hover:underline"
               >
                 ✓ SAVE
               </button>
@@ -227,7 +227,7 @@ export default function MessageRow({
                 href={message.fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 mt-1 font-mono text-[10px] text-accent border border-accent/40 px-2 py-0.5 hover:bg-accent/10 transition-colors"
+                className="inline-flex items-center gap-1 mt-1 font-mono text-[10px] text-accent-ink border border-accent/40 px-2 py-0.5 hover:bg-accent/10 transition-colors"
               >
                 🔗 {message.fileName ?? message.fileUrl}
               </a>

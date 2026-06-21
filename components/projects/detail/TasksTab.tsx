@@ -79,8 +79,13 @@ function TaskRow({ task, currentUserId, canManage, onStatusChange, onEdit, onDel
   return (
     <>
       <tr
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={`Toggle task details: ${task.title}`}
         className="border-b border-border-default hover:bg-surface-raised/50 cursor-pointer transition-colors"
         onClick={() => setExpanded((v) => !v)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((v) => !v) } }}
       >
         <td className="py-3 px-4 max-w-xs">
           <span className="text-sm font-medium truncate block text-primary">{task.title}</span>

@@ -160,7 +160,7 @@ export default function AddMemberModal({
               )}
             </div>
             {selected.size > 0 && (
-              <p className="font-mono text-xs text-accent mt-3 shrink-0">
+              <p className="font-mono text-xs text-accent-ink mt-3 shrink-0">
                 {selected.size} MEMBER(S) SELECTED
               </p>
             )}

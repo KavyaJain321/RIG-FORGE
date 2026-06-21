@@ -206,7 +206,7 @@ export default function EditProjectModal({
               <button
                 type="button"
                 onClick={() => setDeadline('')}
-                className="mt-2 font-mono text-[10px] text-muted tracking-widest hover:text-accent transition-colors duration-150"
+                className="mt-2 font-mono text-[10px] text-muted tracking-widest hover:text-accent-ink transition-colors duration-150"
               >
                 CLEAR DEADLINE
               </button>

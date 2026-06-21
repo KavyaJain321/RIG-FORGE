@@ -121,7 +121,7 @@ export default function MessageInput({
               onClick={() => setVisibility('TEAM')}
               className={`font-mono text-[10px] tracking-widest px-2 py-1 border transition-colors ${
                 visibility === 'TEAM'
-                  ? 'border-accent text-accent bg-accent/10'
+                  ? 'border-accent text-accent-ink bg-accent/10'
                   : 'border-border-default text-muted hover:text-secondary'
               }`}
             >
@@ -190,7 +190,7 @@ export default function MessageInput({
               type="button"
               onClick={() => void handleSubmit()}
               disabled={isDisabled}
-              className="font-mono text-[10px] text-accent hover:underline disabled:opacity-50"
+              className="font-mono text-[10px] text-accent-ink hover:underline disabled:opacity-50"
             >
               ▸ SEND
             </button>

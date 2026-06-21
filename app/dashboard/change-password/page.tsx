@@ -60,7 +60,7 @@ export default function ChangePasswordPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="mb-8 text-center">
-          <p className="font-mono text-[10px] text-accent tracking-widest uppercase mb-2">
+          <p className="font-mono text-[10px] text-accent-ink tracking-widest uppercase mb-2">
             ⚠ ACTION REQUIRED
           </p>
           <h1 className="font-mono font-bold text-2xl text-primary tracking-tight">
@@ -76,7 +76,7 @@ export default function ChangePasswordPage() {
         <div className="bg-surface-raised border border-border-default p-8">
           {success ? (
             <div className="text-center py-4">
-              <p className="text-status-success font-mono text-sm mb-1">✓ Password changed successfully!</p>
+              <p className="text-accent-ink font-mono text-sm mb-1">✓ Password changed successfully!</p>
               <p className="font-mono text-xs text-muted">Redirecting to dashboard...</p>
             </div>
           ) : (
@@ -98,7 +98,7 @@ export default function ChangePasswordPage() {
                   <button
                     type="button"
                     onClick={() => setShowCurrent((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted hover:text-accent tracking-widest transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted hover:text-accent-ink tracking-widest transition-colors"
                   >
                     {showCurrent ? 'HIDE' : 'SHOW'}
                   </button>
@@ -123,7 +123,7 @@ export default function ChangePasswordPage() {
                   <button
                     type="button"
                     onClick={() => setShowNew((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted hover:text-accent tracking-widest transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted hover:text-accent-ink tracking-widest transition-colors"
                   >
                     {showNew ? 'HIDE' : 'SHOW'}
                   </button>

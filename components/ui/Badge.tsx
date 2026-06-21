@@ -5,7 +5,7 @@ interface BadgeProps {
 }
 
 function getRoleClasses(value: string | undefined): string {
-  if (value === 'ADMIN') return 'border-accent text-accent'
+  if (value === 'ADMIN') return 'border-accent text-accent-ink'
   return 'border-border-default text-muted'
 }
 
@@ -13,7 +13,7 @@ function getStatusClasses(value: string | undefined): string {
   switch (value) {
     case 'ACTIVE':
     case 'AVAILABLE':
-      return 'border-status-success text-status-success'
+      return 'border-status-success text-accent-ink'
     case 'FOCUS':
     case 'IN_MEETING':
       return 'border-status-warning text-status-warning'

@@ -176,7 +176,7 @@ export default function ProjectDetailPage() {
   return (
     <div className="min-h-full flex flex-col bg-background-primary">
       {toast && (
-        <div className="fixed top-4 right-4 z-50 border border-accent bg-background-secondary px-4 py-3 font-mono text-xs text-accent tracking-widest forge-glow">
+        <div className="fixed top-4 right-4 z-50 border border-accent bg-background-secondary px-4 py-3 font-mono text-xs text-accent-ink tracking-widest forge-glow">
           {toast}
         </div>
       )}

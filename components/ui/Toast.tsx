@@ -41,7 +41,7 @@ function ToastSingle({
     item.type === 'success' ? 'border-l-status-success' : 'border-l-status-danger'
   const prefix =
     item.type === 'success' ? (
-      <span className="text-status-success">[ ✓ ] </span>
+      <span className="text-accent-ink">[ ✓ ] </span>
     ) : (
       <span className="text-status-danger">[ ! ] </span>
     )

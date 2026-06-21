@@ -52,7 +52,7 @@ function linkify(text: string): React.ReactNode[] {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-accent underline underline-offset-2 hover:text-accent/80 break-all"
+        className="text-accent-ink underline underline-offset-2 hover:text-accent-ink/80 break-all"
       >
         {url}
       </a>,
@@ -82,7 +82,7 @@ function MessageBubble({ message, isOwn, isAuthorLead }: MessageBubbleProps) {
         {message.authorAvatar ? (
           <img src={message.authorAvatar} alt={message.authorName} className="w-8 h-8 rounded-full object-cover" />
         ) : (
-          <span className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold select-none">
+          <span className="w-8 h-8 rounded-full bg-accent/20 text-accent-ink flex items-center justify-center text-xs font-bold select-none">
             {initials}
           </span>
         )}
@@ -130,7 +130,7 @@ function MessageBubble({ message, isOwn, isAuthorLead }: MessageBubbleProps) {
             href={message.fileUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 mt-1 font-mono text-[10px] text-accent border border-accent/40 px-2 py-1 hover:bg-accent/10 transition-colors rounded"
+            className="inline-flex items-center gap-1.5 mt-1 font-mono text-[10px] text-accent-ink border border-accent/40 px-2 py-1 hover:bg-accent/10 transition-colors rounded"
           >
             🔗 {message.fileName ?? message.fileUrl}
           </a>
@@ -296,7 +296,7 @@ export default function UpdatesTab({ projectId, currentUser, isLead, isAdmin = f
             disabled={sending}
             className={`font-mono text-[10px] tracking-widest px-2 py-1 border transition-colors ${
               visibility === 'TEAM'
-                ? 'border-accent text-accent bg-accent/10'
+                ? 'border-accent text-accent-ink bg-accent/10'
                 : 'border-border-default text-muted hover:text-secondary'
             }`}
           >
