@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 import Avatar from '@/components/ui/Avatar'
 import type { ConversationSummary, ChatMessageDTO } from '@/lib/chat/types'
+import MessageInfoModal from './MessageInfoModal'
 
 function timeLabel(iso: string): string {
   try {
@@ -27,6 +28,7 @@ export default function MessageThread({
   onSend: (text: string) => void
 }) {
   const [draft, setDraft] = useState('')
+  const [infoMsg, setInfoMsg] = useState<ChatMessageDTO | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -105,7 +107,10 @@ export default function MessageThread({
             const isForgie = m.kind === 'FORGIE'
             return (
               <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[70%] rounded-2xl px-3 py-2 ${
+                <div
+                  onContextMenu={mine ? (e) => { e.preventDefault(); setInfoMsg(m) } : undefined}
+                  title={mine ? 'Right-click for message info (who’s seen it)' : undefined}
+                  className={`max-w-[70%] rounded-2xl px-3 py-2 ${mine ? 'cursor-context-menu ' : ''}${
                   mine
                     ? 'bg-[#3F7A0A] text-white rounded-br-sm'
                     : isForgie
@@ -146,6 +151,15 @@ export default function MessageThread({
           SEND
         </button>
       </form>
+
+      {infoMsg && (
+        <MessageInfoModal
+          message={infoMsg}
+          conversation={conversation}
+          meId={meId}
+          onClose={() => setInfoMsg(null)}
+        />
+      )}
     </section>
   )
 }
