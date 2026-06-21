@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 import Avatar from '@/components/ui/Avatar'
+import NotificationToggle from './NotificationToggle'
 import type { ConversationSummary } from '@/lib/chat/types'
 
 function preview(c: ConversationSummary): string {
@@ -135,6 +136,7 @@ export default function ConversationList({
       <div className="h-14 px-4 flex items-center justify-between border-b border-border-default">
         <span className="font-mono text-xs uppercase tracking-widest text-text-secondary">Messages</span>
         <div className="flex items-center gap-2">
+          <NotificationToggle />
           <button type="button" onClick={onOpenStarred} title="Starred messages" className="text-text-secondary hover:text-text-primary">
             ⭐
           </button>

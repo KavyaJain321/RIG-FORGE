@@ -121,6 +121,7 @@ model User {
   chatStars            MessageStar[]
   blocksMade           Block[]              @relation("Blocker")
   blocksReceived       Block[]              @relation("Blocked")
+  pushSubscriptions    PushSubscription[]   @relation("PushSubs")
 }
 
 model Project {
@@ -656,4 +657,18 @@ model Block {
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
+}
+
+// A browser Web Push subscription (one per device/browser per user).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation("PushSubs", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

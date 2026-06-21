@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/db'
+import { sendPushToUsers } from '@/lib/push/send'
 import { mentionsForgie, replyAsForgieInChat } from './forgie'
 
 const ORG = 'rig360'
@@ -245,6 +246,29 @@ async function enrichLinkPreview(messageId: string, content: string) {
   await prisma.chatMessage.update({ where: { id: messageId }, data: { linkPreview: preview } }).catch(() => {})
 }
 
+// Fire-and-forget Web Push to the other, non-muted members of a conversation.
+async function notifyNewMessage(conversationId: string, senderId: string, preview: string) {
+  try {
+    const [convo, sender, members] = await Promise.all([
+      prisma.conversation.findUnique({ where: { id: conversationId }, select: { type: true, title: true } }),
+      prisma.user.findUnique({ where: { id: senderId }, select: { name: true } }),
+      prisma.conversationMember.findMany({
+        where: { conversationId, userId: { not: senderId } },
+        select: { userId: true, muteUntil: true },
+      }),
+    ])
+    const now = new Date()
+    const targets = members.filter((m) => !m.muteUntil || m.muteUntil <= now).map((m) => m.userId)
+    if (targets.length === 0) return
+    const senderName = sender?.name ?? 'Someone'
+    const title = convo?.type === 'GROUP' ? convo.title ?? 'Group chat' : senderName
+    const body = convo?.type === 'GROUP' ? `${senderName}: ${preview}` : preview
+    await sendPushToUsers(targets, { title, body: body.slice(0, 140), url: '/dashboard/messages', tag: conversationId })
+  } catch (err) {
+    console.error('[chat] push notify failed', err)
+  }
+}
+
 export async function sendMessage(
   conversationId: string,
   userId: string,
@@ -298,6 +322,7 @@ export async function sendMessage(
   void enrichLinkPreview(message.id, text)
   // If the message addresses @Forgie, generate + post a reply (fire-and-forget).
   if (mentionsForgie(text)) void replyAsForgieInChat(conversationId, userId)
+  void notifyNewMessage(conversationId, userId, text)
   return message
 }
 
@@ -472,6 +497,8 @@ export async function sendMediaMessage(
       data: { lastReadAt: new Date() },
     }),
   ])
+  const label = mediaType === 'IMAGE' ? '📷 Photo' : mediaType === 'AUDIO' ? '🎤 Voice message' : `📎 ${fileName ?? 'File'}`
+  void notifyNewMessage(conversationId, userId, label)
   return message
 }
 
@@ -764,6 +791,7 @@ export async function createPoll(
       data: { lastReadAt: new Date() },
     }),
   ])
+  void notifyNewMessage(conversationId, userId, `📊 Poll: ${q}`)
   return message
 }
 
