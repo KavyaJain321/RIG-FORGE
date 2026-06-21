@@ -24,8 +24,8 @@ const config: Config = {
         },
         text: {
           primary: '#1A1A1A',
-          secondary: '#666666',
-          muted: '#AAAAAA',
+          secondary: '#555555',
+          muted: '#646464',
         },
         border: {
           default: 'rgba(0,0,0,0.08)',
@@ -40,13 +40,13 @@ const config: Config = {
           'spark-muted': '#E55A38',
         },
         primary: '#1A1A1A',
-        secondary: '#666666',
-        muted: '#AAAAAA',
+        secondary: '#555555',
+        muted: '#646464',
         status: {
           success: '#85D933',
           warning: '#FF8A00',
           danger: '#FF4D4D',
-          offline: '#CCCCCC',
+          offline: '#9A9A9A',
         },
         focus: {
           ring: '#85D933',

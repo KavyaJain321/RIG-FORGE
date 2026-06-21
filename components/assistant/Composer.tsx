@@ -208,7 +208,7 @@ export default function Composer({
                 </span>
                 <span className="min-w-0">
                   <span className="block text-sm text-[#1A1A1A] truncate">{opt.display}</span>
-                  <span className="block text-[11px] text-[#999] truncate">{opt.subtitle}</span>
+                  <span className="block text-[11px] text-[#646464] truncate">{opt.subtitle}</span>
                 </span>
               </button>
             ))}
@@ -230,7 +230,7 @@ export default function Composer({
             placeholder={placeholder}
             rows={1}
             maxLength={4000}
-            className="flex-1 resize-none bg-transparent text-sm text-[#1A1A1A] placeholder:text-[#AAAAAA] focus:outline-none leading-relaxed"
+            className="flex-1 resize-none bg-transparent text-sm text-[#1A1A1A] placeholder:text-[#646464] focus:outline-none leading-relaxed"
             style={{ maxHeight: '160px' }}
           />
           <button
@@ -240,7 +240,7 @@ export default function Composer({
             className={[
               'shrink-0 flex items-center justify-center w-9 h-9 rounded-full transition-all duration-150',
               disabled || !value.trim()
-                ? 'bg-black/6 text-[#AAAAAA] cursor-not-allowed'
+                ? 'bg-black/6 text-[#646464] cursor-not-allowed'
                 : 'bg-[#1A1A1A] text-white hover:bg-[#2A2A2A] active:scale-95',
             ].join(' ')}
             aria-label="Send message"
@@ -249,8 +249,8 @@ export default function Composer({
           </button>
         </div>
       </div>
-      <p className="font-mono text-[10px] text-[#999999] mt-1.5 px-1 tracking-wide">
-        Enter to send · Shift+Enter for new line · Type <span className="text-[#666]">@</span> to mention · {value.length}/4000
+      <p className="font-mono text-[10px] text-[#646464] mt-1.5 px-1 tracking-wide">
+        Enter to send · Shift+Enter for new line · Type <span className="text-[#555555]">@</span> to mention · {value.length}/4000
       </p>
     </div>
   )

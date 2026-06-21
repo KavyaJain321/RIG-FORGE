@@ -160,7 +160,7 @@ export default function ForgieChat({ showClose = false, onClose }: ForgieChatPro
           </div>
           <div className="flex flex-col">
             <span className="font-mono text-xs tracking-widest text-[#1A1A1A]">FORGIE</span>
-            <span className="font-mono text-[10px] text-[#999999]">
+            <span className="font-mono text-[10px] text-[#646464]">
               {isSending ? 'thinking...' : 'AI assistant'}
             </span>
           </div>
@@ -172,7 +172,7 @@ export default function ForgieChat({ showClose = false, onClose }: ForgieChatPro
             title={view === 'history' ? 'Back to chat' : 'Conversation history'}
             className={[
               'p-1.5 rounded-full transition-colors',
-              view === 'history' ? 'bg-black/10 text-[#1A1A1A]' : 'hover:bg-black/5 text-[#666]',
+              view === 'history' ? 'bg-black/10 text-[#1A1A1A]' : 'hover:bg-black/5 text-[#555555]',
             ].join(' ')}
             aria-label="Conversation history"
           >
@@ -182,7 +182,7 @@ export default function ForgieChat({ showClose = false, onClose }: ForgieChatPro
             type="button"
             onClick={reset}
             title="New conversation"
-            className="p-1.5 rounded-full hover:bg-black/5 transition-colors text-[#666]"
+            className="p-1.5 rounded-full hover:bg-black/5 transition-colors text-[#555555]"
             aria-label="Start new conversation"
           >
             <NewChatIcon />
@@ -192,7 +192,7 @@ export default function ForgieChat({ showClose = false, onClose }: ForgieChatPro
               type="button"
               onClick={onClose}
               title="Close"
-              className="p-1.5 rounded-full hover:bg-black/5 transition-colors text-[#666]"
+              className="p-1.5 rounded-full hover:bg-black/5 transition-colors text-[#555555]"
               aria-label="Close Forgie"
             >
               <CloseIcon />
@@ -259,7 +259,7 @@ function EmptyState({ firstName }: { firstName: string }) {
         summarize status and call out the team&apos;s slow movers. Diplomatically.
       </p>
       <div className="flex flex-col gap-1.5 w-full pt-1">
-        <p className="font-mono text-[10px] text-[#999999] tracking-widest">TRY:</p>
+        <p className="font-mono text-[10px] text-[#646464] tracking-widest">TRY:</p>
         {examples.map((ex) => (
           <ExampleChip key={ex} text={ex} />
         ))}
@@ -293,9 +293,9 @@ function ExampleChip({ text }: { text: string }) {
 function TypingIndicator() {
   return (
     <div className="flex items-center gap-1.5 px-4 py-2">
-      <span className="w-2 h-2 rounded-full bg-[#999999] animate-bounce" style={{ animationDelay: '0ms' }} />
-      <span className="w-2 h-2 rounded-full bg-[#999999] animate-bounce" style={{ animationDelay: '150ms' }} />
-      <span className="w-2 h-2 rounded-full bg-[#999999] animate-bounce" style={{ animationDelay: '300ms' }} />
+      <span className="w-2 h-2 rounded-full bg-[#646464] animate-bounce" style={{ animationDelay: '0ms' }} />
+      <span className="w-2 h-2 rounded-full bg-[#646464] animate-bounce" style={{ animationDelay: '150ms' }} />
+      <span className="w-2 h-2 rounded-full bg-[#646464] animate-bounce" style={{ animationDelay: '300ms' }} />
     </div>
   )
 }

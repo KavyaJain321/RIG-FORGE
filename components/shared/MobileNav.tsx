@@ -31,11 +31,11 @@ export default function MobileNav() {
             className={[
               'flex-1 flex flex-col items-center justify-center gap-0.5',
               'transition-colors',
-              active ? 'text-[#85D933]' : 'text-[#AAAAAA] hover:text-[#1A1A1A]',
+              active ? 'text-[#3F7A0A]' : 'text-[#555555] hover:text-[#1A1A1A]',
             ].join(' ')}
           >
             <span className="text-sm leading-none">{symbol}</span>
-            <span className="font-mono text-[9px] uppercase tracking-widest leading-none">
+            <span className="font-mono text-[11px] uppercase tracking-wide leading-none">
               {label}
             </span>
           </Link>

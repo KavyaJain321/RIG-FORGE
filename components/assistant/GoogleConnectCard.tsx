@@ -93,7 +93,7 @@ function GoogleConnectCardInner() {
             <h3 className="text-sm font-mono uppercase tracking-widest text-[#1A1A1A]">
               Google Calendar
             </h3>
-            <p className="text-xs text-[#999] mt-1">
+            <p className="text-xs text-[#646464] mt-1">
               Not yet enabled on this server. An admin needs to configure the
               integration before users can connect.
             </p>
@@ -154,10 +154,10 @@ function GoogleConnectCardInner() {
             </>
           ) : (
             <>
-              <p className="text-sm text-[#666] mt-2">
+              <p className="text-sm text-[#555555] mt-2">
                 Let Forgie use your Calendar, Gmail, and Drive on your behalf.
               </p>
-              <p className="text-xs text-[#999] mt-1">
+              <p className="text-xs text-[#646464] mt-1">
                 Forgie can schedule meetings, send emails, and create folders/docs.
                 Read access is limited to what you authorize. Disconnect any time.
               </p>
@@ -187,7 +187,7 @@ function GoogleConnectCardInner() {
             className={[
               'h-9 px-4 text-sm font-medium rounded-lg transition-colors disabled:opacity-50',
               status.connected
-                ? 'bg-white border border-black/10 text-[#666] hover:text-[#1A1A1A]'
+                ? 'bg-white border border-black/10 text-[#555555] hover:text-[#1A1A1A]'
                 : 'bg-[#1A1A1A] text-white hover:bg-[#333]',
             ].join(' ')}
           >
@@ -206,7 +206,7 @@ function FeatureBadge({ label, enabled }: { label: string; enabled: boolean }) {
         'flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-medium',
         enabled
           ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-          : 'bg-[#F2F2EE] border-black/5 text-[#999]',
+          : 'bg-[#F2F2EE] border-black/5 text-[#646464]',
       ].join(' ')}
     >
       <span aria-hidden="true">{enabled ? '✓' : '○'}</span>

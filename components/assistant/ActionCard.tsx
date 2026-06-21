@@ -80,8 +80,8 @@ export default function ActionCard({
     return (
       <Wrapper tone="muted">
         <Row>
-          <span className="font-mono text-[10px] tracking-widest text-[#999]">CANCELLED</span>
-          <span className="text-sm text-[#888]">{action.label}</span>
+          <span className="font-mono text-[10px] tracking-widest text-[#646464]">CANCELLED</span>
+          <span className="text-sm text-[#5C5C5C]">{action.label}</span>
         </Row>
       </Wrapper>
     )
@@ -126,7 +126,7 @@ export default function ActionCard({
             type="button"
             onClick={cancel}
             disabled={busy}
-            className="flex-1 h-9 px-3 bg-white border border-black/10 text-xs text-[#666] hover:text-[#1A1A1A] rounded-lg transition-colors disabled:opacity-60"
+            className="flex-1 h-9 px-3 bg-white border border-black/10 text-xs text-[#555555] hover:text-[#1A1A1A] rounded-lg transition-colors disabled:opacity-60"
           >
             Cancel
           </button>

@@ -28,9 +28,9 @@ export default function ProjectFilters({
   onCreateClick,
 }: ProjectFiltersProps) {
   return (
-    <div className="flex items-center gap-4 px-6 py-4 bg-surface-raised border-b border-border-default">
+    <div className="flex flex-wrap items-center gap-4 px-6 py-4 bg-surface-raised border-b border-border-default">
       {/* Search */}
-      <div className="relative w-[280px] shrink-0">
+      <div className="relative flex-1 min-w-[220px]">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-muted text-sm select-none pointer-events-none">
           ⌕
         </span>

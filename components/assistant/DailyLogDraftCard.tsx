@@ -67,9 +67,9 @@ export default function DailyLogDraftCard() {
           <h3 className="text-sm font-mono uppercase tracking-widest text-[#1A1A1A]">
             Daily log drafted by Forgie
           </h3>
-          <p className="text-xs text-[#999] mt-0.5">Based on what you did today. Tap to approve or edit.</p>
+          <p className="text-xs text-[#646464] mt-0.5">Based on what you did today. Tap to approve or edit.</p>
         </div>
-        <span className="font-mono text-[10px] tracking-widest text-[#999]">DRAFT</span>
+        <span className="font-mono text-[10px] tracking-widest text-[#646464]">DRAFT</span>
       </div>
 
       {editing ? (
@@ -103,7 +103,7 @@ export default function DailyLogDraftCard() {
           type="button"
           onClick={() => setEditing((e) => !e)}
           disabled={submitting}
-          className="px-4 h-9 bg-white border border-black/10 text-sm text-[#666] hover:text-[#1A1A1A] rounded-lg transition-colors disabled:opacity-50"
+          className="px-4 h-9 bg-white border border-black/10 text-sm text-[#555555] hover:text-[#1A1A1A] rounded-lg transition-colors disabled:opacity-50"
         >
           {editing ? 'Cancel edit' : 'Edit'}
         </button>
@@ -111,7 +111,7 @@ export default function DailyLogDraftCard() {
           type="button"
           onClick={() => void send('dismiss')}
           disabled={submitting}
-          className="px-4 h-9 text-sm text-[#999] hover:text-[#666] transition-colors disabled:opacity-50"
+          className="px-4 h-9 text-sm text-[#646464] hover:text-[#555555] transition-colors disabled:opacity-50"
         >
           Dismiss
         </button>

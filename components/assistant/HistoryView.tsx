@@ -37,7 +37,7 @@ export default function HistoryView() {
   return (
     <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
       <div className="flex items-center justify-between px-1 pb-2">
-        <span className="font-mono text-[10px] tracking-widest text-[#999]">
+        <span className="font-mono text-[10px] tracking-widest text-[#646464]">
           PAST CONVERSATIONS
         </span>
         <button
@@ -50,14 +50,14 @@ export default function HistoryView() {
       </div>
 
       {conversationsLoading && conversations.length === 0 && (
-        <div className="text-center py-8 font-mono text-xs text-[#999] tracking-wide">
+        <div className="text-center py-8 font-mono text-xs text-[#646464] tracking-wide">
           Loading...
         </div>
       )}
 
       {conversationsLoaded && conversations.length === 0 && (
         <div className="text-center py-8">
-          <p className="text-sm text-[#666] mb-3">No past conversations yet.</p>
+          <p className="text-sm text-[#555555] mb-3">No past conversations yet.</p>
           <button
             type="button"
             onClick={handleNew}
@@ -87,14 +87,14 @@ export default function HistoryView() {
                 {c.title ?? 'Untitled conversation'}
               </span>
               {c.isPinned && (
-                <span className={`shrink-0 text-[10px] ${isActive ? 'text-white/70' : 'text-[#999]'}`}>
+                <span className={`shrink-0 text-[10px] ${isActive ? 'text-white/70' : 'text-[#646464]'}`}>
                   ★
                 </span>
               )}
             </div>
             <p
               className={`text-[10px] font-mono mt-1 tracking-wide ${
-                isActive ? 'text-white/60' : 'text-[#999]'
+                isActive ? 'text-white/60' : 'text-[#646464]'
               }`}
             >
               {c.messageCount} message{c.messageCount === 1 ? '' : 's'} ·{' '}

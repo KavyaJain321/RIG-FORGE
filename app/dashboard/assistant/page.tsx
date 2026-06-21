@@ -83,14 +83,14 @@ export default function AssistantAdminPage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-[#1A1A1A]">Forgie — Usage Dashboard</h1>
-        <p className="text-sm text-[#666] mt-1">
+        <p className="text-sm text-[#555555] mt-1">
           Monitor AI assistant adoption, provider distribution, and recent
           actions executed on the team's behalf.
         </p>
       </div>
 
       {/* Totals */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <StatCard label="Total Conversations" value={stats.totals.conversations} />
         <StatCard label="Total Messages" value={stats.totals.messages} />
         <StatCard label="AI-Executed Actions" value={stats.totals.auditEntries} />
@@ -103,7 +103,7 @@ export default function AssistantAdminPage() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs font-mono uppercase tracking-widest text-[#999]">
+              <tr className="text-left text-xs font-mono uppercase tracking-widest text-[#646464]">
                 <th className="px-3 py-2">Provider</th>
                 <th className="px-3 py-2 text-right">Messages</th>
                 <th className="px-3 py-2 text-right">Input tokens</th>
@@ -115,10 +115,10 @@ export default function AssistantAdminPage() {
                 <tr key={p.provider}>
                   <td className="px-3 py-2 font-medium">{p.provider}</td>
                   <td className="px-3 py-2 text-right">{p.messageCount.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-[#666]">
+                  <td className="px-3 py-2 text-right text-[#555555]">
                     {p.inputTokens.toLocaleString()}
                   </td>
-                  <td className="px-3 py-2 text-right text-[#666]">
+                  <td className="px-3 py-2 text-right text-[#555555]">
                     {p.outputTokens.toLocaleString()}
                   </td>
                 </tr>
@@ -135,7 +135,7 @@ export default function AssistantAdminPage() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs font-mono uppercase tracking-widest text-[#999]">
+              <tr className="text-left text-xs font-mono uppercase tracking-widest text-[#646464]">
                 <th className="px-3 py-2">User</th>
                 <th className="px-3 py-2">Role</th>
                 <th className="px-3 py-2 text-right">Messages</th>
@@ -146,11 +146,11 @@ export default function AssistantAdminPage() {
               {stats.topUsers.map((u) => (
                 <tr key={u.userId}>
                   <td className="px-3 py-2 font-medium">{u.name}</td>
-                  <td className="px-3 py-2 text-xs uppercase tracking-wide text-[#666]">
+                  <td className="px-3 py-2 text-xs uppercase tracking-wide text-[#555555]">
                     {u.role.replace('_', ' ')}
                   </td>
                   <td className="px-3 py-2 text-right">{u.messageCount.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-[#666]">
+                  <td className="px-3 py-2 text-right text-[#555555]">
                     {(u.inputTokens + u.outputTokens).toLocaleString()}
                   </td>
                 </tr>
@@ -177,13 +177,13 @@ export default function AssistantAdminPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">
                     <span className="font-medium">{a.userName}</span>
-                    <span className="text-[#666]"> · {humanAction(a.action)}</span>
+                    <span className="text-[#555555]"> · {humanAction(a.action)}</span>
                   </p>
                   {a.error && (
                     <p className="text-xs text-red-600 mt-0.5 line-clamp-2">{a.error}</p>
                   )}
                 </div>
-                <span className="shrink-0 text-xs text-[#999] font-mono">
+                <span className="shrink-0 text-xs text-[#646464] font-mono">
                   {formatTime(a.createdAt)}
                 </span>
               </div>
@@ -200,7 +200,7 @@ export default function AssistantAdminPage() {
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="bg-white border border-black/10 rounded-lg p-4">
-      <p className="text-xs text-[#999] uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-xs text-[#646464] uppercase tracking-wide mb-1">{label}</p>
       <p className="text-2xl font-bold text-[#1A1A1A]">{value.toLocaleString()}</p>
     </div>
   )
@@ -209,16 +209,16 @@ function StatCard({ label, value }: { label: string; value: number }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-8">
-      <h2 className="text-sm font-mono uppercase tracking-widest text-[#666] mb-3 px-3">
+      <h2 className="text-sm font-mono uppercase tracking-widest text-[#555555] mb-3 px-3">
         {title}
       </h2>
-      <div className="bg-white border border-black/10 rounded-lg overflow-hidden">{children}</div>
+      <div className="bg-white border border-black/10 rounded-lg overflow-x-auto">{children}</div>
     </section>
   )
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="px-3 py-4 text-sm text-[#999]">{children}</p>
+  return <p className="px-3 py-4 text-sm text-[#646464]">{children}</p>
 }
 
 function humanAction(action: string): string {

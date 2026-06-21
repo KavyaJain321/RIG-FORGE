@@ -137,10 +137,10 @@ export default function NotificationItem({
         <p className={['font-mono text-xs text-text-primary truncate leading-snug', read ? 'font-normal' : 'font-bold'].join(' ')}>
           {title}
         </p>
-        <p className="font-mono text-[10px] text-text-secondary leading-relaxed line-clamp-2 mt-0.5">
+        <p className="font-mono text-xs text-text-secondary leading-relaxed line-clamp-2 mt-0.5">
           {body}
         </p>
-        <p className="font-mono text-[10px] text-text-muted mt-1">{formatRelativeTime(createdAt)}</p>
+        <p className="font-mono text-[11px] text-text-muted mt-1">{formatRelativeTime(createdAt)}</p>
       </div>
 
       {/* Right side: arrow OR delete button */}
@@ -152,7 +152,7 @@ export default function NotificationItem({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onDelete(id) }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:text-status-danger text-text-muted"
+            className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-2 rounded hover:text-status-danger text-text-muted"
             title="Delete notification"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

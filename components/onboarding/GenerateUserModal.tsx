@@ -97,14 +97,14 @@ export default function GenerateUserModal({ onClose, onGenerated, isSuperAdmin =
         ) : (
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-green-400 text-lg">✓</span>
+              <span className="text-[#3F7A0A] text-lg">✓</span>
               <span className="font-mono text-sm text-text-primary">User Created Successfully!</span>
             </div>
             <div className="border-t border-border-default pt-4">
               <p className="font-mono text-xs text-text-muted mb-3">Share these credentials with the user:</p>
               <div className="bg-background-tertiary border border-border-default rounded-card p-3 font-mono text-xs space-y-1">
                 <p><span className="text-text-muted">Email:</span> <span className="text-text-primary">{result.email}</span></p>
-                <p><span className="text-text-muted">Password:</span> <span className="text-accent font-bold">{result.temporaryPassword}</span></p>
+                <p><span className="text-text-muted">Password:</span> <span className="text-text-primary font-bold">{result.temporaryPassword}</span></p>
               </div>
               <button type="button" onClick={() => void handleCopy()} className="w-full h-9 mt-3 bg-background-tertiary border border-border-default rounded-card font-mono text-xs text-text-secondary hover:text-text-primary transition-colors">
                 {copied ? '✓ Copied!' : '📋 Copy All'}

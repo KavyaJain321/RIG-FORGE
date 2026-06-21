@@ -184,7 +184,7 @@ export default function LandingPage() {
         {/* Eyebrow */}
         <p
           className="font-inter text-xs uppercase tracking-[0.2em] mb-5 animate-fade-rise"
-          style={{ color: '#999999' }}
+          style={{ color: '#646464' }}
         >
           Team Operations Platform
         </p>
@@ -249,7 +249,7 @@ export default function LandingPage() {
               </span>
               <span
                 className="font-inter text-[10px] leading-snug"
-                style={{ color: '#888888' }}
+                style={{ color: '#5C5C5C' }}
               >
                 {desc}
               </span>
