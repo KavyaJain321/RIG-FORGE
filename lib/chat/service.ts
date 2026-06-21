@@ -432,3 +432,23 @@ export async function setReaction(messageId: string, userId: string, emoji: stri
   }
   await prisma.messageReaction.create({ data: { messageId, userId, emoji } })
 }
+
+// ─── Search ──────────────────────────────────────────────────────────────────
+
+export async function searchMessages(conversationId: string, userId: string, q: string) {
+  await assertMember(conversationId, userId)
+  const query = q.trim()
+  if (!query) return []
+  return prisma.chatMessage.findMany({
+    where: {
+      conversationId,
+      deletedAt: null,
+      kind: 'USER',
+      type: 'TEXT',
+      content: { contains: query, mode: 'insensitive' },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 30,
+    include: { sender: { select: memberUserSelect } },
+  })
+}

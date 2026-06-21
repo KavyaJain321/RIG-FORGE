@@ -99,6 +99,7 @@ export default function MessageThread({
   onEdit,
   onDelete,
   onReact,
+  onForward,
   users,
   onlineIds,
   onChanged,
@@ -114,6 +115,7 @@ export default function MessageThread({
   onEdit: (messageId: string, text: string) => void
   onDelete: (messageId: string) => void
   onReact: (messageId: string, emoji: string) => void
+  onForward: (msg: ChatMessageDTO) => void
   users: ChatUserLite[]
   onlineIds: Set<string>
   onChanged: () => void
@@ -128,6 +130,9 @@ export default function MessageThread({
   const [replyingTo, setReplyingTo] = useState<ChatMessageDTO | null>(null)
   const [editing, setEditing] = useState<ChatMessageDTO | null>(null)
   const [ctxMenu, setCtxMenu] = useState<CtxMenu>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<ChatMessageDTO[]>([])
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -136,6 +141,7 @@ export default function MessageThread({
   const typingChannelRef = useRef<RealtimeChannel | null>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTypingSentRef = useRef(0)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const convoId = conversation?.id
 
@@ -172,6 +178,21 @@ export default function MessageThread({
       typingChannelRef.current = null
     }
   }, [convoId, meId])
+
+  // In-chat full-text search (server-side, debounced).
+  useEffect(() => {
+    if (!searchOpen || !convoId) { setSearchResults([]); return }
+    const q = searchQuery.trim()
+    if (!q) { setSearchResults([]); return }
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => {
+      void fetch(`/api/chat/conversations/${convoId}/search?q=${encodeURIComponent(q)}`, { credentials: 'include' })
+        .then((r) => r.json())
+        .then((json: { data?: { messages?: ChatMessageDTO[] } }) => setSearchResults(json.data?.messages ?? []))
+        .catch(() => setSearchResults([]))
+    }, 300)
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+  }, [searchQuery, searchOpen, convoId])
 
   function broadcastTyping() {
     const now = Date.now()
@@ -238,6 +259,14 @@ export default function MessageThread({
     return m?.name ?? 'Someone'
   }
 
+  function scrollToMessage(id: string) {
+    const el = document.getElementById(`m-${id}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('ring-2', 'ring-[#3F7A0A]')
+    setTimeout(() => el.classList.remove('ring-2', 'ring-[#3F7A0A]'), 1500)
+  }
+
   // 3-state receipt for MY messages: ✓ sent · ✓✓ grey delivered · ✓✓ blue read.
   function receiptFor(msg: ChatMessageDTO) {
     if (!conversation || msg.senderId !== meId) return null
@@ -291,7 +320,45 @@ export default function MessageThread({
             <p className="text-[11px] text-[#3F7A0A]">online</p>
           ) : null}
         </div>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setSearchOpen((o) => !o); setSearchQuery('') }}
+          className="ml-auto text-text-secondary hover:text-text-primary"
+          title="Search in chat"
+        >
+          🔍
+        </button>
       </div>
+
+      {searchOpen && (
+        <div className="shrink-0 border-b border-border-default bg-surface-raised p-2">
+          <input
+            autoFocus
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search in this chat…"
+            className="w-full h-9 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-[#3F7A0A]"
+          />
+          {searchResults.length > 0 && (
+            <div className="mt-2 max-h-60 overflow-y-auto">
+              {searchResults.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => { scrollToMessage(r.id); setSearchOpen(false) }}
+                  className="w-full text-left px-2 py-1.5 rounded hover:bg-black/[0.04]"
+                >
+                  <p className="text-[11px] text-text-secondary">{r.senderId === meId ? 'You' : nameFor(r.senderId)} · {timeLabel(r.createdAt)}</p>
+                  <p className="text-sm text-text-primary truncate">{r.content}</p>
+                </button>
+              ))}
+            </div>
+          )}
+          {searchQuery.trim() && searchResults.length === 0 && (
+            <p className="mt-2 text-xs text-text-secondary px-2">No matches</p>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-2">
@@ -336,7 +403,7 @@ export default function MessageThread({
             return (
               <Fragment key={m.id}>
                 {dateSep}
-                <div className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+                <div id={`m-${m.id}`} className={`flex flex-col rounded-lg transition-shadow ${mine ? 'items-end' : 'items-start'}`}>
                   <div
                     onContextMenu={m.deletedAt ? undefined : (e) => { e.preventDefault(); setCtxMenu({ msg: m, x: e.clientX, y: e.clientY }) }}
                     className={`max-w-[78%] sm:max-w-[70%] rounded-2xl px-3 py-2 ${m.deletedAt ? '' : 'cursor-context-menu'} ${
@@ -487,6 +554,9 @@ export default function MessageThread({
               </div>
             )}
             <button type="button" onClick={() => { setReplyingTo(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">↩ Reply</button>
+            {!ctxMenu.msg.deletedAt && ctxMenu.msg.type !== 'IMAGE' && (
+              <button type="button" onClick={() => { onForward(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">↪ Forward</button>
+            )}
             {ctxMenu.msg.type !== 'IMAGE' && !ctxMenu.msg.deletedAt && (
               <button type="button" onClick={() => { void navigator.clipboard?.writeText(ctxMenu.msg.content); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">⧉ Copy</button>
             )}

@@ -12,6 +12,7 @@ import type {
 import ConversationList from './ConversationList'
 import MessageThread from './MessageThread'
 import NewChatModal from './NewChatModal'
+import ForwardModal from './ForwardModal'
 
 // Thin fetch wrapper for our { data, error } envelope.
 async function api<T = unknown>(path: string, opts?: RequestInit): Promise<T> {
@@ -48,6 +49,7 @@ export default function ChatApp() {
   const [loadingConvos, setLoadingConvos] = useState(true)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [newChatOpen, setNewChatOpen] = useState(false)
+  const [forwardingMsg, setForwardingMsg] = useState<ChatMessageDTO | null>(null)
 
   const activeIdRef = useRef<string | null>(null)
   activeIdRef.current = activeId
@@ -287,6 +289,24 @@ export default function ChatApp() {
     [me, reloadActiveMessages],
   )
 
+  const handleForward = useCallback(
+    async (content: string, targetIds: string[]) => {
+      for (const targetId of targetIds) {
+        try {
+          await api(`/api/chat/conversations/${targetId}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content }),
+          })
+        } catch (err) {
+          console.error('[chat] forward', err)
+        }
+      }
+      void refreshConversations()
+    },
+    [refreshConversations],
+  )
+
   const openConversation = useCallback(
     async (payload: object) => {
       const data = await api<{ conversation: { id: string } }>('/api/chat/conversations', {
@@ -335,6 +355,7 @@ export default function ChatApp() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         onReact={handleReact}
+        onForward={(msg) => setForwardingMsg(msg)}
         users={users}
         onlineIds={onlineIds}
         onChanged={refreshConversations}
@@ -347,6 +368,14 @@ export default function ChatApp() {
           onClose={() => setNewChatOpen(false)}
           onStartDm={handleStartDm}
           onCreateGroup={handleCreateGroup}
+        />
+      )}
+      {forwardingMsg && (
+        <ForwardModal
+          conversations={conversations}
+          preview={forwardingMsg.content.slice(0, 80)}
+          onClose={() => setForwardingMsg(null)}
+          onForward={(targetIds) => { void handleForward(forwardingMsg.content, targetIds); setForwardingMsg(null) }}
         />
       )}
     </div>
