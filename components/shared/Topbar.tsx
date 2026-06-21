@@ -22,6 +22,7 @@ import ThemeToggle from '@/components/shared/ThemeToggle'
 const ADMIN_NAV = [
   { href: '/dashboard', label: 'DASHBOARD' },
   { href: '/dashboard/messages', label: 'MESSAGES' },
+  { href: '/dashboard/workspace', label: 'WORKSPACE' },
   { href: '/dashboard/projects', label: 'PROJECTS' },
   { href: '/dashboard/people', label: 'PEOPLE' },
   { href: '/dashboard/tickets', label: 'TICKETS' },
@@ -36,6 +37,7 @@ const SUPER_ADMIN_NAV = ADMIN_NAV
 const EMPLOYEE_NAV = [
   { href: '/dashboard', label: 'DASHBOARD' },
   { href: '/dashboard/messages', label: 'MESSAGES' },
+  { href: '/dashboard/workspace', label: 'WORKSPACE' },
   { href: '/dashboard/projects', label: 'MY PROJECTS' },
   { href: '/dashboard/people', label: 'PEOPLE' },
   { href: '/dashboard/tickets', label: 'TICKETS' },
