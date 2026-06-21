@@ -37,31 +37,31 @@ export default function HistoryView() {
   return (
     <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
       <div className="flex items-center justify-between px-1 pb-2">
-        <span className="font-mono text-[10px] tracking-widest text-[#646464]">
+        <span className="font-mono text-[10px] tracking-widest text-text-muted">
           PAST CONVERSATIONS
         </span>
         <button
           type="button"
           onClick={handleNew}
-          className="font-mono text-[10px] tracking-widest text-[#1A1A1A] hover:text-accent-ink transition-colors"
+          className="font-mono text-[10px] tracking-widest text-text-primary hover:text-accent-ink transition-colors"
         >
           + NEW CHAT
         </button>
       </div>
 
       {conversationsLoading && conversations.length === 0 && (
-        <div className="text-center py-8 font-mono text-xs text-[#646464] tracking-wide">
+        <div className="text-center py-8 font-mono text-xs text-text-muted tracking-wide">
           Loading...
         </div>
       )}
 
       {conversationsLoaded && conversations.length === 0 && (
         <div className="text-center py-8">
-          <p className="text-sm text-[#555555] mb-3">No past conversations yet.</p>
+          <p className="text-sm text-text-secondary mb-3">No past conversations yet.</p>
           <button
             type="button"
             onClick={handleNew}
-            className="font-mono text-xs tracking-widest text-[#1A1A1A] underline underline-offset-2"
+            className="font-mono text-xs tracking-widest text-text-primary underline underline-offset-2"
           >
             START ONE
           </button>
@@ -79,7 +79,7 @@ export default function HistoryView() {
               'w-full text-left px-3 py-2.5 rounded-xl transition-colors',
               isActive
                 ? 'bg-[#1A1A1A] text-white'
-                : 'bg-[#F8F8F4] text-[#1A1A1A] hover:bg-[#F0F0EB]',
+                : 'bg-surface-highlight text-text-primary hover:bg-surface-highlight',
             ].join(' ')}
           >
             <div className="flex items-start justify-between gap-2">
@@ -87,14 +87,14 @@ export default function HistoryView() {
                 {c.title ?? 'Untitled conversation'}
               </span>
               {c.isPinned && (
-                <span className={`shrink-0 text-[10px] ${isActive ? 'text-white/70' : 'text-[#646464]'}`}>
+                <span className={`shrink-0 text-[10px] ${isActive ? 'text-white/70' : 'text-text-muted'}`}>
                   ★
                 </span>
               )}
             </div>
             <p
               className={`text-[10px] font-mono mt-1 tracking-wide ${
-                isActive ? 'text-white/60' : 'text-[#646464]'
+                isActive ? 'text-white/60' : 'text-text-muted'
               }`}
             >
               {c.messageCount} message{c.messageCount === 1 ? '' : 's'} ·{' '}

@@ -15,7 +15,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 //               Maximum authority. Use at most once per view.
 //
 // default     — Accent-colored action (lime). Secondary confirms, positive
-//               state changes. text-[#1A1A1A] on lime = 11.97:1 contrast ✓
+//               state changes. text-text-primary on lime = 11.97:1 contrast ✓
 //               (was text-background-primary = #EAEAE4 on lime = 1.45:1 — fixed)
 //
 // subtle      — Ghost / tertiary. Appears on hover.

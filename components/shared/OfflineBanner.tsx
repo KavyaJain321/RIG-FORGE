@@ -53,12 +53,12 @@ export default function OfflineBanner() {
     >
       {isOffline ? (
         <>
-          <span className="w-2 h-2 rounded-full bg-white/80 animate-pulse shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-surface-raised/80 animate-pulse shrink-0" />
           <span>NO NETWORK CONNECTION — CHANGES MAY NOT SAVE</span>
         </>
       ) : (
         <>
-          <span className="w-2 h-2 rounded-full bg-white/80 shrink-0" />
+          <span className="w-2 h-2 rounded-full bg-surface-raised/80 shrink-0" />
           <span>CONNECTION RESTORED</span>
         </>
       )}

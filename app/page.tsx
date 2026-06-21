@@ -142,7 +142,7 @@ export default function LandingPage() {
   }, [])
 
   return (
-    <div className={`${instrument.variable} ${inter.variable} ${playfair.variable} relative h-screen w-full overflow-hidden bg-white flex flex-col`}>
+    <div className={`${instrument.variable} ${inter.variable} ${playfair.variable} relative h-screen w-full overflow-hidden bg-surface-raised flex flex-col`}>
 
       {/* ── Video background ──────────────────────────────────────────────── */}
       <div

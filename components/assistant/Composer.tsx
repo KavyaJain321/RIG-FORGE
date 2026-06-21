@@ -179,11 +179,11 @@ export default function Composer({
   }
 
   return (
-    <div className="border-t border-black/8 bg-[#FAFAF8] p-3">
+    <div className="border-t border-border-default bg-surface-raised p-3">
       <div className="relative">
         {/* @-mention dropdown */}
         {open && visible.length > 0 && (
-          <div className="absolute bottom-full mb-2 left-0 w-72 max-h-64 overflow-y-auto bg-white border border-black/10 rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] py-1 z-20">
+          <div className="absolute bottom-full mb-2 left-0 w-72 max-h-64 overflow-y-auto bg-surface-raised border border-border-default rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] py-1 z-20">
             {visible.map((opt, i) => (
               <button
                 key={opt.key}
@@ -201,21 +201,21 @@ export default function Composer({
                 <span
                   className={[
                     'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold',
-                    opt.key === '__all__' ? 'bg-[#1A1A1A] text-white' : 'bg-black/[0.08] text-[#444]',
+                    opt.key === '__all__' ? 'bg-[#1A1A1A] text-white' : 'bg-black/[0.08] text-text-secondary',
                   ].join(' ')}
                 >
                   {opt.key === '__all__' ? '@' : initials(opt.display)}
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-sm text-[#1A1A1A] truncate">{opt.display}</span>
-                  <span className="block text-[11px] text-[#646464] truncate">{opt.subtitle}</span>
+                  <span className="block text-sm text-text-primary truncate">{opt.display}</span>
+                  <span className="block text-[11px] text-text-muted truncate">{opt.subtitle}</span>
                 </span>
               </button>
             ))}
           </div>
         )}
 
-        <div className="flex items-end gap-2 bg-white border border-black/10 rounded-2xl px-3 py-2 focus-within:border-black/30 transition-colors duration-150 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+        <div className="flex items-end gap-2 bg-surface-raised border border-border-default rounded-2xl px-3 py-2 focus-within:border-border-strong transition-colors duration-150 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
           <textarea
             ref={ref}
             value={value}
@@ -230,7 +230,7 @@ export default function Composer({
             placeholder={placeholder}
             rows={1}
             maxLength={4000}
-            className="flex-1 resize-none bg-transparent text-sm text-[#1A1A1A] placeholder:text-[#646464] focus:outline-none leading-relaxed"
+            className="flex-1 resize-none bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none leading-relaxed"
             style={{ maxHeight: '160px' }}
           />
           <button
@@ -240,7 +240,7 @@ export default function Composer({
             className={[
               'shrink-0 flex items-center justify-center w-9 h-9 rounded-full transition-all duration-150',
               disabled || !value.trim()
-                ? 'bg-black/6 text-[#646464] cursor-not-allowed'
+                ? 'bg-black/6 text-text-muted cursor-not-allowed'
                 : 'bg-[#1A1A1A] text-white hover:bg-[#2A2A2A] active:scale-95',
             ].join(' ')}
             aria-label="Send message"
@@ -249,8 +249,8 @@ export default function Composer({
           </button>
         </div>
       </div>
-      <p className="font-mono text-[10px] text-[#646464] mt-1.5 px-1 tracking-wide">
-        Enter to send · Shift+Enter for new line · Type <span className="text-[#555555]">@</span> to mention · {value.length}/4000
+      <p className="font-mono text-[10px] text-text-muted mt-1.5 px-1 tracking-wide">
+        Enter to send · Shift+Enter for new line · Type <span className="text-text-secondary">@</span> to mention · {value.length}/4000
       </p>
     </div>
   )

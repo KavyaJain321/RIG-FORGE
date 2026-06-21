@@ -87,13 +87,13 @@ function GoogleConnectCardInner() {
   // GOOGLE_CLIENT_ID etc. in env. Show a quiet hint, not a button.
   if (!status.configured) {
     return (
-      <div className="bg-white border border-black/10 rounded-2xl p-5 mb-4">
+      <div className="bg-surface-raised border border-border-default rounded-2xl p-5 mb-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-sm font-mono uppercase tracking-widest text-[#1A1A1A]">
+            <h3 className="text-sm font-mono uppercase tracking-widest text-text-primary">
               Google Calendar
             </h3>
-            <p className="text-xs text-[#646464] mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Not yet enabled on this server. An admin needs to configure the
               integration before users can connect.
             </p>
@@ -128,15 +128,15 @@ function GoogleConnectCardInner() {
   }
 
   return (
-    <div className="bg-white border border-black/10 rounded-2xl p-5 mb-4">
+    <div className="bg-surface-raised border border-border-default rounded-2xl p-5 mb-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
-          <h3 className="text-sm font-mono uppercase tracking-widest text-[#1A1A1A]">
+          <h3 className="text-sm font-mono uppercase tracking-widest text-text-primary">
             Google Workspace
           </h3>
           {status.connected ? (
             <>
-              <p className="text-sm text-[#1A1A1A] mt-2">
+              <p className="text-sm text-text-primary mt-2">
                 ✓ Connected as <span className="font-medium">{status.email}</span>
               </p>
               {/* Feature status grid */}
@@ -154,17 +154,17 @@ function GoogleConnectCardInner() {
             </>
           ) : (
             <>
-              <p className="text-sm text-[#555555] mt-2">
+              <p className="text-sm text-text-secondary mt-2">
                 Let Forgie use your Calendar, Gmail, and Drive on your behalf.
               </p>
-              <p className="text-xs text-[#646464] mt-1">
+              <p className="text-xs text-text-muted mt-1">
                 Forgie can schedule meetings, send emails, and create folders/docs.
                 Read access is limited to what you authorize. Disconnect any time.
               </p>
             </>
           )}
           {toast && (
-            <p className="text-xs text-[#1A1A1A] mt-3 px-3 py-2 bg-[#F2F2EE] rounded-lg">
+            <p className="text-xs text-text-primary mt-3 px-3 py-2 bg-surface-mid rounded-lg">
               {toast}
             </p>
           )}
@@ -187,7 +187,7 @@ function GoogleConnectCardInner() {
             className={[
               'h-9 px-4 text-sm font-medium rounded-lg transition-colors disabled:opacity-50',
               status.connected
-                ? 'bg-white border border-black/10 text-[#555555] hover:text-[#1A1A1A]'
+                ? 'bg-surface-raised border border-border-default text-text-secondary hover:text-text-primary'
                 : 'bg-[#1A1A1A] text-white hover:bg-[#333]',
             ].join(' ')}
           >
@@ -206,7 +206,7 @@ function FeatureBadge({ label, enabled }: { label: string; enabled: boolean }) {
         'flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-medium',
         enabled
           ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-          : 'bg-[#F2F2EE] border-black/5 text-[#646464]',
+          : 'bg-surface-mid border-border-subtle text-text-muted',
       ].join(' ')}
     >
       <span aria-hidden="true">{enabled ? '✓' : '○'}</span>

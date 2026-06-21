@@ -82,8 +82,8 @@ export default function AssistantAdminPage() {
     <div className="max-w-5xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[#1A1A1A]">Forgie — Usage Dashboard</h1>
-        <p className="text-sm text-[#555555] mt-1">
+        <h1 className="text-2xl font-bold text-text-primary">Forgie — Usage Dashboard</h1>
+        <p className="text-sm text-text-secondary mt-1">
           Monitor AI assistant adoption, provider distribution, and recent
           actions executed on the team's behalf.
         </p>
@@ -103,22 +103,22 @@ export default function AssistantAdminPage() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs font-mono uppercase tracking-widest text-[#646464]">
+              <tr className="text-left text-xs font-mono uppercase tracking-widest text-text-muted">
                 <th className="px-3 py-2">Provider</th>
                 <th className="px-3 py-2 text-right">Messages</th>
                 <th className="px-3 py-2 text-right">Input tokens</th>
                 <th className="px-3 py-2 text-right">Output tokens</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-black/5">
+            <tbody className="divide-y divide-border-subtle">
               {stats.byProvider.map((p) => (
                 <tr key={p.provider}>
                   <td className="px-3 py-2 font-medium">{p.provider}</td>
                   <td className="px-3 py-2 text-right">{p.messageCount.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-[#555555]">
+                  <td className="px-3 py-2 text-right text-text-secondary">
                     {p.inputTokens.toLocaleString()}
                   </td>
-                  <td className="px-3 py-2 text-right text-[#555555]">
+                  <td className="px-3 py-2 text-right text-text-secondary">
                     {p.outputTokens.toLocaleString()}
                   </td>
                 </tr>
@@ -135,22 +135,22 @@ export default function AssistantAdminPage() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs font-mono uppercase tracking-widest text-[#646464]">
+              <tr className="text-left text-xs font-mono uppercase tracking-widest text-text-muted">
                 <th className="px-3 py-2">User</th>
                 <th className="px-3 py-2">Role</th>
                 <th className="px-3 py-2 text-right">Messages</th>
                 <th className="px-3 py-2 text-right">Tokens (in + out)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-black/5">
+            <tbody className="divide-y divide-border-subtle">
               {stats.topUsers.map((u) => (
                 <tr key={u.userId}>
                   <td className="px-3 py-2 font-medium">{u.name}</td>
-                  <td className="px-3 py-2 text-xs uppercase tracking-wide text-[#555555]">
+                  <td className="px-3 py-2 text-xs uppercase tracking-wide text-text-secondary">
                     {u.role.replace('_', ' ')}
                   </td>
                   <td className="px-3 py-2 text-right">{u.messageCount.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right text-[#555555]">
+                  <td className="px-3 py-2 text-right text-text-secondary">
                     {(u.inputTokens + u.outputTokens).toLocaleString()}
                   </td>
                 </tr>
@@ -165,7 +165,7 @@ export default function AssistantAdminPage() {
         {stats.recentAudit.length === 0 ? (
           <Empty>No actions yet.</Empty>
         ) : (
-          <div className="divide-y divide-black/5">
+          <div className="divide-y divide-border-subtle">
             {stats.recentAudit.map((a) => (
               <div key={a.id} className="px-3 py-3 flex items-start gap-3">
                 <span
@@ -177,13 +177,13 @@ export default function AssistantAdminPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">
                     <span className="font-medium">{a.userName}</span>
-                    <span className="text-[#555555]"> · {humanAction(a.action)}</span>
+                    <span className="text-text-secondary"> · {humanAction(a.action)}</span>
                   </p>
                   {a.error && (
                     <p className="text-xs text-red-600 mt-0.5 line-clamp-2">{a.error}</p>
                   )}
                 </div>
-                <span className="shrink-0 text-xs text-[#646464] font-mono">
+                <span className="shrink-0 text-xs text-text-muted font-mono">
                   {formatTime(a.createdAt)}
                 </span>
               </div>
@@ -199,9 +199,9 @@ export default function AssistantAdminPage() {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-white border border-black/10 rounded-lg p-4">
-      <p className="text-xs text-[#646464] uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-2xl font-bold text-[#1A1A1A]">{value.toLocaleString()}</p>
+    <div className="bg-surface-raised border border-border-default rounded-lg p-4">
+      <p className="text-xs text-text-muted uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-2xl font-bold text-text-primary">{value.toLocaleString()}</p>
     </div>
   )
 }
@@ -209,16 +209,16 @@ function StatCard({ label, value }: { label: string; value: number }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-8">
-      <h2 className="text-sm font-mono uppercase tracking-widest text-[#555555] mb-3 px-3">
+      <h2 className="text-sm font-mono uppercase tracking-widest text-text-secondary mb-3 px-3">
         {title}
       </h2>
-      <div className="bg-white border border-black/10 rounded-lg overflow-x-auto">{children}</div>
+      <div className="bg-surface-raised border border-border-default rounded-lg overflow-x-auto">{children}</div>
     </section>
   )
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="px-3 py-4 text-sm text-[#646464]">{children}</p>
+  return <p className="px-3 py-4 text-sm text-text-muted">{children}</p>
 }
 
 function humanAction(action: string): string {

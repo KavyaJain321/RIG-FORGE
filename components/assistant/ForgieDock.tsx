@@ -19,7 +19,7 @@ export default function ForgieDock() {
   return (
     <aside
       aria-label="Forgie chat"
-      className="hidden lg:flex w-[380px] flex-shrink-0 sticky top-0 h-screen flex-col border-l border-black/10 bg-[#FAFAF8]"
+      className="hidden lg:flex w-[380px] flex-shrink-0 sticky top-0 h-screen flex-col border-l border-border-default bg-surface-raised"
     >
       <ForgieChat />
     </aside>

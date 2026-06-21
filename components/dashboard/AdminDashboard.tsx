@@ -54,7 +54,7 @@ function StatCard({
           : 'text-neutral-900'
 
   const content = (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100 hover:shadow-md transition-shadow">
+    <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100 hover:shadow-md transition-shadow">
       <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">{label}</p>
       <p className={`text-3xl font-bold ${accentClass}`}>{value}</p>
     </div>
@@ -104,7 +104,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#EAEAE4] p-6 md:p-8">
+      <div className="min-h-screen bg-background-primary p-6 md:p-8">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="shimmer h-8 w-48 rounded" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -124,7 +124,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#EAEAE4] p-6 md:p-8">
+    <div className="min-h-screen bg-background-primary p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
 
         <SetupPrompt />
@@ -168,7 +168,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             {/* Row 2: Who's Working + Onboarding Queue */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
               {/* Who's Working — wider col */}
-              <div className="lg:col-span-3 bg-white rounded-2xl p-5 shadow-sm border border-neutral-100">
+              <div className="lg:col-span-3 bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
                 <h2 className="text-sm font-semibold text-neutral-700 mb-4 uppercase tracking-wider">
                   Who&apos;s Working
                 </h2>
@@ -214,7 +214,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </div>
 
               {/* Onboarding Queue */}
-              <div className="lg:col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-neutral-100">
+              <div className="lg:col-span-2 bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider">
                     Onboarding Queue
@@ -269,7 +269,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             {/* Row 3: Active Projects + Open Tickets */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {/* Active Projects */}
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100">
+              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
                 <h2 className="text-sm font-semibold text-neutral-700 mb-4 uppercase tracking-wider">
                   Active Projects
                 </h2>
@@ -305,7 +305,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </div>
 
               {/* Open Tickets */}
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100">
+              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider">
                     Open Tickets

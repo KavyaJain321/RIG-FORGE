@@ -21,13 +21,13 @@ export default function Message({
           'max-w-[85%] px-4 py-2.5 text-sm rounded-2xl',
           isUser
             ? 'bg-[#1A1A1A] text-white rounded-br-md'
-            : 'bg-[#F2F2EE] text-[#1A1A1A] rounded-bl-md border border-black/5',
+            : 'bg-surface-mid text-text-primary rounded-bl-md border border-border-subtle',
         ].join(' ')}
       >
         {isUser ? (
           <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
         ) : (
-          <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-headings:text-[#1A1A1A] prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-code:text-[#1A1A1A] prose-code:bg-black/5 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-pre:bg-[#1A1A1A] prose-pre:text-[#FAFAFA] prose-strong:text-[#1A1A1A] prose-a:text-emerald-700 prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-emerald-800 [&_a]:[overflow-wrap:anywhere]">
+          <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-headings:text-text-primary prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-code:text-text-primary prose-code:bg-black/5 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-pre:bg-[#1A1A1A] prose-pre:text-[#FAFAFA] prose-strong:text-text-primary prose-a:text-emerald-700 prose-a:underline prose-a:underline-offset-2 hover:prose-a:text-emerald-800 [&_a]:[overflow-wrap:anywhere]">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{

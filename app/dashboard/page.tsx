@@ -9,7 +9,7 @@ import EmployeeDashboard from '@/components/dashboard/EmployeeDashboard'
 
 function LoadingSkeleton() {
   return (
-    <div className="min-h-screen bg-[#EAEAE4] p-8">
+    <div className="min-h-screen bg-background-primary p-8">
       <div className="flex items-center justify-between mb-8">
         <div>
           <div className="shimmer h-4 w-24 mb-3" />

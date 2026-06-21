@@ -80,8 +80,8 @@ export default function ActionCard({
     return (
       <Wrapper tone="muted">
         <Row>
-          <span className="font-mono text-[10px] tracking-widest text-[#646464]">CANCELLED</span>
-          <span className="text-sm text-[#5C5C5C]">{action.label}</span>
+          <span className="font-mono text-[10px] tracking-widest text-text-muted">CANCELLED</span>
+          <span className="text-sm text-text-secondary">{action.label}</span>
         </Row>
       </Wrapper>
     )
@@ -108,11 +108,11 @@ export default function ActionCard({
     <Wrapper tone="default">
       <div className="flex flex-col gap-2">
         <Row>
-          <span className="font-mono text-[10px] tracking-widest text-[#1A1A1A]">
+          <span className="font-mono text-[10px] tracking-widest text-text-primary">
             CONFIRM ACTION
           </span>
         </Row>
-        <p className="text-sm text-[#1A1A1A] leading-snug">{action.label}</p>
+        <p className="text-sm text-text-primary leading-snug">{action.label}</p>
         <div className="flex gap-2 pt-1">
           <button
             type="button"
@@ -126,7 +126,7 @@ export default function ActionCard({
             type="button"
             onClick={cancel}
             disabled={busy}
-            className="flex-1 h-9 px-3 bg-white border border-black/10 text-xs text-[#555555] hover:text-[#1A1A1A] rounded-lg transition-colors disabled:opacity-60"
+            className="flex-1 h-9 px-3 bg-surface-raised border border-border-default text-xs text-text-secondary hover:text-text-primary rounded-lg transition-colors disabled:opacity-60"
           >
             Cancel
           </button>
@@ -146,10 +146,10 @@ function Wrapper({
   children: React.ReactNode
 }) {
   const toneClasses = {
-    default: 'bg-[#F8F8F4] border border-black/10',
+    default: 'bg-surface-highlight border border-border-default',
     success: 'bg-emerald-50 border border-emerald-200',
     error: 'bg-red-50 border border-red-200',
-    muted: 'bg-[#F2F2EE] border border-black/5',
+    muted: 'bg-surface-mid border border-border-subtle',
   }
   return (
     <div className={`mt-2 px-3 py-2.5 rounded-xl ${toneClasses[tone]}`}>{children}</div>

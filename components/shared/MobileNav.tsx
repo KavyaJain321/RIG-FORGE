@@ -20,7 +20,7 @@ export default function MobileNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-14 bg-white/95 backdrop-blur border-t border-black/[0.07] flex items-stretch z-40">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-14 bg-surface-raised/95 backdrop-blur border-t border-border-default flex items-stretch z-40">
       {MOBILE_ITEMS.map(({ href, label, symbol }) => {
         const active = isNavActive(href, pathname)
 
@@ -31,7 +31,7 @@ export default function MobileNav() {
             className={[
               'flex-1 flex flex-col items-center justify-center gap-0.5',
               'transition-colors',
-              active ? 'text-[#3F7A0A]' : 'text-[#555555] hover:text-[#1A1A1A]',
+              active ? 'text-[#3F7A0A]' : 'text-text-secondary hover:text-text-primary',
             ].join(' ')}
           >
             <span className="text-sm leading-none">{symbol}</span>

@@ -75,7 +75,7 @@ export function WeeklyReportEmployeeCard({
   const weekDates = getWeekDates(mondayIso)
 
   return (
-    <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
+    <div className="border border-gray-200 rounded-lg bg-surface-raised overflow-hidden">
       {/* ── Collapsed (always visible) ─────────────────────────────────────── */}
       <div className="px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

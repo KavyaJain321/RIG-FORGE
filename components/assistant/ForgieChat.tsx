@@ -153,14 +153,14 @@ export default function ForgieChat({ showClose = false, onClose }: ForgieChatPro
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-black/10 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-default shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-[#1A1A1A] text-white flex items-center justify-center text-xs font-bold">
             F
           </div>
           <div className="flex flex-col">
-            <span className="font-mono text-xs tracking-widest text-[#1A1A1A]">FORGIE</span>
-            <span className="font-mono text-[10px] text-[#646464]">
+            <span className="font-mono text-xs tracking-widest text-text-primary">FORGIE</span>
+            <span className="font-mono text-[10px] text-text-muted">
               {isSending ? 'thinking...' : 'AI assistant'}
             </span>
           </div>
@@ -172,7 +172,7 @@ export default function ForgieChat({ showClose = false, onClose }: ForgieChatPro
             title={view === 'history' ? 'Back to chat' : 'Conversation history'}
             className={[
               'p-1.5 rounded-full transition-colors',
-              view === 'history' ? 'bg-black/10 text-[#1A1A1A]' : 'hover:bg-black/5 text-[#555555]',
+              view === 'history' ? 'bg-black/10 text-text-primary' : 'hover:bg-text-primary/[0.06] text-text-secondary',
             ].join(' ')}
             aria-label="Conversation history"
           >
@@ -182,7 +182,7 @@ export default function ForgieChat({ showClose = false, onClose }: ForgieChatPro
             type="button"
             onClick={reset}
             title="New conversation"
-            className="p-1.5 rounded-full hover:bg-black/5 transition-colors text-[#555555]"
+            className="p-1.5 rounded-full hover:bg-text-primary/[0.06] transition-colors text-text-secondary"
             aria-label="Start new conversation"
           >
             <NewChatIcon />
@@ -192,7 +192,7 @@ export default function ForgieChat({ showClose = false, onClose }: ForgieChatPro
               type="button"
               onClick={onClose}
               title="Close"
-              className="p-1.5 rounded-full hover:bg-black/5 transition-colors text-[#555555]"
+              className="p-1.5 rounded-full hover:bg-text-primary/[0.06] transition-colors text-text-secondary"
               aria-label="Close Forgie"
             >
               <CloseIcon />
@@ -250,16 +250,16 @@ function EmptyState({ firstName }: { firstName: string }) {
 
   return (
     <div className="flex flex-col items-start gap-4 py-2">
-      <p className="text-sm text-[#1A1A1A] leading-relaxed">
+      <p className="text-sm text-text-primary leading-relaxed">
         Hi {firstName}. I&apos;m Forgie — RIG FORGE&apos;s resident know-it-all
         (in the technical sense, hopefully).
       </p>
-      <p className="text-sm text-[#1A1A1A] leading-relaxed">
+      <p className="text-sm text-text-primary leading-relaxed">
         I track every project, task, and ticket on the platform. I can also
         summarize status and call out the team&apos;s slow movers. Diplomatically.
       </p>
       <div className="flex flex-col gap-1.5 w-full pt-1">
-        <p className="font-mono text-[10px] text-[#646464] tracking-widest">TRY:</p>
+        <p className="font-mono text-[10px] text-text-muted tracking-widest">TRY:</p>
         {examples.map((ex) => (
           <ExampleChip key={ex} text={ex} />
         ))}
@@ -283,7 +283,7 @@ function ExampleChip({ text }: { text: string }) {
       type="button"
       onClick={handleClick}
       disabled={isSending}
-      className="text-left text-sm text-[#444] bg-[#F8F8F4] hover:bg-[#F0F0EB] border border-black/5 rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
+      className="text-left text-sm text-text-secondary bg-surface-highlight hover:bg-surface-highlight border border-border-subtle rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
     >
       “{text}”
     </button>

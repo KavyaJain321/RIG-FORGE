@@ -176,7 +176,7 @@ function ProjectCard({ project: p }: { project: ProjectReportProjectEntry }) {
     CANCELLED: 'bg-red-100 text-red-700',
   }
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5">
+    <div className="bg-surface-raised border border-gray-200 rounded-xl p-5">
       {/* Title row */}
       <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
         <div>
@@ -296,7 +296,7 @@ function EmployeeReport({
           <select
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}
-            className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="activity">Activity</option>
             <option value="tasks">Tasks Done</option>
@@ -316,7 +316,7 @@ function EmployeeCard({ employee: e }: { employee: EmployeeReportEntry }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-surface-raised border border-gray-200 rounded-xl overflow-hidden">
       {/* Top row */}
       <div className="px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
@@ -520,7 +520,7 @@ function WeeklyReport({
             <select
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="activity">Activity</option>
               <option value="tasks">Tasks Done</option>
@@ -547,7 +547,7 @@ function WeeklyProjectRow({ project: p }: { project: WeeklyReportProjectSnapshot
     CANCELLED: 'bg-red-100 text-red-700',
   }
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-5 py-4">
+    <div className="bg-surface-raised border border-gray-200 rounded-lg px-5 py-4">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -591,7 +591,7 @@ function WeeklyProjectRow({ project: p }: { project: WeeklyReportProjectSnapshot
 
 function StatCard({ label, value, color }: { label: string; value: number | string; color?: 'red' }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
+    <div className="bg-surface-raised border border-gray-200 rounded-lg p-4">
       <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</p>
       <p className={`text-xl font-bold ${color === 'red' ? 'text-red-600' : 'text-gray-900'}`}>{value}</p>
     </div>

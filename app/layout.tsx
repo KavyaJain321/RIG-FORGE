@@ -41,6 +41,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Set theme class before paint to avoid a flash of the wrong theme. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})();",
+          }}
+        />
+      </head>
       <body
         className={`${sans.variable} ${display.variable} bg-background-primary text-text-primary min-h-screen antialiased`}
       >

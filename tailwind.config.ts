@@ -7,53 +7,56 @@ const config: Config = {
     './hooks/**/*.ts',
     './store/**/*.ts',
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
+        // Theme-aware tokens. Values are CSS vars in channel format
+        // (`R G B`) so Tailwind opacity modifiers (e.g. bg-accent/10) work.
+        // Light + dark palettes are defined in app/globals.css (:root / .dark).
         background: {
-          primary: '#EAEAE4',
-          secondary: '#F2F2ED',
-          tertiary: '#EFEFEA',
+          primary: 'rgb(var(--c-bg-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--c-bg-secondary) / <alpha-value>)',
+          tertiary: 'rgb(var(--c-bg-tertiary) / <alpha-value>)',
         },
         surface: {
-          base: '#EAEAE4',
-          raised: '#FFFFFF',
-          sunken: '#E2E2DC',
-          highlight: '#F8F8F5',
-          mid: '#F4F4F0',
+          base: 'rgb(var(--c-surface-base) / <alpha-value>)',
+          raised: 'rgb(var(--c-surface-raised) / <alpha-value>)',
+          sunken: 'rgb(var(--c-surface-sunken) / <alpha-value>)',
+          highlight: 'rgb(var(--c-surface-highlight) / <alpha-value>)',
+          mid: 'rgb(var(--c-surface-mid) / <alpha-value>)',
         },
         text: {
-          primary: '#1A1A1A',
-          secondary: '#555555',
-          muted: '#646464',
+          primary: 'rgb(var(--c-text-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--c-text-secondary) / <alpha-value>)',
+          muted: 'rgb(var(--c-text-muted) / <alpha-value>)',
         },
         border: {
-          default: 'rgba(0,0,0,0.08)',
-          subtle: 'rgba(0,0,0,0.04)',
-          strong: 'rgba(0,0,0,0.14)',
+          default: 'var(--c-border-default)',
+          subtle: 'var(--c-border-subtle)',
+          strong: 'var(--c-border-strong)',
         },
         accent: {
-          DEFAULT: '#85D933',
-          hover: '#9DED47',
-          pressed: '#6EBF20',
-          // Dark lime for accent/success used as TEXT on light surfaces.
-          // Bright #85D933 is ~1.6:1 on white (unreadable); #3F7A0A is ~5.25:1 (AA).
-          ink: '#3F7A0A',
-          spark: '#FF6B4A',
-          'spark-muted': '#E55A38',
+          DEFAULT: 'rgb(var(--c-accent) / <alpha-value>)',
+          hover: 'rgb(var(--c-accent-hover) / <alpha-value>)',
+          pressed: 'rgb(var(--c-accent-pressed) / <alpha-value>)',
+          // Accent/success used as TEXT: dark lime on light (AA), bright on dark.
+          ink: 'rgb(var(--c-accent-ink) / <alpha-value>)',
+          spark: 'rgb(var(--c-accent-spark) / <alpha-value>)',
+          'spark-muted': 'rgb(var(--c-accent-spark-muted) / <alpha-value>)',
         },
-        primary: '#1A1A1A',
-        secondary: '#555555',
-        muted: '#646464',
+        primary: 'rgb(var(--c-text-primary) / <alpha-value>)',
+        secondary: 'rgb(var(--c-text-secondary) / <alpha-value>)',
+        muted: 'rgb(var(--c-text-muted) / <alpha-value>)',
         status: {
-          success: '#85D933',
-          warning: '#FF8A00',
-          danger: '#FF4D4D',
-          offline: '#9A9A9A',
+          success: 'rgb(var(--c-status-success) / <alpha-value>)',
+          warning: 'rgb(var(--c-status-warning) / <alpha-value>)',
+          danger: 'rgb(var(--c-status-danger) / <alpha-value>)',
+          offline: 'rgb(var(--c-status-offline) / <alpha-value>)',
         },
         focus: {
-          ring: '#85D933',
-          muted: 'rgba(0,0,0,0.08)',
+          ring: 'rgb(var(--c-accent) / <alpha-value>)',
+          muted: 'var(--c-border-default)',
         },
         elevation: {
           soft: 'rgba(0, 0, 0, 0.06)',

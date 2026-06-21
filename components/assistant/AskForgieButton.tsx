@@ -20,12 +20,12 @@ export default function AskForgieButton() {
       title="Ask Forgie (AI assistant)"
       className={[
         'lg:hidden flex items-center gap-1.5 h-9 px-3',
-        'border border-black/10 rounded-full',
+        'border border-border-default rounded-full',
         'font-mono text-xs tracking-widest uppercase',
         'transition-colors duration-150',
         isOpen
           ? 'bg-[#1A1A1A] text-[#FAFAFA] border-[#1A1A1A]'
-          : 'bg-white/70 text-[#555555] hover:bg-white hover:text-[#1A1A1A]',
+          : 'bg-surface-raised/70 text-text-secondary hover:bg-surface-raised hover:text-text-primary',
       ].join(' ')}
     >
       <SparkIcon />

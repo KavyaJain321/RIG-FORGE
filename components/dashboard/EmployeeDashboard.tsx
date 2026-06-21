@@ -59,7 +59,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100">
+    <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
       <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">{label}</p>
       <p className="text-3xl font-bold text-neutral-900">{value}</p>
     </div>
@@ -94,7 +94,7 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#EAEAE4] p-6 md:p-8">
+      <div className="min-h-screen bg-background-primary p-6 md:p-8">
         <div className="max-w-5xl mx-auto space-y-6">
           <div className="shimmer h-10 w-64 rounded" />
           <div className="grid grid-cols-3 gap-4">
@@ -111,7 +111,7 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#EAEAE4] p-6 md:p-8">
+    <div className="min-h-screen bg-background-primary p-6 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
 
         <SetupPrompt />
@@ -160,7 +160,7 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
             {/* Row 2: My Projects + My Upcoming Tasks */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* My Projects */}
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100">
+              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
                 <h2 className="text-sm font-semibold text-neutral-700 mb-4 uppercase tracking-wider">
                   My Projects
                 </h2>
@@ -200,7 +200,7 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
               </div>
 
               {/* My Upcoming Tasks */}
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100">
+              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
                 <h2 className="text-sm font-semibold text-neutral-700 mb-4 uppercase tracking-wider">
                   My Upcoming Tasks
                 </h2>
@@ -240,7 +240,7 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
             </div>
 
             {/* Row 3: My Recent Tickets */}
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-neutral-100">
+            <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
               <h2 className="text-sm font-semibold text-neutral-700 mb-4 uppercase tracking-wider">
                 My Recent Tickets
               </h2>

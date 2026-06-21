@@ -23,7 +23,7 @@ function Checkbox({ checked, indeterminate }: { checked: boolean; indeterminate?
       className={`shrink-0 w-4 h-4 rounded flex items-center justify-center border transition-all duration-100 ${
         checked || indeterminate
           ? 'bg-blue-600 border-blue-600'
-          : 'bg-white border-gray-300'
+          : 'bg-surface-raised border-gray-300'
       }`}
     >
       {indeterminate && !checked ? (
@@ -99,7 +99,7 @@ export function MultiSelect({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white border rounded-xl text-sm text-left transition-all duration-150 ${
+        className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 bg-surface-raised border rounded-xl text-sm text-left transition-all duration-150 ${
           open
             ? 'border-blue-500 ring-2 ring-blue-100 shadow-sm'
             : 'border-gray-300 hover:border-gray-400'
@@ -140,7 +140,7 @@ export function MultiSelect({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute z-50 mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+        <div className="absolute z-50 mt-1.5 w-full bg-surface-raised border border-gray-200 rounded-xl shadow-xl overflow-hidden">
           {/* Search */}
           {options.length > 5 && (
             <div className="px-3 pt-2.5 pb-2 border-b border-gray-100">

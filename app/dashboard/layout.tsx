@@ -19,7 +19,7 @@ export default function DashboardLayout({
     // Top-level split: main column flexes to fill width, ForgieDock is a
     // fixed-width persistent pane on the right (desktop only). min-w-0 lets the
     // main column shrink below its content width so the dock can't be pushed off.
-    <div className="flex min-h-screen bg-[#EAEAE4]">
+    <div className="flex min-h-screen bg-background-primary">
       <div className="flex-1 min-w-0 flex flex-col">
         <Topbar />
         <main className="flex-1 min-w-0">

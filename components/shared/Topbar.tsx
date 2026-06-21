@@ -15,11 +15,13 @@ import NotificationBell from '@/components/notifications/NotificationBell'
 import NotificationDropdown from '@/components/notifications/NotificationDropdown'
 import AskForgieButton from '@/components/assistant/AskForgieButton'
 import ChatPanel from '@/components/assistant/ChatPanel'
+import ThemeToggle from '@/components/shared/ThemeToggle'
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
 const ADMIN_NAV = [
   { href: '/dashboard', label: 'DASHBOARD' },
+  { href: '/dashboard/messages', label: 'MESSAGES' },
   { href: '/dashboard/projects', label: 'PROJECTS' },
   { href: '/dashboard/people', label: 'PEOPLE' },
   { href: '/dashboard/tickets', label: 'TICKETS' },
@@ -33,6 +35,7 @@ const SUPER_ADMIN_NAV = ADMIN_NAV
 
 const EMPLOYEE_NAV = [
   { href: '/dashboard', label: 'DASHBOARD' },
+  { href: '/dashboard/messages', label: 'MESSAGES' },
   { href: '/dashboard/projects', label: 'MY PROJECTS' },
   { href: '/dashboard/people', label: 'PEOPLE' },
   { href: '/dashboard/tickets', label: 'TICKETS' },
@@ -147,7 +150,7 @@ export default function Topbar() {
             aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
             aria-expanded={mobileNavOpen}
             onClick={() => setMobileNavOpen((prev) => !prev)}
-            className="h-9 px-3 rounded-full border border-black/10 bg-white/70 hover:bg-white transition-colors font-mono text-xs text-[#555555]"
+            className="h-9 px-3 rounded-full border border-border-default bg-surface-raised/70 hover:bg-surface-raised transition-colors font-mono text-xs text-text-secondary"
           >
             {mobileNavOpen ? 'CLOSE' : 'MENU'}
           </button>
@@ -162,7 +165,7 @@ export default function Topbar() {
                     href={href}
                     className={[
                       'topbar-dropdown-item',
-                      active ? 'font-semibold text-[#1A1A1A]' : '',
+                      active ? 'font-semibold text-text-primary' : '',
                     ].join(' ')}
                     onClick={() => setMobileNavOpen(false)}
                   >
@@ -204,6 +207,9 @@ export default function Topbar() {
 
           {/* Ask Forgie (AI assistant) — only shown for approved users */}
           {user && !user.mustChangePassword && <AskForgieButton />}
+
+          {/* Light / dark theme toggle */}
+          <ThemeToggle />
 
           {/* Notification bell */}
           <NotificationBell
@@ -262,7 +268,7 @@ export default function Topbar() {
                         setUserMenuOpen(false)
                         router.push('/dashboard/profile')
                       }}
-                      className="topbar-dropdown-item w-full text-left border-b border-border-default px-3 py-2.5 hover:bg-black/5 transition-colors"
+                      className="topbar-dropdown-item w-full text-left border-b border-border-default px-3 py-2.5 hover:bg-text-primary/[0.06] transition-colors"
                     >
                       <p className="font-mono text-xs text-text-primary">{user.name}</p>
                       <p className="font-mono text-[10px] text-text-muted uppercase tracking-widest mt-0.5">

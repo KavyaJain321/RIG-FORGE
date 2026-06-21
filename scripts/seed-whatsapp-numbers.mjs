@@ -30,6 +30,7 @@ const SEEDS = [
   ['Pranav',  'pranavpuri03@gmail.com',       '+919315754266'],
   ['Radhesh', 'radheshtiwaric@gmail.com',     '+917999891702'],
   ['Rohan',   'rohanbatraind@gmail.com',      '+917253069231'],
+  ['Sudipta', 'sudiptaj90@gmail.com',         '+917799399762'],
   ['Utkarsh', 'kapoorutkarsh17@gmail.com',    '+918076869691'],
   ['Yash',    '04yash27@gmail.com',           '+919818280093'],
   ['Madhur',  'agg.madhuraggarwal@gmail.com', '+919760007994'],

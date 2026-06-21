@@ -96,7 +96,7 @@ export default function DevDashboardPage() {
   }, [loading, user, router])
 
   if (loading || (!rows && !denied)) {
-    return <div className="p-8 text-sm text-[#646464]">Loading…</div>
+    return <div className="p-8 text-sm text-text-muted">Loading…</div>
   }
   if (denied) return null
 
@@ -108,12 +108,12 @@ export default function DevDashboardPage() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-6">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-[#1A1A1A]">Forgie — Developer Console</h1>
+          <h1 className="text-2xl font-bold text-text-primary">Forgie — Developer Console</h1>
           <span className="text-[10px] font-mono uppercase tracking-widest bg-[#1A1A1A] text-white px-2 py-0.5 rounded">
             hidden
           </span>
         </div>
-        <p className="text-sm text-[#555555] mt-1">
+        <p className="text-sm text-text-secondary mt-1">
           Every user's Forgie activity — web &amp; WhatsApp chats and the actions Forgie ran for them.
           Visible only to allowlisted developer accounts.
         </p>
@@ -130,14 +130,14 @@ export default function DevDashboardPage() {
           <button
             key={r.id}
             onClick={() => setSelected(r)}
-            className="text-left bg-white border border-black/10 rounded-lg p-4 hover:border-black/30 hover:shadow-sm transition"
+            className="text-left bg-surface-raised border border-border-default rounded-lg p-4 hover:border-border-strong hover:shadow-sm transition"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="font-semibold text-[#1A1A1A] truncate">{r.name}</p>
-                <p className="text-xs text-[#646464] truncate">{r.email}</p>
+                <p className="font-semibold text-text-primary truncate">{r.name}</p>
+                <p className="text-xs text-text-muted truncate">{r.email}</p>
               </div>
-              <span className="shrink-0 text-[10px] font-mono uppercase tracking-wide text-[#555555]">
+              <span className="shrink-0 text-[10px] font-mono uppercase tracking-wide text-text-secondary">
                 {r.role.replace('_', ' ')}
               </span>
             </div>
@@ -148,7 +148,7 @@ export default function DevDashboardPage() {
               <Metric label="Actions" value={r.actions} sub="ran" />
             </div>
 
-            <div className="mt-3 flex items-center justify-between text-[11px] text-[#646464]">
+            <div className="mt-3 flex items-center justify-between text-[11px] text-text-muted">
               <span>{r.whatsappNumber ?? 'no WA number'}</span>
               <span>{r.lastActiveAt ? `active ${relative(r.lastActiveAt)}` : 'never used'}</span>
             </div>
@@ -189,13 +189,13 @@ function DetailPanel({ row, onClose }: { row: UserRow; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-2xl bg-[#F7F7F2] h-full overflow-y-auto shadow-xl">
-        <div className="sticky top-0 bg-[#F7F7F2] border-b border-black/10 px-5 py-4 flex items-start justify-between">
+      <div className="relative w-full max-w-2xl bg-surface-mid h-full overflow-y-auto shadow-xl">
+        <div className="sticky top-0 bg-surface-mid border-b border-border-default px-5 py-4 flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-[#1A1A1A]">{row.name}</h2>
-            <p className="text-xs text-[#646464]">{row.email}{row.whatsappNumber ? ` · ${row.whatsappNumber}` : ''}</p>
+            <h2 className="text-lg font-bold text-text-primary">{row.name}</h2>
+            <p className="text-xs text-text-muted">{row.email}{row.whatsappNumber ? ` · ${row.whatsappNumber}` : ''}</p>
           </div>
-          <button type="button" aria-label="Close panel" onClick={onClose} className="text-[#555555] hover:text-black text-xl leading-none p-1">×</button>
+          <button type="button" aria-label="Close panel" onClick={onClose} className="text-text-secondary hover:text-text-primary text-xl leading-none p-1">×</button>
         </div>
 
         <div className="flex gap-1 px-5 pt-4">
@@ -205,27 +205,27 @@ function DetailPanel({ row, onClose }: { row: UserRow; onClose: () => void }) {
         </div>
 
         <div className="px-5 py-4">
-          {!detail && <p className="text-sm text-[#646464]">Loading…</p>}
+          {!detail && <p className="text-sm text-text-muted">Loading…</p>}
 
           {detail && tab !== 'ACTIONS' && shown.length === 0 && (
-            <p className="text-sm text-[#646464]">No {tab === 'WEB' ? 'web' : 'WhatsApp'} conversations.</p>
+            <p className="text-sm text-text-muted">No {tab === 'WEB' ? 'web' : 'WhatsApp'} conversations.</p>
           )}
 
           {detail && tab !== 'ACTIONS' && shown.map((c) => (
-            <div key={c.id} className="mb-3 bg-white border border-black/10 rounded-lg overflow-hidden">
+            <div key={c.id} className="mb-3 bg-surface-raised border border-border-default rounded-lg overflow-hidden">
               <button
                 onClick={() => setOpenConv(openConv === c.id ? null : c.id)}
                 className="w-full text-left px-4 py-3 flex items-center justify-between gap-2 hover:bg-black/[0.02]"
               >
-                <span className="text-sm font-medium text-[#1A1A1A] truncate">
+                <span className="text-sm font-medium text-text-primary truncate">
                   {c.title || 'Untitled conversation'}
                 </span>
-                <span className="shrink-0 text-[11px] text-[#646464]">
+                <span className="shrink-0 text-[11px] text-text-muted">
                   {c.messages.length} msg · {relative(c.updatedAt)}
                 </span>
               </button>
               {openConv === c.id && (
-                <div className="px-4 pb-4 space-y-3 border-t border-black/5 pt-3">
+                <div className="px-4 pb-4 space-y-3 border-t border-border-subtle pt-3">
                   {c.messages.map((m) => (
                     <MessageBubble key={m.id} m={m} />
                   ))}
@@ -236,18 +236,18 @@ function DetailPanel({ row, onClose }: { row: UserRow; onClose: () => void }) {
 
           {detail && tab === 'ACTIONS' && (
             detail.actions.length === 0 ? (
-              <p className="text-sm text-[#646464]">Forgie hasn't run any actions for this user.</p>
+              <p className="text-sm text-text-muted">Forgie hasn't run any actions for this user.</p>
             ) : (
               <div className="space-y-2">
                 {detail.actions.map((a) => (
-                  <div key={a.id} className="bg-white border border-black/10 rounded-lg px-4 py-3">
+                  <div key={a.id} className="bg-surface-raised border border-border-default rounded-lg px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className={['w-2 h-2 rounded-full', a.success ? 'bg-emerald-500' : 'bg-red-500'].join(' ')} />
                       <span className="text-sm font-medium">{a.action.replace(/_/g, ' ')}</span>
-                      <span className="ml-auto text-[11px] text-[#646464]">{relative(a.createdAt)}</span>
+                      <span className="ml-auto text-[11px] text-text-muted">{relative(a.createdAt)}</span>
                     </div>
                     {a.error && <p className="text-xs text-red-600 mt-1">{a.error}</p>}
-                    <pre className="mt-2 text-[11px] text-[#555] bg-black/[0.03] rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">
+                    <pre className="mt-2 text-[11px] text-text-secondary bg-black/[0.03] rounded p-2 overflow-x-auto whitespace-pre-wrap break-words">
                       {safeJson(a.args)}
                     </pre>
                   </div>
@@ -268,7 +268,7 @@ function MessageBubble({ m }: { m: Message }) {
       <div
         className={[
           'max-w-[85%] rounded-lg px-3 py-2 text-sm',
-          isUser ? 'bg-[#1A1A1A] text-white' : 'bg-black/[0.04] text-[#1A1A1A]',
+          isUser ? 'bg-[#1A1A1A] text-white' : 'bg-black/[0.04] text-text-primary',
         ].join(' ')}
       >
         <div className="flex items-center gap-2 mb-0.5">
@@ -286,9 +286,9 @@ function MessageBubble({ m }: { m: Message }) {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-white border border-black/10 rounded-lg p-4">
-      <p className="text-xs text-[#646464] uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-2xl font-bold text-[#1A1A1A]">{value.toLocaleString()}</p>
+    <div className="bg-surface-raised border border-border-default rounded-lg p-4">
+      <p className="text-xs text-text-muted uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-2xl font-bold text-text-primary">{value.toLocaleString()}</p>
     </div>
   )
 }
@@ -296,9 +296,9 @@ function StatCard({ label, value }: { label: string; value: number }) {
 function Metric({ label, value, sub }: { label: string; value: number; sub: string }) {
   return (
     <div className="bg-black/[0.03] rounded-md px-2 py-1.5 text-center">
-      <p className="text-[10px] font-mono uppercase tracking-wide text-[#646464]">{label}</p>
-      <p className="text-lg font-bold text-[#1A1A1A] leading-tight">{value}</p>
-      <p className="text-[10px] text-[#646464]">{sub}</p>
+      <p className="text-[10px] font-mono uppercase tracking-wide text-text-muted">{label}</p>
+      <p className="text-lg font-bold text-text-primary leading-tight">{value}</p>
+      <p className="text-[10px] text-text-muted">{sub}</p>
     </div>
   )
 }
@@ -309,7 +309,7 @@ function Tab({ active, onClick, children }: { active: boolean; onClick: () => vo
       onClick={onClick}
       className={[
         'px-3 py-1.5 text-xs font-mono uppercase tracking-wide rounded-t-md',
-        active ? 'bg-white text-[#1A1A1A] border border-black/10 border-b-white' : 'text-[#646464] hover:text-[#555555]',
+        active ? 'bg-surface-raised text-text-primary border border-border-default border-b-white' : 'text-text-muted hover:text-text-secondary',
       ].join(' ')}
     >
       {children}
