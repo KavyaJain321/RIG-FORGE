@@ -62,6 +62,8 @@ export default function MessageThread({
   loading,
   onSend,
   onSendImage,
+  onEdit,
+  onDelete,
   users,
   onlineIds,
   onChanged,
@@ -74,6 +76,8 @@ export default function MessageThread({
   loading: boolean
   onSend: (text: string, replyToId?: string | null) => void
   onSendImage: (file: File) => void
+  onEdit: (messageId: string, text: string) => void
+  onDelete: (messageId: string) => void
   users: ChatUserLite[]
   onlineIds: Set<string>
   onChanged: () => void
@@ -86,6 +90,7 @@ export default function MessageThread({
   const [atBottom, setAtBottom] = useState(true)
   const [typingName, setTypingName] = useState<string | null>(null)
   const [replyingTo, setReplyingTo] = useState<ChatMessageDTO | null>(null)
+  const [editing, setEditing] = useState<ChatMessageDTO | null>(null)
   const [ctxMenu, setCtxMenu] = useState<CtxMenu>(null)
 
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -157,12 +162,24 @@ export default function MessageThread({
     ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`
   }
 
+  function startEdit(msg: ChatMessageDTO) {
+    setEditing(msg)
+    setReplyingTo(null)
+    setDraft(msg.content)
+    setTimeout(() => taRef.current?.focus(), 0)
+  }
+
   function send() {
     const text = draft.trim()
     if (!text) return
-    onSend(text, replyingTo?.id ?? null)
+    if (editing) {
+      onEdit(editing.id, text)
+      setEditing(null)
+    } else {
+      onSend(text, replyingTo?.id ?? null)
+      setReplyingTo(null)
+    }
     setDraft('')
-    setReplyingTo(null)
     if (taRef.current) taRef.current.style.height = 'auto'
   }
 
@@ -284,8 +301,8 @@ export default function MessageThread({
                 {dateSep}
                 <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ msg: m, x: e.clientX, y: e.clientY }) }}
-                    className={`max-w-[78%] sm:max-w-[70%] rounded-2xl px-3 py-2 cursor-context-menu ${
+                    onContextMenu={m.deletedAt ? undefined : (e) => { e.preventDefault(); setCtxMenu({ msg: m, x: e.clientX, y: e.clientY }) }}
+                    className={`max-w-[78%] sm:max-w-[70%] rounded-2xl px-3 py-2 ${m.deletedAt ? '' : 'cursor-context-menu'} ${
                       mine
                         ? 'bg-[#3F7A0A] text-white rounded-br-sm'
                         : isForgie
@@ -298,25 +315,32 @@ export default function MessageThread({
                         {nameFor(m.senderId)}
                       </p>
                     )}
-                    {m.replyToId && (
-                      <div className={`mb-1 rounded px-2 py-1 border-l-2 text-xs ${mine ? 'border-white/60 bg-black/10 text-white/80' : 'border-[#3F7A0A] bg-black/[0.05] text-text-secondary'}`}>
-                        <span className="block font-medium">
-                          {quoted ? (quoted.senderId === meId ? 'You' : nameFor(quoted.senderId)) : 'Message'}
-                        </span>
-                        <span className="block truncate">
-                          {quoted ? (quoted.type === 'IMAGE' ? '📷 Photo' : quoted.content) : '…'}
-                        </span>
-                      </div>
-                    )}
-                    {m.type === 'IMAGE' ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.content} alt="" className="rounded-lg max-w-full max-h-72 object-cover" />
+                    {m.deletedAt ? (
+                      <p className="text-sm italic opacity-70">🚫 This message was deleted</p>
                     ) : (
-                      <p className="text-sm whitespace-pre-wrap break-words">{m.content}</p>
+                      <>
+                        {m.replyToId && (
+                          <div className={`mb-1 rounded px-2 py-1 border-l-2 text-xs ${mine ? 'border-white/60 bg-black/10 text-white/80' : 'border-[#3F7A0A] bg-black/[0.05] text-text-secondary'}`}>
+                            <span className="block font-medium">
+                              {quoted ? (quoted.senderId === meId ? 'You' : nameFor(quoted.senderId)) : 'Message'}
+                            </span>
+                            <span className="block truncate">
+                              {quoted ? (quoted.deletedAt ? 'This message was deleted' : quoted.type === 'IMAGE' ? '📷 Photo' : quoted.content) : '…'}
+                            </span>
+                          </div>
+                        )}
+                        {m.type === 'IMAGE' ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={m.content} alt="" className="rounded-lg max-w-full max-h-72 object-cover" />
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap break-words">{m.content}</p>
+                        )}
+                      </>
                     )}
                     <div className={`text-[10px] mt-0.5 flex items-center justify-end gap-1 ${mine ? 'text-white/70' : 'text-[#999]'}`}>
+                      {m.editedAt && !m.deletedAt && <span className="opacity-60">edited</span>}
                       <span>{timeLabel(m.createdAt)}</span>
-                      {mine && receiptFor(m)}
+                      {mine && !m.deletedAt && receiptFor(m)}
                     </div>
                   </div>
                 </div>
@@ -341,6 +365,13 @@ export default function MessageThread({
 
       {/* Composer (with reply preview) */}
       <div className="shrink-0 border-t border-border-default bg-surface-raised/60">
+        {editing && (
+          <div className="px-3 pt-2 flex items-center gap-2">
+            <span className="text-[11px] text-[#3F7A0A] font-medium shrink-0">Editing</span>
+            <span className="flex-1 text-xs text-text-secondary truncate">{editing.content}</span>
+            <button type="button" onClick={() => { setEditing(null); setDraft('') }} className="text-text-secondary hover:text-text-primary">✕</button>
+          </div>
+        )}
         {replyingTo && (
           <div className="px-3 pt-2 flex items-start gap-2">
             <div className="flex-1 min-w-0 border-l-2 border-[#3F7A0A] bg-black/[0.04] rounded px-2 py-1">
@@ -398,8 +429,14 @@ export default function MessageThread({
             onClick={(e) => e.stopPropagation()}
           >
             <button type="button" onClick={() => { setReplyingTo(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">↩ Reply</button>
-            {ctxMenu.msg.type !== 'IMAGE' && (
+            {ctxMenu.msg.type !== 'IMAGE' && !ctxMenu.msg.deletedAt && (
               <button type="button" onClick={() => { void navigator.clipboard?.writeText(ctxMenu.msg.content); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">⧉ Copy</button>
+            )}
+            {ctxMenu.msg.senderId === meId && ctxMenu.msg.type !== 'IMAGE' && !ctxMenu.msg.deletedAt && (
+              <button type="button" onClick={() => { startEdit(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">✎ Edit</button>
+            )}
+            {ctxMenu.msg.senderId === meId && !ctxMenu.msg.deletedAt && (
+              <button type="button" onClick={() => { const id = ctxMenu.msg.id; setCtxMenu(null); if (confirm('Delete this message for everyone?')) onDelete(id) }} className="w-full text-left px-3 py-2 text-sm text-status-danger hover:bg-black/[0.05]">🗑 Delete</button>
             )}
             {ctxMenu.msg.senderId === meId && (
               <button type="button" onClick={() => { setInfoMsg(ctxMenu.msg); setCtxMenu(null) }} className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-black/[0.05]">ⓘ Info</button>

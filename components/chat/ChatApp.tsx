@@ -31,6 +31,8 @@ function rowToMsg(row: Record<string, unknown>): ChatMessageDTO {
     content: String(row.content),
     replyToId: row.replyToId ? String(row.replyToId) : null,
     deliveredAt: row.deliveredAt ? String(row.deliveredAt) : null,
+    editedAt: row.editedAt ? String(row.editedAt) : null,
+    deletedAt: row.deletedAt ? String(row.deletedAt) : null,
     createdAt: String(row.createdAt),
   }
 }
@@ -133,7 +135,13 @@ export default function ChatApp() {
           setMessages((prev) =>
             prev.map((m) =>
               m.id === id
-                ? { ...m, content: String(row.content), deliveredAt: row.deliveredAt ? String(row.deliveredAt) : null }
+                ? {
+                    ...m,
+                    content: String(row.content),
+                    deliveredAt: row.deliveredAt ? String(row.deliveredAt) : null,
+                    editedAt: row.editedAt ? String(row.editedAt) : null,
+                    deletedAt: row.deletedAt ? String(row.deletedAt) : null,
+                  }
                 : m,
             ),
           )
@@ -203,6 +211,37 @@ export default function ChatApp() {
     [activeId, refreshConversations],
   )
 
+  const handleEdit = useCallback(
+    async (messageId: string, text: string) => {
+      try {
+        const data = await api<{ message: ChatMessageDTO }>(`/api/chat/messages/${messageId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: text }),
+        })
+        const msg = data.message
+        setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, content: msg.content, editedAt: msg.editedAt } : m)))
+        void refreshConversations()
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Edit failed')
+      }
+    },
+    [refreshConversations],
+  )
+
+  const handleDelete = useCallback(
+    async (messageId: string) => {
+      try {
+        await api(`/api/chat/messages/${messageId}`, { method: 'DELETE' })
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, content: '', deletedAt: new Date().toISOString() } : m)))
+        void refreshConversations()
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Delete failed')
+      }
+    },
+    [refreshConversations],
+  )
+
   const openConversation = useCallback(
     async (payload: object) => {
       const data = await api<{ conversation: { id: string } }>('/api/chat/conversations', {
@@ -248,6 +287,8 @@ export default function ChatApp() {
         loading={loadingMsgs}
         onSend={handleSend}
         onSendImage={handleSendImage}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
         users={users}
         onlineIds={onlineIds}
         onChanged={refreshConversations}

@@ -159,7 +159,8 @@ export async function listMessages(
   const limit = Math.min(Math.max(opts.limit ?? 30, 1), 100)
 
   const messages = await prisma.chatMessage.findMany({
-    where: { conversationId, deletedAt: null },
+    // Deleted messages are kept as tombstones ("This message was deleted").
+    where: { conversationId },
     orderBy: { createdAt: 'desc' },
     take: limit,
     ...(opts.before ? { cursor: { id: opts.before }, skip: 1 } : {}),
@@ -366,4 +367,43 @@ export async function sendMediaMessage(
     }),
   ])
   return message
+}
+
+// ─── Edit / delete ───────────────────────────────────────────────────────────
+
+const EDIT_WINDOW_MS = 15 * 60 * 1000
+
+export async function editMessage(messageId: string, userId: string, content: string) {
+  const msg = await prisma.chatMessage.findUnique({
+    where: { id: messageId },
+    select: { senderId: true, createdAt: true, deletedAt: true, type: true },
+  })
+  if (!msg) throw new Error('Message not found')
+  if (msg.senderId !== userId) throw new Error('You can only edit your own messages')
+  if (msg.deletedAt) throw new Error('Cannot edit a deleted message')
+  if (msg.type !== 'TEXT') throw new Error('Only text messages can be edited')
+  if (Date.now() - new Date(msg.createdAt).getTime() > EDIT_WINDOW_MS) {
+    throw new Error('The edit window has passed')
+  }
+  const text = content.trim()
+  if (!text) throw new Error('Message cannot be empty')
+  return prisma.chatMessage.update({
+    where: { id: messageId },
+    data: { content: text, editedAt: new Date() },
+    include: { sender: { select: memberUserSelect } },
+  })
+}
+
+export async function deleteForEveryone(messageId: string, userId: string) {
+  const msg = await prisma.chatMessage.findUnique({
+    where: { id: messageId },
+    select: { senderId: true, deletedAt: true },
+  })
+  if (!msg) throw new Error('Message not found')
+  if (msg.senderId !== userId) throw new Error('You can only delete your own messages')
+  if (msg.deletedAt) return
+  await prisma.chatMessage.update({
+    where: { id: messageId },
+    data: { deletedAt: new Date(), content: '' },
+  })
 }

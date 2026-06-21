@@ -25,6 +25,8 @@ export interface ChatMessageDTO {
   content: string
   replyToId?: string | null
   deliveredAt?: string | null
+  editedAt?: string | null
+  deletedAt?: string | null
   createdAt: string
   sender?: ChatUserLite | null
 }
