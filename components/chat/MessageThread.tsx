@@ -85,6 +85,26 @@ function TypingDots() {
   )
 }
 
+// Voice-note / audio player with a 1x → 1.5x → 2x playback-speed toggle.
+function AudioPlayer({ src }: { src: string }) {
+  const ref = useRef<HTMLAudioElement>(null)
+  const [speed, setSpeed] = useState(1)
+  function cycleSpeed() {
+    const next = speed === 1 ? 1.5 : speed === 1.5 ? 2 : 1
+    setSpeed(next)
+    if (ref.current) ref.current.playbackRate = next
+  }
+  return (
+    <div className="flex items-center gap-2">
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <audio ref={ref} controls src={src} className="max-w-[200px] h-8" />
+      <button type="button" onClick={cycleSpeed} title="Playback speed" className="text-[10px] rounded-full border border-border-default px-1.5 py-0.5 shrink-0">
+        {speed}x
+      </button>
+    </div>
+  )
+}
+
 const SKELETON = [
   ['justify-start', '42%'],
   ['justify-end', '55%'],
@@ -143,12 +163,17 @@ export default function MessageThread({
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<ChatMessageDTO[]>([])
+  const [recording, setRecording] = useState(false)
+  const [recordSecs, setRecordSecs] = useState(0)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const docRef = useRef<HTMLInputElement>(null)
+  const mediaRecRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const typingChannelRef = useRef<RealtimeChannel | null>(null)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTypingSentRef = useRef(0)
@@ -254,6 +279,33 @@ export default function MessageThread({
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     send()
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream)
+      chunksRef.current = []
+      mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data) }
+      mr.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        onSendImage(new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' }))
+        stream.getTracks().forEach((t) => t.stop())
+      }
+      mr.start()
+      mediaRecRef.current = mr
+      setRecording(true)
+      setRecordSecs(0)
+      recTimerRef.current = setInterval(() => setRecordSecs((s) => s + 1), 1000)
+    } catch {
+      alert('Microphone access is required to record a voice note.')
+    }
+  }
+
+  function stopRecording() {
+    mediaRecRef.current?.stop()
+    setRecording(false)
+    if (recTimerRef.current) clearInterval(recTimerRef.current)
   }
 
   if (!conversation) {
@@ -471,10 +523,29 @@ export default function MessageThread({
                             </span>
                           </a>
                         ) : m.type === 'AUDIO' ? (
-                          // eslint-disable-next-line jsx-a11y/media-has-caption
-                          <audio controls src={m.content} className="max-w-[240px]" />
+                          <AudioPlayer src={m.content} />
                         ) : (
-                          <p className="text-sm whitespace-pre-wrap break-words">{formatText(m.content)}</p>
+                          <>
+                            <p className="text-sm whitespace-pre-wrap break-words">{formatText(m.content)}</p>
+                            {m.linkPreview && (
+                              <a
+                                href={m.linkPreview.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-1 block rounded-lg overflow-hidden border border-border-default bg-surface-raised text-text-primary max-w-[280px]"
+                              >
+                                {m.linkPreview.image && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={m.linkPreview.image} alt="" className="w-full h-32 object-cover" />
+                                )}
+                                <div className="p-2">
+                                  {m.linkPreview.title && <p className="text-xs font-medium truncate">{m.linkPreview.title}</p>}
+                                  {m.linkPreview.description && <p className="text-[11px] text-text-secondary line-clamp-2">{m.linkPreview.description}</p>}
+                                  <p className="text-[10px] text-text-secondary truncate mt-0.5">{m.linkPreview.url}</p>
+                                </div>
+                              </a>
+                            )}
+                          </>
                         )}
                       </>
                     )}
@@ -571,6 +642,15 @@ export default function MessageThread({
             hidden
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onSendImage(f); e.target.value = '' }}
           />
+          {recording ? (
+            <button type="button" onClick={stopRecording} title="Stop recording" className="h-10 px-3 shrink-0 rounded-full bg-red-500 text-white text-xs flex items-center gap-1">
+              ⏹ {recordSecs}s
+            </button>
+          ) : (
+            <button type="button" onClick={() => void startRecording()} title="Record voice note" className="h-10 w-10 shrink-0 rounded-full border border-border-default flex items-center justify-center text-text-secondary hover:text-text-primary">
+              🎤
+            </button>
+          )}
           <textarea
             ref={taRef}
             value={draft}

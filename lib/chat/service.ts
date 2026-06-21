@@ -174,6 +174,47 @@ export async function listMessages(
   return messages.reverse().map((m) => ({ ...m, starred: m.stars.length > 0 }))
 }
 
+const URL_RE = /(https?:\/\/[^\s]+)/i
+
+// Best-effort Open-Graph preview. Server-side fetch (avoids client CORS), short
+// timeout + size cap. (SSRF hardening — allowlist/Block private IPs — is a prod TODO.)
+async function fetchOgPreview(url: string) {
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 5000)
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; RigForgeBot/1.0)' },
+    })
+    clearTimeout(timer)
+    if (!res.ok || !(res.headers.get('content-type') ?? '').includes('text/html')) return null
+    const html = (await res.text()).slice(0, 200_000)
+    const og = (prop: string): string | undefined => {
+      const a = html.match(new RegExp(`<meta[^>]+property=["']og:${prop}["'][^>]+content=["']([^"']+)["']`, 'i'))
+      const b = html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:${prop}["']`, 'i'))
+      return (a?.[1] ?? b?.[1])?.trim()
+    }
+    const title = og('title') ?? html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim()
+    const description = og('description')
+    let image = og('image')
+    if (image?.startsWith('/')) {
+      try { image = new URL(url).origin + image } catch { /* ignore */ }
+    }
+    if (!title && !description && !image) return null
+    return { url, title, description, image }
+  } catch {
+    return null
+  }
+}
+
+async function enrichLinkPreview(messageId: string, content: string) {
+  const match = content.match(URL_RE)
+  if (!match) return
+  const preview = await fetchOgPreview(match[1])
+  if (!preview) return
+  await prisma.chatMessage.update({ where: { id: messageId }, data: { linkPreview: preview } }).catch(() => {})
+}
+
 export async function sendMessage(
   conversationId: string,
   userId: string,
@@ -207,6 +248,8 @@ export async function sendMessage(
       data: { lastReadAt: new Date() },
     }),
   ])
+  // Fire-and-forget Open-Graph preview; delivered live via the ChatMessage UPDATE sub.
+  void enrichLinkPreview(message.id, text)
   return message
 }
 
