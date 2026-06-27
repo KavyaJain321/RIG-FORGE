@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db'
 import { createEvent, isUserGcalConnected } from '@/lib/assistant/tools/gcal'
 import { isGoogleReauthError } from '@/lib/google/oauth'
 import { generate } from '@/lib/llm/generate'
+import { APP_NAME } from '@/lib/branding'
 
 // POST /api/google/meet/schedule — { request: "<natural language>" }
 // Forgie turns the request into a Google Calendar event with a Meet link.
@@ -49,14 +50,21 @@ Default the duration to 30 minutes if no end is implied. Resolve relative dates 
         .filter((e): e is string => Boolean(e))
     }
 
+    // Use OUR in-app call link (opens the embedded call inside RF), not Google Meet.
+    const slug = parsed.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 24)
+    const room = `rigforge-${slug ? slug + '-' : ''}${Math.random().toString(36).slice(2, 8)}`
+    const base = (process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/+$/, '')
+    const callLink = `${base}/dashboard/workspace?call=${room}`
+
     const event = await createEvent(payload.userId, {
       title: parsed.title,
       start: parsed.start,
       end: parsed.end,
       attendees: attendeeEmails,
-      withMeetLink: true,
+      withMeetLink: false,
+      description: `${APP_NAME} video call — join here:\n${callLink}`,
     })
-    return successResponse({ id: event.id, title: event.title, start: event.start, meetLink: event.meetLink, eventUrl: event.eventUrl, attendees: attendeeEmails })
+    return successResponse({ id: event.id, title: event.title, start: event.start, meetLink: callLink, eventUrl: event.eventUrl, attendees: attendeeEmails })
   } catch (error) {
     if (isGoogleReauthError(error)) return errorResponse('Reconnect your Google account to schedule meetings.', 401)
     return errorResponse(error instanceof Error ? error.message : 'Failed to schedule the meeting', 500)

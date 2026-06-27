@@ -123,7 +123,7 @@ export default function MeetPanel() {
           <div className="mt-3 p-3 rounded-lg bg-[#EDE7FB] text-[#2A1A4A] text-sm">
             🤖 Scheduled <span className="font-medium">{scheduled.title}</span>
             {scheduled.start ? ` · ${new Date(scheduled.start).toLocaleString([], { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}
-            {scheduled.meetLink && <> · <a href={scheduled.meetLink} target="_blank" rel="noopener noreferrer" className="underline">Meet link</a></>}
+            {scheduled.meetLink && <> · <a href={scheduled.meetLink} target="_blank" rel="noopener noreferrer" className="underline">Join call</a></>}
             {scheduled.eventUrl && <> · <a href={scheduled.eventUrl} target="_blank" rel="noopener noreferrer" className="underline">Calendar</a></>}
           </div>
         )}
