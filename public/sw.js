@@ -35,7 +35,14 @@ self.addEventListener('push', (event) => {
     data: { url: data.url || '/dashboard/messages' },
     tag: data.tag || undefined,
   }
-  event.waitUntil(self.registration.showNotification(title, options))
+  // Don't buzz the user if they're already looking at the messages tab.
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const onChatFocused = clients.some((c) => c.focused && c.url && c.url.includes('/dashboard/messages'))
+      if (onChatFocused) return
+      return self.registration.showNotification(title, options)
+    }),
+  )
 })
 
 self.addEventListener('notificationclick', (event) => {
