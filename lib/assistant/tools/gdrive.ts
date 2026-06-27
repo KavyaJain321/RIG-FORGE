@@ -81,6 +81,30 @@ export async function searchDrive(userId: string, args: DriveSearchArgs) {
   }
 }
 
+// Recently-modified files (default Drive-panel view when there's no search query).
+export async function recentDriveFiles(userId: string, limit = 25) {
+  const auth = await getAuthorizedClient(userId)
+  const drive = google.drive({ version: 'v3', auth })
+  const res = await drive.files.list({
+    q: 'trashed = false',
+    pageSize: Math.min(Math.max(limit, 1), 50),
+    fields: 'files(id, name, mimeType, modifiedTime, size, webViewLink, owners(displayName, emailAddress))',
+    orderBy: 'modifiedTime desc',
+  })
+  return {
+    results: (res.data.files ?? []).map((f) => ({
+      id: f.id,
+      name: f.name,
+      mimeType: f.mimeType,
+      size: f.size ? parseInt(f.size, 10) : null,
+      modifiedTime: f.modifiedTime,
+      url: f.webViewLink,
+      owners: f.owners?.map((o) => o.displayName ?? o.emailAddress) ?? [],
+      isFolder: f.mimeType === FOLDER_MIME,
+    })),
+  }
+}
+
 // ─── Tool: list folder ───────────────────────────────────────────────────────
 
 export interface ListFolderArgs {

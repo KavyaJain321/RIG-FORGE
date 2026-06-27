@@ -5,11 +5,13 @@ import { useEffect, useState } from 'react'
 import MailPanel from '@/components/workspace/MailPanel'
 import CodePanel from '@/components/workspace/CodePanel'
 import MeetPanel from '@/components/workspace/MeetPanel'
+import DrivePanel from '@/components/workspace/DrivePanel'
 
 const TABS = [
   { key: 'mail', label: '📬 Mail' },
   { key: 'code', label: '⌥ Code' },
   { key: 'meet', label: '📹 Meet' },
+  { key: 'drive', label: '📁 Drive' },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
@@ -32,7 +34,7 @@ export default function WorkspacePage() {
             type="button"
             onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-sm font-mono -mb-px border-b-2 transition-colors ${
-              tab === t.key ? 'border-[#3F7A0A] text-text-primary' : 'border-transparent text-text-secondary hover:text-text-primary'
+              tab === t.key ? 'border-accent-ink text-text-primary' : 'border-transparent text-text-secondary hover:text-text-primary'
             }`}
           >
             {t.label}
@@ -43,6 +45,7 @@ export default function WorkspacePage() {
       {tab === 'mail' && <MailPanel />}
       {tab === 'code' && <CodePanel />}
       {tab === 'meet' && <MeetPanel />}
+      {tab === 'drive' && <DrivePanel />}
     </div>
   )
 }
