@@ -23,6 +23,12 @@ async function api<T>(url: string): Promise<T> {
   if (!r.ok || j.error) throw new Error(j.error || 'Request failed')
   return j.data as T
 }
+async function api2<T>(url: string, body: unknown): Promise<T> {
+  const r = await fetch(url, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const j = await r.json()
+  if (!r.ok || j.error) throw new Error(j.error || 'Request failed')
+  return j.data as T
+}
 
 function shortDate(d: string): string {
   const dt = new Date(d)
@@ -37,6 +43,22 @@ export default function CodePanel() {
   const [view, setView] = useState<View>('commits')
   const [items, setItems] = useState<Commit[] | PR[] | Issue[]>([])
   const [loadingItems, setLoadingItems] = useState(false)
+  const [summary, setSummary] = useState('')
+  const [summarizing, setSummarizing] = useState(false)
+
+  async function summarize() {
+    if (!active) return
+    setSummarizing(true)
+    setSummary('')
+    try {
+      const r = await api2<{ text: string }>('/api/github/assist', { repo: active.name, view })
+      setSummary(r.text)
+    } catch (e) {
+      setSummary('Forgie failed: ' + (e as Error).message)
+    } finally {
+      setSummarizing(false)
+    }
+  }
 
   useEffect(() => {
     void (async () => {
@@ -66,10 +88,12 @@ export default function CodePanel() {
   function openRepo(r: Repo) {
     setActive(r)
     setView('commits')
+    setSummary('')
     void loadItems(r.name, 'commits')
   }
   function switchView(v: View) {
     setView(v)
+    setSummary('')
     if (active) void loadItems(active.name, v)
   }
 
@@ -136,11 +160,14 @@ export default function CodePanel() {
                 <p className="text-lg font-medium text-text-primary truncate">{active.name}</p>
                 <a href={active.url} target="_blank" rel="noopener noreferrer" className="text-xs font-mono text-accent-ink shrink-0">Open ↗</a>
               </div>
-              <div className="flex gap-2 mt-3">
+              <div className="flex flex-wrap items-center gap-2 mt-3">
                 {subTab('commits', 'Commits')}
                 {subTab('prs', 'Pull requests')}
                 {subTab('issues', 'Issues')}
+                <button type="button" onClick={() => void summarize()} disabled={summarizing} className="px-3 py-1.5 text-xs font-mono rounded-full border border-border-default text-text-primary disabled:opacity-40">✨ Summarize</button>
               </div>
+              {summarizing && <p className="text-xs text-accent-ink mt-2">Forgie is reading the repo…</p>}
+              {summary && <div className="mt-2 p-2.5 rounded-lg bg-[#EDE7FB] text-[#2A1A4A] text-sm whitespace-pre-wrap">🤖 {summary}</div>}
             </div>
             <div className="flex-1 overflow-y-auto">
               {loadingItems ? (

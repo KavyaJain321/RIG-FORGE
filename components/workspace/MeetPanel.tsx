@@ -15,6 +15,25 @@ export default function MeetPanel() {
   const [activeRoom, setActiveRoom] = useState<string | null>(null)
   const [topic, setTopic] = useState('')
   const [copied, setCopied] = useState(false)
+  const [sched, setSched] = useState('')
+  const [scheduling, setScheduling] = useState(false)
+  const [scheduled, setScheduled] = useState<{ title: string; meetLink: string | null; eventUrl: string | null; start: string | null } | null>(null)
+  const [schedErr, setSchedErr] = useState('')
+
+  async function scheduleMeeting() {
+    if (!sched.trim()) return
+    setScheduling(true); setScheduled(null); setSchedErr('')
+    try {
+      const r = await fetch('/api/google/meet/schedule', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request: sched.trim() }) })
+      const j = await r.json()
+      if (!r.ok || j.error) { setSchedErr(j.error || 'Failed to schedule'); return }
+      setScheduled(j.data); setSched('')
+    } catch (e) {
+      setSchedErr((e as Error).message)
+    } finally {
+      setScheduling(false)
+    }
+  }
 
   // Join straight into a call when arriving via an RF invite link (?call=<room>).
   useEffect(() => {
@@ -81,6 +100,33 @@ export default function MeetPanel() {
             📹 Start call
           </button>
         </div>
+      </div>
+
+      {/* Schedule with Forgie */}
+      <div className="p-6 border-t border-border-default">
+        <p className="text-sm font-medium text-text-primary mb-1">✨ Schedule with Forgie</p>
+        <p className="text-xs text-text-secondary mb-4">Describe it in plain English — Forgie creates a calendar event with a Meet link.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={sched}
+            onChange={(e) => setSched(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void scheduleMeeting() }}
+            placeholder="e.g. sync with Pranav tomorrow 3pm for 30 min"
+            className="flex-1 min-w-[240px] h-10 px-3 rounded-lg border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink"
+          />
+          <button type="button" onClick={() => void scheduleMeeting()} disabled={scheduling || !sched.trim()} className="h-10 px-5 rounded-full border border-border-default text-text-primary font-mono text-xs disabled:opacity-40">
+            {scheduling ? 'Scheduling…' : 'Schedule'}
+          </button>
+        </div>
+        {schedErr && <p className="text-xs text-status-danger mt-2">{schedErr}</p>}
+        {scheduled && (
+          <div className="mt-3 p-3 rounded-lg bg-[#EDE7FB] text-[#2A1A4A] text-sm">
+            🤖 Scheduled <span className="font-medium">{scheduled.title}</span>
+            {scheduled.start ? ` · ${new Date(scheduled.start).toLocaleString([], { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}
+            {scheduled.meetLink && <> · <a href={scheduled.meetLink} target="_blank" rel="noopener noreferrer" className="underline">Meet link</a></>}
+            {scheduled.eventUrl && <> · <a href={scheduled.eventUrl} target="_blank" rel="noopener noreferrer" className="underline">Calendar</a></>}
+          </div>
+        )}
       </div>
     </div>
   )
