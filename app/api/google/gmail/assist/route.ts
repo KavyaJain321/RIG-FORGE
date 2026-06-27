@@ -4,6 +4,7 @@ import type { ModelMessage } from 'ai'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { getMessage, isUserGmailEnabled } from '@/lib/assistant/tools/gmail'
+import { isGoogleReauthError } from '@/lib/google/oauth'
 import { generate } from '@/lib/llm/generate'
 
 // POST /api/google/gmail/assist — { messageId, mode: 'summarize' | 'reply', instruction? }
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
     const result = await generate(messages)
     return successResponse({ text: (result.text || '').trim(), mode })
   } catch (error) {
+    if (isGoogleReauthError(error)) return errorResponse('Reconnect your Google account to use Mail.', 401)
     return errorResponse(error instanceof Error ? error.message : 'Forgie could not process this email', 500)
   }
 }

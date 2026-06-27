@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { getMessage, isUserGmailEnabled } from '@/lib/assistant/tools/gmail'
+import { isGoogleReauthError } from '@/lib/google/oauth'
 
 // GET /api/google/gmail/message?id=<messageId> — full message body for the reading pane.
 export async function GET(request: NextRequest) {
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
     const message = await getMessage(payload.userId, { messageId: id })
     return successResponse(message)
   } catch (error) {
+    if (isGoogleReauthError(error)) return errorResponse('Reconnect your Google account to use Mail.', 401)
     return errorResponse(error instanceof Error ? error.message : 'Failed to load message', 500)
   }
 }

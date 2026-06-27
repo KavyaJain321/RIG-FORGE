@@ -87,7 +87,9 @@ export default function MailPanel() {
       const r = await api<{ messages: MailMsg[] }>(`/api/google/gmail/list?scope=${scope}&limit=25`)
       setMessages(r.messages)
     } catch (e) {
-      console.error('[mail] inbox', e)
+      // Stale/revoked Google token → fall back to the connect prompt.
+      if (/reconnect/i.test((e as Error).message)) setConnected(false)
+      else console.error('[mail] inbox', e)
     } finally {
       setLoading(false)
     }

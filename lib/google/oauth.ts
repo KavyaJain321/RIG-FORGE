@@ -23,6 +23,14 @@ import { encryptSecret, decryptSecret } from '@/lib/secret-box'
 // Refresh access tokens this many ms before they expire.
 const REFRESH_THRESHOLD_MS = 5 * 60 * 1000  // 5 minutes
 
+// Thrown when a stored Google token can no longer be refreshed (revoked /
+// belongs to a different OAuth client). Callers should surface a "reconnect
+// Google" prompt rather than a 500.
+export const GOOGLE_REAUTH_REQUIRED = 'GOOGLE_REAUTH_REQUIRED'
+export function isGoogleReauthError(e: unknown): boolean {
+  return e instanceof Error && e.message === GOOGLE_REAUTH_REQUIRED
+}
+
 export const GOOGLE_SCOPES = [
   'openid',
   'email',
@@ -149,7 +157,19 @@ export async function getAuthorizedClient(userId: string): Promise<OAuth2Client>
   // If close to expiry, force a refresh and persist
   const msUntilExpiry = integ.expiresAt.getTime() - Date.now()
   if (msUntilExpiry < REFRESH_THRESHOLD_MS) {
-    const { credentials } = await client.refreshAccessToken()
+    let credentials
+    try {
+      ;({ credentials } = await client.refreshAccessToken())
+    } catch (err) {
+      // Refresh token revoked / invalid (e.g. user removed access, or token
+      // belongs to a different OAuth client) → surface a clean "reconnect"
+      // signal instead of a raw 500.
+      const msg = err instanceof Error ? err.message : String(err)
+      if (/invalid_grant|invalid_token|unauthorized|invalid_client/i.test(msg)) {
+        throw new Error(GOOGLE_REAUTH_REQUIRED)
+      }
+      throw err
+    }
     if (credentials.access_token) {
       const newExpiry = new Date(credentials.expiry_date ?? Date.now() + 3600 * 1000)
       await prisma.googleIntegration.update({

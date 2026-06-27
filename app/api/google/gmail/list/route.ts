@@ -4,6 +4,7 @@ import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { prisma } from '@/lib/db'
 import { searchMessages, isUserGmailEnabled } from '@/lib/assistant/tools/gmail'
+import { isGoogleReauthError } from '@/lib/google/oauth'
 
 // Personal-mail providers — never treated as "team" domains, so a teammate whose
 // login email happens to be gmail.com doesn't drag all of gmail into the filter.
@@ -76,6 +77,7 @@ export async function GET(request: NextRequest) {
     const result = await searchMessages(payload.userId, { query, limit })
     return successResponse({ ...result, scope, filtered: scope === 'work' && clauseCount > 0 })
   } catch (error) {
+    if (isGoogleReauthError(error)) return errorResponse('Reconnect your Google account to use Mail.', 401)
     return errorResponse(error instanceof Error ? error.message : 'Failed to load mail', 500)
   }
 }

@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { sendMessage, isUserGmailEnabled } from '@/lib/assistant/tools/gmail'
+import { isGoogleReauthError } from '@/lib/google/oauth'
 
 // POST /api/google/gmail/send — { to, subject, body, cc? } — send / reply from RF.
 export async function POST(request: NextRequest) {
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
     })
     return successResponse(result)
   } catch (error) {
+    if (isGoogleReauthError(error)) return errorResponse('Reconnect your Google account to use Mail.', 401)
     return errorResponse(error instanceof Error ? error.message : 'Failed to send', 500)
   }
 }
