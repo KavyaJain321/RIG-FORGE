@@ -12,6 +12,7 @@ export interface TokenPayload {
   role: string
   isOnboarding: boolean
   mustChangePassword: boolean
+  organizationId: string
 }
 
 /** Returns true for ADMIN and SUPER_ADMIN roles. */
@@ -103,7 +104,9 @@ export function verifyToken(token: string): TokenPayload | null {
       'email' in decoded &&
       'role' in decoded
     ) {
-      return decoded as TokenPayload
+      const p = decoded as TokenPayload
+      // Backward-compat: tokens minted before multi-tenancy lack organizationId.
+      return { ...p, organizationId: p.organizationId ?? 'rig360' }
     }
     return null
   } catch {

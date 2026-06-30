@@ -22,7 +22,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     const valid = await comparePassword(password, user.passwordHash)
     if (!valid) return errorResponse('Invalid email or password', 401)
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role, isOnboarding: user.isOnboarding, mustChangePassword: user.mustChangePassword })
+    const token = signToken({ userId: user.id, email: user.email, role: user.role, isOnboarding: user.isOnboarding, mustChangePassword: user.mustChangePassword, organizationId: user.organizationId })
     if (!token) return errorResponse('Authentication service unavailable', 503)
 
     // If approved user: set WORKING + create daily activity.

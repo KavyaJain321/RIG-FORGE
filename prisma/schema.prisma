@@ -727,3 +727,18 @@ model PushSubscription {
   @@index([userId])
   @@index([organizationId])
 }
+
+// ─── Organizations (multi-tenancy) ─────────────────────────────────────────────
+// One row per tenant (customer org); `organizationId` on every other table points
+// here. Single-org for now (the seeded "rig360"). Real provisioning + per-org
+// branding/plan arrive with self-serve signup (Phase 2+).
+model Organization {
+  id        String   @id // the organizationId stamped on every table (e.g. "rig360")
+  name      String
+  slug      String   @unique
+  plan      String   @default("internal") // billing tier (later)
+  branding  Json? // logo / colors / app-name overrides (later)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
