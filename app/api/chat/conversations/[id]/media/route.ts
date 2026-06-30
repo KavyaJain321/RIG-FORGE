@@ -2,14 +2,17 @@ import { type NextRequest } from 'next/server'
 
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
-import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { sendMediaMessage } from '@/lib/chat/service'
 
-const BUCKET = 'chat-media'
-const MAX_BYTES = 50 * 1024 * 1024
+const MAX_BYTES = 100 * 1024 * 1024 // 100 MB
 
-// POST /api/chat/conversations/[id]/media — multipart upload of an image,
-// audio note, or document → creates an IMAGE/AUDIO/FILE message.
+// POST /api/chat/conversations/[id]/media
+// Body: { key, fileName, fileSize, contentType }
+//
+// COMMIT step. The file has already been uploaded directly to R2 via a presigned
+// PUT (see ./presign). This just records the message pointing at the stable proxy
+// path. We validate the key is scoped to this conversation so a member can't attach
+// media from another thread.
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const token = getTokenFromCookies(request)
@@ -17,27 +20,27 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid or expired session', 401)
 
-    const form = await request.formData().catch(() => null)
-    const file = form?.get('file')
-    if (!(file instanceof File)) return errorResponse('file is required (multipart form-data)', 400)
-    if (file.size > MAX_BYTES) return errorResponse('file must be under 50MB', 400)
+    const body = (await request.json().catch(() => null)) as
+      | { key?: string; fileName?: string; fileSize?: number; contentType?: string }
+      | null
+    const key = body?.key?.trim()
+    const fileName = body?.fileName?.trim() || 'file'
+    const fileSize = typeof body?.fileSize === 'number' ? body.fileSize : undefined
+    const contentType = body?.contentType || 'application/octet-stream'
 
-    const admin = getSupabaseAdmin()
-    if (!admin) return errorResponse('Storage not configured', 500)
+    if (!key) return errorResponse('key is required', 400)
+    if (!key.startsWith(`messages/${params.id}/`)) return errorResponse('Invalid media key', 400)
+    if (fileSize !== undefined && fileSize > MAX_BYTES) return errorResponse('File must be under 100MB', 400)
 
-    const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin'
-    const path = `messages/${params.id}/${Date.now()}.${ext}`
-    const buffer = Buffer.from(await file.arrayBuffer())
+    const mediaType = contentType.startsWith('image/')
+      ? 'IMAGE'
+      : contentType.startsWith('audio/')
+        ? 'AUDIO'
+        : 'FILE'
+    const proxyPath = `/api/chat/media/${key}`
 
-    const { error: upErr } = await admin.storage
-      .from(BUCKET)
-      .upload(path, buffer, { contentType: file.type || 'application/octet-stream', upsert: true })
-    if (upErr) return errorResponse(`Upload failed: ${upErr.message}`, 500)
-
-    // Bucket is private — store a stable authenticated-proxy path (not a public URL).
-    const mediaUrl = `/api/chat/media/${path}`
-    const mediaType = file.type.startsWith('image/') ? 'IMAGE' : file.type.startsWith('audio/') ? 'AUDIO' : 'FILE'
-    const message = await sendMediaMessage(params.id, payload.userId, mediaType, mediaUrl, file.name, file.size)
+    // sendMediaMessage re-checks membership.
+    const message = await sendMediaMessage(params.id, payload.userId, mediaType, proxyPath, fileName, fileSize)
     return successResponse({ message })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unexpected error occurred'

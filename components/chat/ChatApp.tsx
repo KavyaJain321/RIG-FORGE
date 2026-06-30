@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useAuthStore } from '@/store/authStore'
 import { getSupabaseClient } from '@/lib/supabase/client'
+import { compressImage } from '@/lib/image/compress'
 import type {
   ConversationSummary,
   ChatMessageDTO,
@@ -256,24 +257,75 @@ export default function ChatApp() {
   )
 
   const handleSendImage = useCallback(
-    async (file: File) => {
-      if (!activeId) return
-      const fd = new FormData()
-      fd.append('file', file)
+    async (rawFile: File) => {
+      const convId = activeIdRef.current
+      if (!convId) return
+
+      // Compress images client-side (4MB photo → ~300KB) before upload.
+      const file = await compressImage(rawFile)
+      const mediaType: ChatMessageDTO['type'] = file.type.startsWith('image/')
+        ? 'IMAGE'
+        : file.type.startsWith('audio/')
+          ? 'AUDIO'
+          : 'FILE'
+
+      // Optimistic bubble with a local preview so the send feels instant.
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const localUrl = URL.createObjectURL(file)
+      const optimistic = {
+        id: tempId,
+        conversationId: convId,
+        senderId: meIdRef.current,
+        kind: 'USER',
+        type: mediaType,
+        content: localUrl,
+        fileName: file.name,
+        fileSize: file.size,
+        createdAt: new Date().toISOString(),
+      } as ChatMessageDTO
+      setMessages((prev) => [...prev, optimistic])
+
       try {
+        // 1) Ask for a signed upload URL + the object key.
+        const pre = await api<{ uploadUrl: string; key: string }>(
+          `/api/chat/conversations/${convId}/media/presign`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }),
+          },
+        )
+        // 2) Upload the bytes DIRECTLY to the rf-media Worker (R2).
+        const put = await fetch(pre.uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        })
+        if (!put.ok) throw new Error(`Upload failed (${put.status})`)
+        // 3) Commit — record the message pointing at the stable proxy path.
         const data = await api<{ message: ChatMessageDTO }>(
-          `/api/chat/conversations/${activeId}/media`,
-          { method: 'POST', body: fd },
+          `/api/chat/conversations/${convId}/media`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: pre.key, fileName: file.name, fileSize: file.size, contentType: file.type }),
+          },
         )
         const msg = data.message
-        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
+        setMessages((prev) => {
+          const withoutTemp = prev.filter((m) => m.id !== tempId)
+          return withoutTemp.some((m) => m.id === msg.id) ? withoutTemp : [...withoutTemp, msg]
+        })
+        URL.revokeObjectURL(localUrl)
         void refreshConversations()
       } catch (err) {
-        console.error('[chat] image', err)
-        alert(err instanceof Error ? err.message : 'Image upload failed')
+        console.error('[chat] media upload', err)
+        setMessages((prev) => prev.filter((m) => m.id !== tempId))
+        URL.revokeObjectURL(localUrl)
+        alert(err instanceof Error ? err.message : 'Upload failed')
       }
     },
-    [activeId, refreshConversations],
+    [refreshConversations],
   )
 
   const handleEdit = useCallback(

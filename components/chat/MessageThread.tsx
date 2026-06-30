@@ -690,7 +690,7 @@ export default function MessageThread({
                         )}
                         {m.type === 'IMAGE' ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.content} alt="" className="rounded-lg max-w-full max-h-72 object-cover" />
+                          <img src={m.content} alt="" loading="lazy" decoding="async" className="rounded-lg max-w-full max-h-72 object-cover" />
                         ) : m.type === 'FILE' ? (
                           <a href={m.content} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${mine ? 'bg-text-primary/[0.15]' : 'bg-text-primary//[0.04]'}`}>
                             <span className="text-lg shrink-0">📄</span>

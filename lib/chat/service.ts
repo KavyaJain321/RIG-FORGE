@@ -16,6 +16,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { sendPushToUsers } from '@/lib/push/send'
 import { safeFetch } from '@/lib/net/safe-fetch'
+import { deleteObject, keyFromProxyPath } from '@/lib/storage/r2'
 import { APP_NAME_UPPER } from '@/lib/branding'
 import { mentionsForgie, replyAsForgieInChat } from './forgie'
 
@@ -583,7 +584,7 @@ export async function editMessage(messageId: string, userId: string, content: st
 export async function deleteForEveryone(messageId: string, userId: string) {
   const msg = await prisma.chatMessage.findUnique({
     where: { id: messageId },
-    select: { senderId: true, deletedAt: true },
+    select: { senderId: true, deletedAt: true, type: true, content: true },
   })
   if (!msg) throw new Error('Message not found')
   if (msg.senderId !== userId) throw new Error('You can only delete your own messages')
@@ -592,6 +593,11 @@ export async function deleteForEveryone(messageId: string, userId: string) {
     where: { id: messageId },
     data: { deletedAt: new Date(), content: '' },
   })
+  // Free the underlying R2 object for media messages (best-effort).
+  if (msg.type === 'IMAGE' || msg.type === 'FILE' || msg.type === 'AUDIO') {
+    const key = keyFromProxyPath(msg.content)
+    if (key) void deleteObject(key)
+  }
 }
 
 // ─── Reactions ───────────────────────────────────────────────────────────────

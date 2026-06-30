@@ -1,0 +1,15 @@
+name = "rf-media"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+account_id = "455ec6856576fd2aef0c22a55bf6b78d"
+
+# Bind the R2 bucket — the Worker reads/writes objects directly (no S3 endpoint).
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "rf-chat-media"
+
+# Custom domain (forge.rig360media.com) is attached separately via the dashboard
+# so the deploy never touches DNS. See go-live notes.
+#
+# R2_SIGNING_SECRET is NOT stored here — set it as a secret:
+#   wrangler secret put R2_SIGNING_SECRET
