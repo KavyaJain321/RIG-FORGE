@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
-import { isAdminRole } from '@/lib/auth'
+import { isAdminRole } from '@/lib/roles'
 import { useSocket } from '@/hooks/useSocket'
 import Avatar from '@/components/ui/Avatar'
 import StatusDot from '@/components/ui/StatusDot'

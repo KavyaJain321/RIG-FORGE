@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 import { useAuth } from '@/hooks/useAuth'
-import { isAdminRole } from '@/lib/auth'
+import { isAdminRole } from '@/lib/roles'
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
 import type { WeeklyReportSummary, ApiResponse, DailyLogEntry } from '@/lib/types'
 

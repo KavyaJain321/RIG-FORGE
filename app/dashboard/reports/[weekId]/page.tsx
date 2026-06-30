@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
 import { useAuth } from '@/hooks/useAuth'
-import { isAdminRole } from '@/lib/auth'
+import { isAdminRole } from '@/lib/roles'
 import { WeeklyReportEmployeeCard } from '@/components/reports/WeeklyReportEmployeeCard'
 import type {
   WeeklyReportSnapshot,

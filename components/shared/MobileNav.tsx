@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState, type ReactNode } from 'react'
 
 import { useAuthStore } from '@/store/authStore'
-import { isAdminRole } from '@/lib/auth'
+import { isAdminRole } from '@/lib/roles'
 
 // ── Icons (inline SVG so we don't pull an icon lib into the bundle) ──────────
 const ic = 'h-[22px] w-[22px]'

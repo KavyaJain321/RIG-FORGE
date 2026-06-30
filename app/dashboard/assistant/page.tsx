@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { useAuth } from '@/hooks/useAuth'
-import { isAdminRole } from '@/lib/auth'
+import { isAdminRole } from '@/lib/roles'
 
 interface Stats {
   totals: { conversations: number; messages: number; auditEntries: number }

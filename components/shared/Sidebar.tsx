@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
-import { isAdminRole } from '@/lib/auth'
+import { isAdminRole } from '@/lib/roles'
 import LogoutLogModal from '@/components/shared/LogoutLogModal'
 import { APP_NAME } from '@/lib/branding'
 

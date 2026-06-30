@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { isAdminRole } from '@/lib/auth'
+import { isAdminRole } from '@/lib/roles'
 import AdminDashboard from '@/components/dashboard/AdminDashboard'
 import EmployeeDashboard from '@/components/dashboard/EmployeeDashboard'
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { useAuth } from '@/hooks/useAuth'
-import { isAdminRole } from '@/lib/auth'
+import { isAdminRole } from '@/lib/roles'
 import ProjectFilters from '@/components/projects/ProjectFilters'
 import ProjectListRow from '@/components/projects/ProjectListRow'
 import ProjectRowSkeleton from '@/components/projects/ProjectRowSkeleton'

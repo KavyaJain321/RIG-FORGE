@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
 import { useThread } from '@/hooks/useThread'
 import { useAuthStore } from '@/store/authStore'
-import { isAdminRole } from '@/lib/auth'
+import { isAdminRole } from '@/lib/roles'
 import type { LocalMessage, ThreadType } from '@/components/thread/types'
 
 // ─── Props ────────────────────────────────────────────────────────────────────

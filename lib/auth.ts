@@ -2,6 +2,8 @@ import { type NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 
+import { setOrgContext } from '@/lib/tenant-context'
+
 export const COOKIE_NAME = 'forge-token'
 
 const BCRYPT_ROUNDS = 12
@@ -15,10 +17,10 @@ export interface TokenPayload {
   organizationId: string
 }
 
-/** Returns true for ADMIN and SUPER_ADMIN roles. */
-export function isAdminRole(role: string): boolean {
-  return role === 'ADMIN' || role === 'SUPER_ADMIN'
-}
+// Re-exported from the client-safe module so server code can keep importing it
+// from '@/lib/auth' while client components import from '@/lib/roles' (avoiding
+// pulling node:async_hooks / jsonwebtoken into the browser bundle).
+export { isAdminRole } from '@/lib/roles'
 
 /**
  * Allowlist gate for the hidden developer dashboard (/dashboard/dev).
@@ -106,7 +108,11 @@ export function verifyToken(token: string): TokenPayload | null {
     ) {
       const p = decoded as TokenPayload
       // Backward-compat: tokens minted before multi-tenancy lack organizationId.
-      return { ...p, organizationId: p.organizationId ?? 'rig360' }
+      const organizationId = p.organizationId ?? 'rig360'
+      // Bind this request's org so the Prisma org-scope extension can filter
+      // every query for the rest of the async execution.
+      setOrgContext(organizationId)
+      return { ...p, organizationId }
     }
     return null
   } catch {
