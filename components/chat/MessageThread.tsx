@@ -791,7 +791,7 @@ export default function MessageThread({
             <button type="button" onClick={() => setReplyingTo(null)} className="text-text-secondary hover:text-text-primary">✕</button>
           </div>
         )}
-        <form onSubmit={handleSubmit} className="p-3 flex items-end gap-2">
+        <form onSubmit={handleSubmit} className="p-3 flex flex-wrap items-end gap-2">
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -850,12 +850,12 @@ export default function MessageThread({
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
             rows={1}
             placeholder="Type a message…  (Shift+Enter for new line)"
-            className="flex-1 max-h-[120px] py-2 px-4 rounded-2xl border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink resize-none leading-5"
+            className="order-first w-full sm:order-none sm:w-auto sm:flex-1 max-h-[120px] py-2 px-4 rounded-2xl border border-border-default bg-surface-raised text-sm outline-none focus:border-accent-ink resize-none leading-5"
           />
           <button
             type="submit"
             disabled={!draft.trim()}
-            className="h-10 px-5 rounded-full bg-[#3F7A0A] text-white font-mono text-xs hover:bg-[#356a08] disabled:opacity-40 transition-colors"
+            className="ml-auto sm:ml-0 h-10 px-5 rounded-full bg-[#3F7A0A] text-white font-mono text-xs hover:bg-[#356a08] disabled:opacity-40 transition-colors"
           >
             SEND
           </button>

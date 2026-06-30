@@ -59,7 +59,7 @@ function detailToSummary(detail: ProjectDetail): ProjectSummary {
 
 function ColumnHeaders({ isAdmin }: { isAdmin: boolean }) {
   return (
-    <div className="flex items-center px-6 gap-6 py-3 bg-background-primary border-b border-border-default sticky top-0 z-10">
+    <div className="hidden lg:flex items-center px-6 gap-6 py-3 bg-background-primary border-b border-border-default sticky top-0 z-10">
       <div className="flex-1 min-w-0">
         <span className="font-mono text-[10px] text-muted tracking-widest uppercase">
           Project

@@ -276,8 +276,8 @@ export default function NotificationDropdown({ isOpen, onClose, bellRef, isAdmin
   return (
     <div
       ref={dropdownRef}
-      style={{ position: 'fixed', left: '240px', top: `${topPx}px`, width: '380px', maxHeight: '80vh', zIndex: 100, boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
-      className="flex flex-col bg-background-secondary border border-border-default overflow-hidden"
+      style={{ position: 'fixed', top: `${topPx}px`, maxHeight: '80vh', zIndex: 100, boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}
+      className="left-2 right-2 lg:left-[240px] lg:right-auto lg:w-[380px] flex flex-col bg-background-secondary border border-border-default overflow-hidden rounded-xl lg:rounded-none"
     >
       {/* ── Header ───────────────────────────────────────────────────── */}
       <div className="px-4 py-3 border-b border-border-default shrink-0">

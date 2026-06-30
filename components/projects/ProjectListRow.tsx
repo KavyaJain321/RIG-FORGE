@@ -213,7 +213,7 @@ export default function ProjectListRow({
       role="button"
       tabIndex={0}
       aria-label={`Open project: ${project.name}`}
-      className={`relative flex items-center px-6 gap-6 min-h-[64px] bg-background-secondary border-b border-border-default hover:bg-background-tertiary cursor-pointer transition-all duration-300 ${isRemoving ? 'opacity-0' : 'opacity-100'}`}
+      className={`relative flex flex-col gap-3 lg:flex-row lg:items-center px-4 sm:px-6 lg:gap-6 py-3 lg:py-0 lg:min-h-[64px] bg-background-secondary border-b border-border-default hover:bg-background-tertiary cursor-pointer transition-all duration-300 ${isRemoving ? 'opacity-0' : 'opacity-100'}`}
       onClick={handleRowClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/dashboard/projects/${project.id}`) } }}
     >
@@ -270,8 +270,12 @@ export default function ProjectListRow({
         )}
       </div>
 
+      {/* Meta columns: wrap into rows on mobile; on lg, contents dissolves this
+          wrapper so the children become direct columns of the row again. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 lg:contents">
+
       {/* ── COLUMN 2: Progress ──────────────────────────────────────────────── */}
-      <div className="w-48 shrink-0" data-no-nav>
+      <div className="w-full lg:w-48 shrink-0" data-no-nav>
         <p className="font-mono text-[10px] text-muted tracking-widest uppercase mb-1">
           Progress
         </p>
@@ -282,7 +286,7 @@ export default function ProjectListRow({
       </div>
 
       {/* ── COLUMN 3: Members ───────────────────────────────────────────────── */}
-      <div className="w-32 shrink-0">
+      <div className="lg:w-32 shrink-0">
         {project.members.length === 0 ? (
           <span className="font-mono text-xs text-muted">—</span>
         ) : (
@@ -302,7 +306,7 @@ export default function ProjectListRow({
       </div>
 
       {/* ── COLUMN 4: Deadline ──────────────────────────────────────────────── */}
-      <div className="w-32 shrink-0">
+      <div className="lg:w-32 shrink-0">
         {editMode ? (
           <input
             data-no-nav
@@ -324,7 +328,7 @@ export default function ProjectListRow({
       </div>
 
       {/* ── COLUMN 5: Status ────────────────────────────────────────────────── */}
-      <div className="w-28 shrink-0">
+      <div className="lg:w-28 shrink-0">
         {editMode ? (
           <div data-no-nav className="relative">
             <select
@@ -344,10 +348,12 @@ export default function ProjectListRow({
         )}
       </div>
 
+      </div>
+
       {/* ── COLUMN 6: Actions (ADMIN only) ──────────────────────────────────── */}
       {isAdmin && (
         <div
-          className="w-20 shrink-0 flex items-center justify-end gap-2"
+          className="w-full lg:w-20 shrink-0 flex items-center justify-end gap-1 [&>button]:p-2 lg:[&>button]:p-0"
           data-no-nav
           onClick={(e) => e.stopPropagation()}
         >
