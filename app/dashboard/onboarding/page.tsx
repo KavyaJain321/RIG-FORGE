@@ -79,7 +79,11 @@ export default function OnboardingPage() {
             Pending Approval ({pending.length})
           </h2>
           {fetching ? (
-            <p className="font-mono text-xs text-text-muted">Loading...</p>
+            <div className="space-y-3" aria-busy="true">
+              {[1, 2].map((i) => (
+                <div key={i} className="shimmer h-20 rounded-card" />
+              ))}
+            </div>
           ) : pending.length === 0 ? (
             <div className="bg-surface-raised border border-border-default rounded-card p-6 text-center">
               <p className="font-mono text-xs text-text-muted">No users pending approval.</p>

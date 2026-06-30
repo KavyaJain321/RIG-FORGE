@@ -104,7 +104,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background-primary p-6 md:p-8">
+      <div className="min-h-screen bg-background-primary p-4 sm:p-6 md:p-8">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="shimmer h-8 w-48 rounded" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -124,7 +124,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background-primary p-6 md:p-8">
+    <div className="min-h-screen bg-background-primary p-4 sm:p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
 
         <SetupPrompt />

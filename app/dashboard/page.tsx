@@ -9,23 +9,23 @@ import EmployeeDashboard from '@/components/dashboard/EmployeeDashboard'
 
 function LoadingSkeleton() {
   return (
-    <div className="min-h-screen bg-background-primary p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
+    <div className="min-h-screen bg-background-primary p-4 sm:p-6 md:p-8">
+      <div className="flex items-center justify-between gap-3 mb-8">
+        <div className="min-w-0">
           <div className="shimmer h-4 w-24 mb-3" />
-          <div className="shimmer h-8 w-56 mb-2" />
-          <div className="shimmer h-3 w-40" />
+          <div className="shimmer h-8 w-56 max-w-[60vw] mb-2" />
+          <div className="shimmer h-3 w-40 max-w-[50vw]" />
         </div>
-        <div className="shimmer h-4 w-48" />
+        <div className="shimmer h-4 w-28 sm:w-48 shrink-0" />
       </div>
-      <div className="flex gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="shimmer flex-1 h-28 rounded-2xl" />
+          <div key={i} className="shimmer h-28 rounded-2xl" />
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-5">
-        <div className="shimmer h-[400px] rounded-2xl" />
-        <div className="shimmer h-[400px] rounded-2xl" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="shimmer h-[300px] sm:h-[400px] rounded-2xl" />
+        <div className="shimmer h-[300px] sm:h-[400px] rounded-2xl" />
       </div>
     </div>
   )

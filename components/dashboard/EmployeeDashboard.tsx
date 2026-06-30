@@ -59,9 +59,9 @@ function StatusBadge({ status }: { status: string }) {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-border-subtle">
-      <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">{label}</p>
-      <p className="text-3xl font-bold text-text-primary">{value}</p>
+    <div className="bg-surface-raised rounded-2xl p-3 sm:p-5 shadow-sm border border-border-subtle">
+      <p className="text-[10px] sm:text-xs font-medium text-text-muted uppercase tracking-wider mb-1.5 sm:mb-2">{label}</p>
+      <p className="text-2xl sm:text-3xl font-bold text-text-primary">{value}</p>
     </div>
   )
 }
@@ -94,7 +94,7 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background-primary p-6 md:p-8">
+      <div className="min-h-screen bg-background-primary p-4 sm:p-6 md:p-8">
         <div className="max-w-5xl mx-auto space-y-6">
           <div className="shimmer h-10 w-64 rounded" />
           <div className="grid grid-cols-3 gap-4">
@@ -111,7 +111,7 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background-primary p-6 md:p-8">
+    <div className="min-h-screen bg-background-primary p-4 sm:p-6 md:p-8">
       <div className="max-w-5xl mx-auto space-y-6">
 
         <SetupPrompt />

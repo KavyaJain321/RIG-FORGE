@@ -121,7 +121,11 @@ function AdminTickets() {
         </div>
 
         {fetching ? (
-          <p className="font-mono text-xs text-text-muted">Loading...</p>
+          <div className="space-y-3" aria-busy="true">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="shimmer h-24 rounded-card" />
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
           <div className="bg-surface-raised border border-border-default rounded-card p-8 text-center">
             <p className="font-mono text-xs text-text-muted">
@@ -232,7 +236,11 @@ function EmployeeTickets() {
 
         {/* List */}
         {fetching ? (
-          <p className="font-mono text-xs text-text-muted">Loading...</p>
+          <div className="space-y-3" aria-busy="true">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="shimmer h-24 rounded-card" />
+            ))}
+          </div>
         ) : tickets.length === 0 ? (
           <div className="bg-surface-raised border border-border-default rounded-card p-10 text-center">
             <p className="font-mono text-xs text-text-muted mb-3">
