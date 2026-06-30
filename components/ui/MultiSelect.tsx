@@ -23,7 +23,7 @@ function Checkbox({ checked, indeterminate }: { checked: boolean; indeterminate?
       className={`shrink-0 w-4 h-4 rounded flex items-center justify-center border transition-all duration-100 ${
         checked || indeterminate
           ? 'bg-blue-600 border-blue-600'
-          : 'bg-surface-raised border-gray-300'
+          : 'bg-surface-raised border-border-default'
       }`}
     >
       {indeterminate && !checked ? (
@@ -102,7 +102,7 @@ export function MultiSelect({
         className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 bg-surface-raised border rounded-xl text-sm text-left transition-all duration-150 ${
           open
             ? 'border-blue-500 ring-2 ring-blue-100 shadow-sm'
-            : 'border-gray-300 hover:border-gray-400'
+            : 'border-border-default hover:border-border-strong'
         }`}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -111,7 +111,7 @@ export function MultiSelect({
               {selected.length}
             </span>
           )}
-          <span className={`truncate ${selected.length === 0 ? 'text-gray-400' : 'text-gray-800 font-medium'}`}>
+          <span className={`truncate ${selected.length === 0 ? 'text-text-muted' : 'text-text-primary font-medium'}`}>
             {triggerLabel}
           </span>
         </div>
@@ -121,7 +121,7 @@ export function MultiSelect({
             <span
               role="button"
               onClick={(e) => { e.stopPropagation(); onChange([]) }}
-              className="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 rounded transition-colors"
+              className="w-4 h-4 flex items-center justify-center text-text-muted hover:text-text-secondary rounded transition-colors"
               title="Clear all"
             >
               <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -130,7 +130,7 @@ export function MultiSelect({
             </span>
           )}
           <svg
-            className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -140,12 +140,12 @@ export function MultiSelect({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute z-50 mt-1.5 w-full bg-surface-raised border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+        <div className="absolute z-50 mt-1.5 w-full bg-surface-raised border border-border-default rounded-xl shadow-xl overflow-hidden">
           {/* Search */}
           {options.length > 5 && (
-            <div className="px-3 pt-2.5 pb-2 border-b border-gray-100">
+            <div className="px-3 pt-2.5 pb-2 border-b border-border-subtle">
               <div className="relative">
-                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                 </svg>
                 <input
@@ -154,7 +154,7 @@ export function MultiSelect({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search…"
-                  className="w-full pl-7 pr-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-7 pr-3 py-1.5 text-sm bg-surface-highlight border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -165,12 +165,12 @@ export function MultiSelect({
             <button
               type="button"
               onClick={toggleAll}
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-gray-50 border-b border-gray-100 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-surface-highlight border-b border-border-subtle transition-colors text-left"
             >
               <Checkbox checked={allSelected} indeterminate={someSelected} />
-              <span className="text-sm font-semibold text-gray-700">Select All</span>
+              <span className="text-sm font-semibold text-text-secondary">Select All</span>
               {selected.length > 0 && (
-                <span className="ml-auto text-xs text-gray-400">{selected.length}/{options.length}</span>
+                <span className="ml-auto text-xs text-text-muted">{selected.length}/{options.length}</span>
               )}
             </button>
           )}
@@ -184,17 +184,17 @@ export function MultiSelect({
                   key={opt.id}
                   type="button"
                   onClick={() => toggle(opt.id)}
-                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-gray-50 transition-colors text-left ${
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 hover:bg-surface-highlight transition-colors text-left ${
                     isChecked ? 'bg-blue-50/40' : ''
                   }`}
                 >
                   <Checkbox checked={isChecked} />
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm truncate ${isChecked ? 'text-gray-900 font-medium' : 'text-gray-700'}`}>
+                    <p className={`text-sm truncate ${isChecked ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>
                       {opt.label}
                     </p>
                     {opt.sub && (
-                      <p className="text-[11px] text-gray-400 truncate mt-0.5">{opt.sub}</p>
+                      <p className="text-[11px] text-text-muted truncate mt-0.5">{opt.sub}</p>
                     )}
                   </div>
                   {isChecked && (
@@ -208,7 +208,7 @@ export function MultiSelect({
 
             {filtered.length === 0 && (
               <div className="px-4 py-8 text-center">
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-text-muted">
                   {search ? `No results for "${search}"` : 'No options available'}
                 </p>
               </div>
@@ -217,8 +217,8 @@ export function MultiSelect({
 
           {/* Footer — show selected count & clear */}
           {selected.length > 0 && (
-            <div className="px-3.5 py-2.5 border-t border-gray-100 flex items-center justify-between bg-gray-50">
-              <span className="text-xs text-gray-500 font-medium">{selected.length} selected</span>
+            <div className="px-3.5 py-2.5 border-t border-border-subtle flex items-center justify-between bg-surface-highlight">
+              <span className="text-xs text-text-muted font-medium">{selected.length} selected</span>
               <button
                 type="button"
                 onClick={() => onChange([])}

@@ -75,15 +75,15 @@ export function WeeklyReportEmployeeCard({
   const weekDates = getWeekDates(mondayIso)
 
   return (
-    <div className="border border-gray-200 rounded-lg bg-surface-raised overflow-hidden">
+    <div className="border border-border-default rounded-lg bg-surface-raised overflow-hidden">
       {/* ── Collapsed (always visible) ─────────────────────────────────────── */}
       <div className="px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           {/* Name + role */}
           <div className="flex items-center gap-3 min-w-0">
             <div>
-              <p className="font-semibold text-gray-900 truncate">{employee.name}</p>
-              <p className="text-xs text-gray-500 truncate">{employee.email}</p>
+              <p className="font-semibold text-text-primary truncate">{employee.name}</p>
+              <p className="text-xs text-text-muted truncate">{employee.email}</p>
             </div>
             <span
               className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${getRoleBadgeClass(employee.role)}`}
@@ -94,7 +94,7 @@ export function WeeklyReportEmployeeCard({
 
           {/* Activity dots (Mon–Fri) */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-text-muted">
               {employee.daysActive}/5 days
             </span>
             <div className="flex gap-1">
@@ -103,7 +103,7 @@ export function WeeklyReportEmployeeCard({
                   key={date}
                   title={WEEK_DAYS[i]}
                   className={`w-3 h-3 rounded-full ${
-                    activeSet.has(date) ? 'bg-green-500' : 'bg-gray-200'
+                    activeSet.has(date) ? 'bg-green-500' : 'bg-surface-mid'
                   }`}
                 />
               ))}
@@ -113,10 +113,10 @@ export function WeeklyReportEmployeeCard({
 
         {/* Stats row */}
         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-          <span className="text-gray-700">
+          <span className="text-text-secondary">
             <span className="font-medium">{employee.tasksCompleted.length}</span> tasks done
           </span>
-          <span className="text-gray-700">
+          <span className="text-text-secondary">
             <span className="font-medium">{employee.tasksInProgress.length}</span> in progress
           </span>
           {employee.overdueTasksCount > 0 ? (
@@ -124,11 +124,11 @@ export function WeeklyReportEmployeeCard({
               {employee.overdueTasksCount} overdue
             </span>
           ) : (
-            <span className="text-gray-700">0 overdue</span>
+            <span className="text-text-secondary">0 overdue</span>
           )}
-          <span className="text-gray-500">|</span>
-          <span className="text-gray-700">↑{employee.ticketsRaised} raised</span>
-          <span className="text-gray-700">✓{employee.ticketsHelped} helped</span>
+          <span className="text-text-muted">|</span>
+          <span className="text-text-secondary">↑{employee.ticketsRaised} raised</span>
+          <span className="text-text-secondary">✓{employee.ticketsHelped} helped</span>
         </div>
 
         {/* Toggle button */}
@@ -142,19 +142,19 @@ export function WeeklyReportEmployeeCard({
 
       {/* ── Expanded ───────────────────────────────────────────────────────── */}
       {expanded && (
-        <div className="border-t border-gray-100 px-5 py-4 space-y-6 bg-gray-50">
+        <div className="border-t border-border-subtle px-5 py-4 space-y-6 bg-surface-highlight">
           {/* Activity dots Mon–Sun with labels */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
               Activity
             </h3>
             <div className="flex gap-4">
               {weekDates.map((date, i) => (
                 <div key={date} className="flex flex-col items-center gap-1">
-                  <span className="text-xs text-gray-500">{WEEK_DAYS[i]}</span>
+                  <span className="text-xs text-text-muted">{WEEK_DAYS[i]}</span>
                   <div
                     className={`w-4 h-4 rounded-full ${
-                      activeSet.has(date) ? 'bg-green-500' : 'bg-gray-200'
+                      activeSet.has(date) ? 'bg-green-500' : 'bg-surface-mid'
                     }`}
                   />
                 </div>
@@ -164,15 +164,15 @@ export function WeeklyReportEmployeeCard({
 
           {/* Tasks Completed */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
               Tasks Completed This Week
             </h3>
             {employee.tasksCompleted.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">No tasks completed this week</p>
+              <p className="text-sm text-text-muted italic">No tasks completed this week</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-gray-400 border-b border-gray-200">
+                  <tr className="text-left text-xs text-text-muted border-b border-border-default">
                     <th className="pb-1 font-medium">Title</th>
                     <th className="pb-1 font-medium">Project</th>
                     <th className="pb-1 font-medium">Completed</th>
@@ -181,9 +181,9 @@ export function WeeklyReportEmployeeCard({
                 <tbody className="divide-y divide-gray-100">
                   {employee.tasksCompleted.map((task) => (
                     <tr key={task.id}>
-                      <td className="py-1.5 pr-3 text-gray-800">{task.title}</td>
-                      <td className="py-1.5 pr-3 text-gray-600">{task.projectName}</td>
-                      <td className="py-1.5 text-gray-600">{formatDateShort(task.completedAt)}</td>
+                      <td className="py-1.5 pr-3 text-text-primary">{task.title}</td>
+                      <td className="py-1.5 pr-3 text-text-secondary">{task.projectName}</td>
+                      <td className="py-1.5 text-text-secondary">{formatDateShort(task.completedAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -193,15 +193,15 @@ export function WeeklyReportEmployeeCard({
 
           {/* Tasks In Progress */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
               Tasks In Progress
             </h3>
             {employee.tasksInProgress.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">All caught up!</p>
+              <p className="text-sm text-text-muted italic">All caught up!</p>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs text-gray-400 border-b border-gray-200">
+                  <tr className="text-left text-xs text-text-muted border-b border-border-default">
                     <th className="pb-1 font-medium">Title</th>
                     <th className="pb-1 font-medium">Project</th>
                     <th className="pb-1 font-medium">Due Date</th>
@@ -213,10 +213,10 @@ export function WeeklyReportEmployeeCard({
                       task.dueDate !== null && new Date(task.dueDate) < new Date()
                     return (
                       <tr key={task.id}>
-                        <td className="py-1.5 pr-3 text-gray-800">{task.title}</td>
-                        <td className="py-1.5 pr-3 text-gray-600">{task.projectName}</td>
+                        <td className="py-1.5 pr-3 text-text-primary">{task.title}</td>
+                        <td className="py-1.5 pr-3 text-text-secondary">{task.projectName}</td>
                         <td className="py-1.5 flex items-center gap-2">
-                          <span className={isOverdue ? 'text-red-600' : 'text-gray-600'}>
+                          <span className={isOverdue ? 'text-red-600' : 'text-text-secondary'}>
                             {formatDateShort(task.dueDate)}
                           </span>
                           {isOverdue && (
@@ -235,19 +235,19 @@ export function WeeklyReportEmployeeCard({
 
           {/* Daily Logs */}
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
               Daily Logs
             </h3>
             {employee.dailyLogs.length === 0 ? (
-              <p className="text-sm text-gray-400 italic">No daily logs this week</p>
+              <p className="text-sm text-text-muted italic">No daily logs this week</p>
             ) : (
               <div className="space-y-4">
                 {employee.dailyLogs.map((log) => (
                   <div key={log.date}>
-                    <p className="text-sm font-bold text-gray-800">{formatDateLabel(log.date)}</p>
-                    <p className="text-sm text-gray-700 mt-1">{log.workSummary}</p>
+                    <p className="text-sm font-bold text-text-primary">{formatDateLabel(log.date)}</p>
+                    <p className="text-sm text-text-secondary mt-1">{log.workSummary}</p>
                     {log.notes && (
-                      <p className="text-xs text-gray-400 mt-0.5">{log.notes}</p>
+                      <p className="text-xs text-text-muted mt-0.5">{log.notes}</p>
                     )}
                   </div>
                 ))}

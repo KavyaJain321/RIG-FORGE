@@ -59,16 +59,16 @@ const REPORT_TYPES = [
         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     ),
-    badgeClass: 'bg-gray-100 text-gray-600',
+    badgeClass: 'bg-surface-highlight text-text-secondary',
     ringClass:  'ring-gray-400',
-    activeCard: 'border-gray-500 bg-gray-50',
+    activeCard: 'border-border-strong bg-surface-highlight',
   },
 ]
 
 const TYPE_BADGE: Record<string, string> = {
   PROJECT:  'bg-violet-100 text-violet-700',
   EMPLOYEE: 'bg-blue-100 text-blue-700',
-  WEEKLY:   'bg-gray-100 text-gray-600',
+  WEEKLY:   'bg-surface-highlight text-text-secondary',
 }
 
 // ─── Generator Form ───────────────────────────────────────────────────────────
@@ -141,17 +141,17 @@ function GeneratorForm({ onGenerated }: { onGenerated: () => void }) {
   }
 
   return (
-    <div className="bg-surface-raised border border-gray-200 rounded-2xl shadow-sm mb-8">
+    <div className="bg-surface-raised border border-border-default rounded-2xl shadow-sm mb-8">
       {/* Header */}
-      <div className="px-6 py-5 border-b border-gray-100">
-        <h2 className="text-base font-semibold text-gray-900">Generate New Report</h2>
-        <p className="text-sm text-gray-500 mt-0.5">Choose a type, set filters, and save a snapshot to your history</p>
+      <div className="px-6 py-5 border-b border-border-subtle">
+        <h2 className="text-base font-semibold text-text-primary">Generate New Report</h2>
+        <p className="text-sm text-text-muted mt-0.5">Choose a type, set filters, and save a snapshot to your history</p>
       </div>
 
       <div className="px-6 py-5 space-y-6">
         {/* ── Type selector cards ────────────────────────────────────────────── */}
         <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Report Type</p>
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Report Type</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {REPORT_TYPES.map((t) => {
               const active = type === t.id
@@ -163,14 +163,14 @@ function GeneratorForm({ onGenerated }: { onGenerated: () => void }) {
                   className={`text-left p-4 rounded-xl border-2 transition-all duration-150 ${
                     active
                       ? `${t.activeCard} shadow-sm`
-                      : 'border-gray-200 bg-surface-raised hover:border-gray-300 hover:bg-gray-50'
+                      : 'border-border-default bg-surface-raised hover:border-border-default hover:bg-surface-highlight'
                   }`}
                 >
-                  <div className={`inline-flex p-1.5 rounded-lg mb-2.5 ${active ? t.badgeClass : 'bg-gray-100 text-gray-500'}`}>
+                  <div className={`inline-flex p-1.5 rounded-lg mb-2.5 ${active ? t.badgeClass : 'bg-surface-highlight text-text-muted'}`}>
                     {t.icon}
                   </div>
-                  <p className={`text-sm font-semibold mb-0.5 ${active ? 'text-gray-900' : 'text-gray-700'}`}>{t.label}</p>
-                  <p className="text-[11px] text-gray-400 leading-tight">{t.description}</p>
+                  <p className={`text-sm font-semibold mb-0.5 ${active ? 'text-text-primary' : 'text-text-secondary'}`}>{t.label}</p>
+                  <p className="text-[11px] text-text-muted leading-tight">{t.description}</p>
                 </button>
               )
             })}
@@ -180,27 +180,27 @@ function GeneratorForm({ onGenerated }: { onGenerated: () => void }) {
         {/* ── Date range ─────────────────────────────────────────────────────── */}
         {type !== 'WEEKLY' && (
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Date Range</p>
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Date Range</p>
             <div className="flex gap-4 flex-wrap">
               <div className="flex-1 min-w-[150px]">
-                <label className="text-xs text-gray-500 block mb-1.5 font-medium">From</label>
+                <label className="text-xs text-text-muted block mb-1.5 font-medium">From</label>
                 <input
                   type="date"
                   value={dateFrom}
                   max={dateTo}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow [color-scheme:light]"
+                  className="w-full border border-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow [color-scheme:light]"
                 />
               </div>
               <div className="flex-1 min-w-[150px]">
-                <label className="text-xs text-gray-500 block mb-1.5 font-medium">To</label>
+                <label className="text-xs text-text-muted block mb-1.5 font-medium">To</label>
                 <input
                   type="date"
                   value={dateTo}
                   min={dateFrom}
                   max={today()}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm text-gray-800 bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow [color-scheme:light]"
+                  className="w-full border border-border-default rounded-lg px-3 py-2.5 text-sm text-text-primary bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow [color-scheme:light]"
                 />
               </div>
             </div>
@@ -211,7 +211,7 @@ function GeneratorForm({ onGenerated }: { onGenerated: () => void }) {
         {type !== 'WEEKLY' && (
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
                 {type === 'PROJECT' ? 'Projects' : 'Employees'}
               </p>
               {selectedIds.length > 0 && (
@@ -221,7 +221,7 @@ function GeneratorForm({ onGenerated }: { onGenerated: () => void }) {
               )}
             </div>
             {loadingOptions ? (
-              <div className="h-10 bg-gray-100 rounded-lg animate-pulse" />
+              <div className="h-10 bg-surface-highlight rounded-lg animate-pulse" />
             ) : (
               <MultiSelect
                 options={options}
@@ -240,13 +240,13 @@ function GeneratorForm({ onGenerated }: { onGenerated: () => void }) {
             disabled={generating}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 ${
               generating
-                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                ? 'bg-surface-mid text-text-muted cursor-not-allowed'
                 : 'bg-gray-900 text-white hover:bg-gray-700 active:scale-95 shadow-sm'
             }`}
           >
             {generating ? (
               <>
-                <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-border-strong border-t-transparent rounded-full animate-spin" />
                 Generating…
               </>
             ) : (
@@ -322,7 +322,7 @@ function ReportList() {
 
   if (loading) return (
     <div className="flex justify-center items-center py-20">
-      <div className="w-7 h-7 border-2 border-gray-200 border-t-gray-700 rounded-full animate-spin" />
+      <div className="w-7 h-7 border-2 border-border-default border-t-gray-700 rounded-full animate-spin" />
     </div>
   )
 
@@ -340,7 +340,7 @@ function ReportList() {
         <div className="flex flex-wrap items-center gap-3 mb-4">
           {/* Search */}
           <div className="relative flex-1 min-w-[180px]">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
             </svg>
             <input
@@ -348,20 +348,20 @@ function ReportList() {
               placeholder="Search reports…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-9 pr-3 py-2 border border-border-default rounded-lg text-sm bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
           {/* Type filter */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-surface-highlight rounded-lg p-1">
             {['ALL', 'PROJECT', 'EMPLOYEE', 'WEEKLY'].map((t) => (
               <button
                 key={t}
                 onClick={() => setFilterType(t)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                   filterType === t
-                    ? 'bg-surface-raised text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-surface-raised text-text-primary shadow-sm'
+                    : 'text-text-muted hover:text-text-secondary'
                 }`}
               >
                 {t === 'ALL' ? 'All' : t === 'PROJECT' ? 'Projects' : t === 'EMPLOYEE' ? 'Employees' : 'Weekly'}
@@ -369,24 +369,24 @@ function ReportList() {
             ))}
           </div>
 
-          <span className="text-xs text-gray-400 shrink-0">{filtered.length} report{filtered.length !== 1 ? 's' : ''}</span>
+          <span className="text-xs text-text-muted shrink-0">{filtered.length} report{filtered.length !== 1 ? 's' : ''}</span>
         </div>
       )}
 
       {/* Empty states */}
       {reports.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-            <svg className="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <div className="w-14 h-14 rounded-2xl bg-surface-highlight flex items-center justify-center mb-4">
+            <svg className="w-7 h-7 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <p className="text-sm font-semibold text-gray-700 mb-1">No reports yet</p>
-          <p className="text-sm text-gray-400 max-w-xs">Generate your first report using the form above to start building your report history.</p>
+          <p className="text-sm font-semibold text-text-secondary mb-1">No reports yet</p>
+          <p className="text-sm text-text-muted max-w-xs">Generate your first report using the form above to start building your report history.</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-sm text-gray-500">No reports match your filters</p>
+          <p className="text-sm text-text-muted">No reports match your filters</p>
           <button onClick={() => { setSearch(''); setFilterType('ALL') }} className="mt-2 text-sm text-blue-600 hover:underline">
             Clear filters
           </button>
@@ -401,7 +401,7 @@ function ReportList() {
             return (
               <div
                 key={r.id}
-                className="group bg-surface-raised border border-gray-200 rounded-xl px-5 py-4 flex items-center justify-between gap-4 hover:border-gray-300 hover:shadow-sm transition-all duration-150"
+                className="group bg-surface-raised border border-border-default rounded-xl px-5 py-4 flex items-center justify-between gap-4 hover:border-border-default hover:shadow-sm transition-all duration-150"
               >
                 {/* Left: icon + info */}
                 <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -413,14 +413,14 @@ function ReportList() {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate leading-snug">
+                    <p className="text-sm font-semibold text-text-primary truncate leading-snug">
                       {r.label ?? `Report · ${fmtDate(r.weekStart)} – ${fmtDate(r.weekEnd)}`}
                     </p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${badgeClass}`}>
                         {r.reportType}
                       </span>
-                      <span className="text-xs text-gray-400">Generated {fmtDate(r.generatedAt)}</span>
+                      <span className="text-xs text-text-muted">Generated {fmtDate(r.generatedAt)}</span>
                     </div>
                   </div>
                 </div>
@@ -437,7 +437,7 @@ function ReportList() {
                       >
                         {deletingId === r.id ? '…' : 'Delete'}
                       </button>
-                      <button onClick={() => setConfirmId(null)} className="text-xs text-gray-500 hover:text-gray-700 px-1.5 py-1">
+                      <button onClick={() => setConfirmId(null)} className="text-xs text-text-muted hover:text-text-secondary px-1.5 py-1">
                         Cancel
                       </button>
                     </div>
@@ -445,7 +445,7 @@ function ReportList() {
                     <>
                       <Link
                         href={`/dashboard/reports/${r.id}`}
-                        className="flex items-center gap-1 px-3.5 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        className="flex items-center gap-1 px-3.5 py-1.5 text-xs font-semibold text-text-secondary bg-surface-highlight hover:bg-surface-mid rounded-lg transition-colors"
                       >
                         View
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -454,7 +454,7 @@ function ReportList() {
                       </Link>
                       <button
                         onClick={() => setConfirmId(r.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                         title="Delete report"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -533,18 +533,18 @@ function WeeklyNoteSection() {
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[50vh]">
-      <div className="w-7 h-7 border-2 border-gray-200 border-t-gray-700 rounded-full animate-spin" />
+      <div className="w-7 h-7 border-2 border-border-default border-t-gray-700 rounded-full animate-spin" />
     </div>
   )
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Weekly Summary</h1>
-      <p className="text-sm text-gray-500 mb-6">Week ending {thisWeekFriday}</p>
-      <div className="bg-surface-raised border border-gray-200 rounded-xl p-6 shadow-sm">
+      <h1 className="text-2xl font-bold text-text-primary mb-1">Weekly Summary</h1>
+      <p className="text-sm text-text-muted mb-6">Week ending {thisWeekFriday}</p>
+      <div className="bg-surface-raised border border-border-default rounded-xl p-6 shadow-sm">
         {!editing && entry ? (
           <>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{entry.workSummary}</p>
+            <p className="text-sm text-text-secondary whitespace-pre-wrap">{entry.workSummary}</p>
             <button onClick={() => setEditing(true)} className="mt-4 text-xs text-blue-600 hover:text-blue-800 font-medium">Edit</button>
           </>
         ) : (
@@ -554,12 +554,12 @@ function WeeklyNoteSection() {
               onChange={(e) => setDraft(e.target.value.slice(0, MAX_NOTE_LENGTH))}
               rows={6}
               placeholder="Summarise what you worked on this week…"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-border-default rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="flex items-center justify-between mt-2">
-              <span className="text-xs text-gray-400">{draft.length}/{MAX_NOTE_LENGTH}</span>
+              <span className="text-xs text-text-muted">{draft.length}/{MAX_NOTE_LENGTH}</span>
               <div className="flex gap-2">
-                {editing && <button onClick={() => setEditing(false)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>}
+                {editing && <button onClick={() => setEditing(false)} className="text-xs text-text-muted hover:text-text-secondary">Cancel</button>}
                 <button
                   onClick={() => void handleSave()}
                   disabled={saving || draft.trim().length === 0}
@@ -586,16 +586,16 @@ function AdminReportsSection() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Page header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-        <p className="text-sm text-gray-500 mt-1">Generate and manage project & employee reports for any date range</p>
+        <h1 className="text-2xl font-bold text-text-primary">Reports</h1>
+        <p className="text-sm text-text-muted mt-1">Generate and manage project & employee reports for any date range</p>
       </div>
 
       <GeneratorForm onGenerated={() => setListKey((k) => k + 1)} />
 
       {/* Saved reports heading */}
       <div className="flex items-center gap-3 mb-4">
-        <h2 className="text-base font-semibold text-gray-800">Saved Reports</h2>
-        <div className="h-px flex-1 bg-gray-200" />
+        <h2 className="text-base font-semibold text-text-primary">Saved Reports</h2>
+        <div className="h-px flex-1 bg-surface-mid" />
       </div>
 
       <ReportList key={listKey} />
@@ -615,7 +615,7 @@ export default function ReportsPage() {
 
   if (loading || !user) return (
     <div className="flex items-center justify-center min-h-screen">
-      <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-border-default border-t-gray-800 rounded-full animate-spin" />
     </div>
   )
 

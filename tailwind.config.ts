@@ -54,6 +54,11 @@ const config: Config = {
           danger: 'rgb(var(--c-status-danger) / <alpha-value>)',
           offline: 'rgb(var(--c-status-offline) / <alpha-value>)',
         },
+        // Chat "sent/mine" message bubble — purple that flips with the theme.
+        bubble: {
+          mine: 'rgb(var(--c-bubble-mine) / <alpha-value>)',
+          'mine-ink': 'rgb(var(--c-bubble-mine-ink) / <alpha-value>)',
+        },
         focus: {
           ring: 'rgb(var(--c-accent) / <alpha-value>)',
           muted: 'var(--c-border-default)',

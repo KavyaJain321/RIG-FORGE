@@ -65,7 +65,7 @@ export default function MemberRow({
             {isOwnRow && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-accent/20 text-accent-ink">YOU</span>
             )}
-            <span className={`w-2 h-2 rounded-full shrink-0 ${member.currentStatus === 'WORKING' ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+            <span className={`w-2 h-2 rounded-full shrink-0 ${member.currentStatus === 'WORKING' ? 'bg-emerald-500' : 'bg-surface-mid'}`} />
           </div>
           <p className="text-xs text-text-muted">Joined {formatJoined(member.joinedAt)}</p>
         </div>

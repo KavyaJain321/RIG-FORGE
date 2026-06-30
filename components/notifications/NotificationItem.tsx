@@ -113,7 +113,7 @@ export default function NotificationItem({
               'w-4 h-4 rounded border flex items-center justify-center mt-0.5 transition-all',
               selected
                 ? 'bg-accent border-accent'
-                : 'bg-surface-raised border-gray-300',
+                : 'bg-surface-raised border-border-default',
             ].join(' ')}
           >
             {selected && (

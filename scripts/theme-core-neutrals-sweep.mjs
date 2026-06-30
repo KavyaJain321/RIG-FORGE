@@ -9,13 +9,17 @@ const DRY = process.argv.includes('--dry')
 const ROOTS = ['app', 'components']
 const EXTS = new Set(['.tsx', '.ts'])
 const FAM = 'gray|neutral|zinc|slate|stone'
+// Intentionally all-dark components — leave their own dark palette untouched.
+const SKIP_FILES = new Set(['LogoutLogModal.tsx'])
 
 // [shade list, prefix, token] — shades matched with (?![0-9]) so 50 != 500.
 const MAP = [
   // text: dark shades -> primary, mid -> secondary, light -> muted
   [['900', '800'], 'text', 'text-text-primary'],
   [['700', '600'], 'text', 'text-text-secondary'],
-  [['500', '400', '300'], 'text', 'text-text-muted'],
+  // shade 300 deliberately NOT mapped: it's used as light-on-dark (badges,
+  // chevrons) and stays readable on dark either way.
+  [['500', '400'], 'text', 'text-text-muted'],
   // backgrounds: light tints -> subtle/mid surfaces (dark shades left alone)
   [['50', '100'], 'bg', 'bg-surface-highlight'],
   [['200', '300'], 'bg', 'bg-surface-mid'],
@@ -36,7 +40,7 @@ function* walk(dir) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) { yield* walk(p); continue }
-    if (EXTS.has(extname(p))) yield p
+    if (EXTS.has(extname(p)) && !SKIP_FILES.has(name)) yield p
   }
 }
 

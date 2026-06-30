@@ -133,15 +133,15 @@ function ProjectReport({ report, snapshot }: { report: ReportFull; snapshot: Pro
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 border-b border-gray-200 pb-5">
+      <div className="mb-6 border-b border-border-default pb-5">
         <div className="flex items-center gap-3 mb-1">
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 uppercase tracking-wide">Project Report</span>
-          {report.label && <span className="text-sm text-gray-500">{report.label}</span>}
+          {report.label && <span className="text-sm text-text-muted">{report.label}</span>}
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">
+        <h1 className="text-2xl font-bold text-text-primary mt-2">
           {fmt(snapshot.dateFrom)} – {fmt(snapshot.dateTo)}
         </h1>
-        <p className="text-sm text-gray-400 mt-1">Generated {fmt(report.generatedAt)}</p>
+        <p className="text-sm text-text-muted mt-1">Generated {fmt(report.generatedAt)}</p>
       </div>
 
       {/* Summary bar */}
@@ -161,7 +161,7 @@ function ProjectReport({ report, snapshot }: { report: ReportFull; snapshot: Pro
       </div>
 
       {totalTickets > 0 && (
-        <p className="mt-6 text-sm text-gray-500 text-right">Total tickets raised in range: <strong>{totalTickets}</strong></p>
+        <p className="mt-6 text-sm text-text-muted text-right">Total tickets raised in range: <strong>{totalTickets}</strong></p>
       )}
     </div>
   )
@@ -176,13 +176,13 @@ function ProjectCard({ project: p }: { project: ProjectReportProjectEntry }) {
     CANCELLED: 'bg-red-100 text-red-700',
   }
   return (
-    <div className="bg-surface-raised border border-gray-200 rounded-xl p-5">
+    <div className="bg-surface-raised border border-border-default rounded-xl p-5">
       {/* Title row */}
       <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
         <div>
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
-            <h3 className="text-base font-bold text-gray-900">{p.name}</h3>
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[p.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            <h3 className="text-base font-bold text-text-primary">{p.name}</h3>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[p.status] ?? 'bg-surface-highlight text-text-secondary'}`}>
               {p.status.replace('_', ' ')}
             </span>
             {p.tasks.overdue > 0 && (
@@ -191,7 +191,7 @@ function ProjectCard({ project: p }: { project: ProjectReportProjectEntry }) {
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-text-muted">
             Lead: {p.leadName ?? '—'} · {p.memberCount} member{p.memberCount !== 1 ? 's' : ''}
           </p>
         </div>
@@ -204,14 +204,14 @@ function ProjectCard({ project: p }: { project: ProjectReportProjectEntry }) {
 
       {/* Progress bar */}
       <div className="flex items-center gap-3 mb-3">
-        <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+        <div className="flex-1 bg-surface-highlight rounded-full h-2 overflow-hidden">
           <div className="h-2 rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
         </div>
-        <span className="text-xs font-medium text-gray-600 shrink-0">
+        <span className="text-xs font-medium text-text-secondary shrink-0">
           {p.tasks.completed}/{p.tasks.total} tasks ({pct}%)
         </span>
       </div>
-      <div className="flex gap-4 text-xs text-gray-500 mb-4">
+      <div className="flex gap-4 text-xs text-text-muted mb-4">
         <span>{p.tasks.inProgress} in progress</span>
         <span>{p.tasks.total - p.tasks.completed - p.tasks.inProgress} to-do</span>
         {p.ticketsInRange > 0 && <span>{p.ticketsInRange} ticket{p.ticketsInRange !== 1 ? 's' : ''} raised</span>}
@@ -219,21 +219,21 @@ function ProjectCard({ project: p }: { project: ProjectReportProjectEntry }) {
 
       {/* Member breakdown table */}
       {p.members.length > 0 && (
-        <div className="border border-gray-100 rounded-lg overflow-hidden">
+        <div className="border border-border-subtle rounded-lg overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead className="bg-surface-highlight">
               <tr>
-                <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Member</th>
-                <th className="text-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Done</th>
-                <th className="text-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">In Progress</th>
+                <th className="text-left px-3 py-2 text-xs font-semibold text-text-muted uppercase tracking-wide">Member</th>
+                <th className="text-center px-3 py-2 text-xs font-semibold text-text-muted uppercase tracking-wide">Done</th>
+                <th className="text-center px-3 py-2 text-xs font-semibold text-text-muted uppercase tracking-wide">In Progress</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {p.members.map((m) => (
-                <tr key={m.userId} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-800 font-medium">{m.name}</td>
-                  <td className="px-3 py-2 text-center text-gray-700">{m.tasksCompleted}</td>
-                  <td className="px-3 py-2 text-center text-gray-700">{m.tasksInProgress}</td>
+                <tr key={m.userId} className="hover:bg-surface-highlight">
+                  <td className="px-3 py-2 text-text-primary font-medium">{m.name}</td>
+                  <td className="px-3 py-2 text-center text-text-secondary">{m.tasksCompleted}</td>
+                  <td className="px-3 py-2 text-center text-text-secondary">{m.tasksInProgress}</td>
                 </tr>
               ))}
             </tbody>
@@ -270,15 +270,15 @@ function EmployeeReport({
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 border-b border-gray-200 pb-5">
+      <div className="mb-6 border-b border-border-default pb-5">
         <div className="flex items-center gap-3 mb-1">
           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 uppercase tracking-wide">Employee Report</span>
-          {report.label && <span className="text-sm text-gray-500">{report.label}</span>}
+          {report.label && <span className="text-sm text-text-muted">{report.label}</span>}
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 mt-2">
+        <h1 className="text-2xl font-bold text-text-primary mt-2">
           {fmt(snapshot.dateFrom)} – {fmt(snapshot.dateTo)}
         </h1>
-        <p className="text-sm text-gray-400 mt-1">Generated {fmt(report.generatedAt)}</p>
+        <p className="text-sm text-text-muted mt-1">Generated {fmt(report.generatedAt)}</p>
       </div>
 
       {/* Summary bar */}
@@ -290,13 +290,13 @@ function EmployeeReport({
 
       {/* Sort control */}
       <div className="flex items-center justify-between mb-4 no-print">
-        <h2 className="text-lg font-bold text-gray-900">👥 Employee Activity</h2>
+        <h2 className="text-lg font-bold text-text-primary">👥 Employee Activity</h2>
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">Sort by:</label>
+          <label className="text-sm text-text-secondary">Sort by:</label>
           <select
             value={sortMode}
             onChange={(e) => setSortMode(e.target.value as SortMode)}
-            className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-sm border border-border-default rounded-md px-3 py-1.5 bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="activity">Activity</option>
             <option value="tasks">Tasks Done</option>
@@ -316,13 +316,13 @@ function EmployeeCard({ employee: e }: { employee: EmployeeReportEntry }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className="bg-surface-raised border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-surface-raised border border-border-default rounded-xl overflow-hidden">
       {/* Top row */}
       <div className="px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
           <div>
-            <h3 className="text-base font-bold text-gray-900">{e.name}</h3>
-            <p className="text-xs text-gray-500">{e.email} · {e.role.replace('_', ' ')}</p>
+            <h3 className="text-base font-bold text-text-primary">{e.name}</h3>
+            <p className="text-xs text-text-muted">{e.email} · {e.role.replace('_', ' ')}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap text-xs">
             <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 font-medium">
@@ -348,7 +348,7 @@ function EmployeeCard({ employee: e }: { employee: EmployeeReportEntry }) {
         {e.projects.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2">
             {e.projects.map((pr) => (
-              <span key={pr.id} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+              <span key={pr.id} className="text-xs px-2 py-0.5 rounded-full bg-surface-highlight text-text-secondary">
                 {pr.name} ({pr.tasksCompleted} done)
               </span>
             ))}
@@ -357,7 +357,7 @@ function EmployeeCard({ employee: e }: { employee: EmployeeReportEntry }) {
 
         {/* Ticket counts */}
         {(e.ticketsRaised > 0 || e.ticketsHelped > 0) && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-text-muted">
             Tickets raised: {e.ticketsRaised} · Tickets helped: {e.ticketsHelped}
           </p>
         )}
@@ -368,27 +368,27 @@ function EmployeeCard({ employee: e }: { employee: EmployeeReportEntry }) {
         <>
           <button
             onClick={() => setExpanded((v) => !v)}
-            className="w-full text-left px-5 py-2.5 bg-gray-50 border-t border-gray-100 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors no-print flex items-center justify-between"
+            className="w-full text-left px-5 py-2.5 bg-surface-highlight border-t border-border-subtle text-xs font-medium text-text-secondary hover:bg-surface-highlight transition-colors no-print flex items-center justify-between"
           >
             <span>{expanded ? 'Hide details' : 'Show details'}</span>
-            <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className={`w-4 h-4 text-text-muted transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
 
           {expanded && (
-            <div className="px-5 py-4 border-t border-gray-100 space-y-4">
+            <div className="px-5 py-4 border-t border-border-subtle space-y-4">
               {/* Completed tasks */}
               {e.tasksCompleted.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">✅ Completed Tasks</p>
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">✅ Completed Tasks</p>
                   <ul className="space-y-1">
                     {e.tasksCompleted.map((t) => (
-                      <li key={t.id} className="text-sm text-gray-700 flex items-start gap-1.5">
-                        <span className="text-gray-400 mt-0.5">·</span>
+                      <li key={t.id} className="text-sm text-text-secondary flex items-start gap-1.5">
+                        <span className="text-text-muted mt-0.5">·</span>
                         <span>
                           <span className="font-medium">{t.title}</span>
-                          <span className="text-gray-400 text-xs ml-1">
+                          <span className="text-text-muted text-xs ml-1">
                             — {t.projectName} · {new Date(t.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           </span>
                         </span>
@@ -401,14 +401,14 @@ function EmployeeCard({ employee: e }: { employee: EmployeeReportEntry }) {
               {/* In progress tasks */}
               {e.tasksInProgress.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🔄 In Progress</p>
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">🔄 In Progress</p>
                   <ul className="space-y-1">
                     {e.tasksInProgress.map((t) => (
-                      <li key={t.id} className="text-sm text-gray-700 flex items-start gap-1.5">
-                        <span className="text-gray-400 mt-0.5">·</span>
+                      <li key={t.id} className="text-sm text-text-secondary flex items-start gap-1.5">
+                        <span className="text-text-muted mt-0.5">·</span>
                         <span>
                           <span className="font-medium">{t.title}</span>
-                          <span className="text-gray-400 text-xs ml-1">— {t.projectName}</span>
+                          <span className="text-text-muted text-xs ml-1">— {t.projectName}</span>
                         </span>
                       </li>
                     ))}
@@ -419,15 +419,15 @@ function EmployeeCard({ employee: e }: { employee: EmployeeReportEntry }) {
               {/* Daily logs */}
               {e.dailyLogs.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">📝 Daily Logs</p>
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">📝 Daily Logs</p>
                   <div className="space-y-2">
                     {e.dailyLogs.map((log) => (
-                      <div key={log.date} className="text-sm border-l-2 border-gray-200 pl-3">
-                        <p className="text-xs font-semibold text-gray-500 mb-0.5">
+                      <div key={log.date} className="text-sm border-l-2 border-border-default pl-3">
+                        <p className="text-xs font-semibold text-text-muted mb-0.5">
                           {new Date(log.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                         </p>
-                        <p className="text-gray-700">{log.workSummary}</p>
-                        {log.notes && <p className="text-gray-400 text-xs mt-0.5">{log.notes}</p>}
+                        <p className="text-text-secondary">{log.workSummary}</p>
+                        {log.notes && <p className="text-text-muted text-xs mt-0.5">{log.notes}</p>}
                       </div>
                     ))}
                   </div>
@@ -470,12 +470,12 @@ function WeeklyReport({
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 uppercase tracking-wide">Weekly Report</span>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-surface-highlight text-text-secondary uppercase tracking-wide">Weekly Report</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-2xl font-bold text-text-primary">
           {fmtShort(report.weekStart)} – {fmtShort(report.weekEnd)}
         </h1>
-        <p className="text-sm text-gray-400 mt-1">Generated {fmt(report.generatedAt)}</p>
+        <p className="text-sm text-text-muted mt-1">Generated {fmt(report.generatedAt)}</p>
       </div>
 
       {/* Summary */}
@@ -491,10 +491,10 @@ function WeeklyReport({
       {/* Projects */}
       {projects.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">📁 Project Progress</h2>
+          <h2 className="text-lg font-bold text-text-primary mb-4">📁 Project Progress</h2>
           {activeProjects.length > 0 && (
             <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Active ({activeProjects.length})</p>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-3">Active ({activeProjects.length})</p>
               <div className="flex flex-col gap-3 mb-6">
                 {activeProjects.map((p) => <WeeklyProjectRow key={p.projectId} project={p} />)}
               </div>
@@ -502,7 +502,7 @@ function WeeklyReport({
           )}
           {otherProjects.length > 0 && (
             <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Other ({otherProjects.length})</p>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-3">Other ({otherProjects.length})</p>
               <div className="flex flex-col gap-3">
                 {otherProjects.map((p) => <WeeklyProjectRow key={p.projectId} project={p} />)}
               </div>
@@ -514,13 +514,13 @@ function WeeklyReport({
       {/* Employees */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-900">👥 Employee Activity</h2>
+          <h2 className="text-lg font-bold text-text-primary">👥 Employee Activity</h2>
           <div className="flex items-center gap-2 no-print">
-            <label className="text-sm text-gray-600">Sort by:</label>
+            <label className="text-sm text-text-secondary">Sort by:</label>
             <select
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-sm border border-border-default rounded-md px-3 py-1.5 bg-surface-raised focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="activity">Activity</option>
               <option value="tasks">Tasks Done</option>
@@ -547,12 +547,12 @@ function WeeklyProjectRow({ project: p }: { project: WeeklyReportProjectSnapshot
     CANCELLED: 'bg-red-100 text-red-700',
   }
   return (
-    <div className="bg-surface-raised border border-gray-200 rounded-lg px-5 py-4">
+    <div className="bg-surface-raised border border-border-default rounded-lg px-5 py-4">
       <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-gray-900">{p.name}</p>
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[p.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            <p className="font-semibold text-text-primary">{p.name}</p>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor[p.status] ?? 'bg-surface-highlight text-text-secondary'}`}>
               {p.status.replace('_', ' ')}
             </span>
             {p.tasksOverdue > 0 && (
@@ -561,7 +561,7 @@ function WeeklyProjectRow({ project: p }: { project: WeeklyReportProjectSnapshot
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-text-muted mt-0.5">
             Lead: {p.leadName ?? '—'} · {p.memberCount} member{p.memberCount !== 1 ? 's' : ''}
           </p>
         </div>
@@ -572,14 +572,14 @@ function WeeklyProjectRow({ project: p }: { project: WeeklyReportProjectSnapshot
         )}
       </div>
       <div className="flex items-center gap-3">
-        <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+        <div className="flex-1 bg-surface-highlight rounded-full h-2 overflow-hidden">
           <div className="h-2 rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
         </div>
-        <span className="text-xs font-medium text-gray-600 w-20 text-right">
+        <span className="text-xs font-medium text-text-secondary w-20 text-right">
           {p.tasksCompleted}/{p.tasksTotal} ({pct}%)
         </span>
       </div>
-      <div className="flex gap-4 mt-2 text-xs text-gray-500">
+      <div className="flex gap-4 mt-2 text-xs text-text-muted">
         <span>{p.tasksInProgress} in progress</span>
         <span>{p.tasksTotal - p.tasksCompleted - p.tasksInProgress} to-do</span>
       </div>
@@ -591,9 +591,9 @@ function WeeklyProjectRow({ project: p }: { project: WeeklyReportProjectSnapshot
 
 function StatCard({ label, value, color }: { label: string; value: number | string; color?: 'red' }) {
   return (
-    <div className="bg-surface-raised border border-gray-200 rounded-lg p-4">
-      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-xl font-bold ${color === 'red' ? 'text-red-600' : 'text-gray-900'}`}>{value}</p>
+    <div className="bg-surface-raised border border-border-default rounded-lg p-4">
+      <p className="text-xs text-text-muted uppercase tracking-wide mb-1">{label}</p>
+      <p className={`text-xl font-bold ${color === 'red' ? 'text-red-600' : 'text-text-primary'}`}>{value}</p>
     </div>
   )
 }

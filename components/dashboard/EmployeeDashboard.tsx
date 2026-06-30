@@ -39,17 +39,17 @@ const STATUS_BADGE: Record<string, string> = {
   OPEN: 'bg-amber-100 text-amber-700',
   ACCEPTED: 'bg-blue-100 text-blue-700',
   COMPLETED: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-neutral-100 text-neutral-500',
-  TODO: 'bg-neutral-100 text-neutral-600',
+  CANCELLED: 'bg-surface-highlight text-text-muted',
+  TODO: 'bg-surface-highlight text-text-secondary',
   IN_PROGRESS: 'bg-blue-100 text-blue-700',
   DONE: 'bg-emerald-100 text-emerald-700',
   ACTIVE: 'bg-emerald-100 text-emerald-700',
   ON_HOLD: 'bg-amber-100 text-amber-700',
-  COMPLETED_STATUS: 'bg-neutral-100 text-neutral-500',
+  COMPLETED_STATUS: 'bg-surface-highlight text-text-muted',
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const cls = STATUS_BADGE[status] ?? 'bg-neutral-100 text-neutral-500'
+  const cls = STATUS_BADGE[status] ?? 'bg-surface-highlight text-text-muted'
   return (
     <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${cls}`}>
       {status.replace('_', ' ')}
@@ -59,9 +59,9 @@ function StatusBadge({ status }: { status: string }) {
 
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
-      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">{label}</p>
-      <p className="text-3xl font-bold text-neutral-900">{value}</p>
+    <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-border-subtle">
+      <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">{label}</p>
+      <p className="text-3xl font-bold text-text-primary">{value}</p>
     </div>
   )
 }
@@ -119,10 +119,10 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-neutral-400 mb-1">
+            <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-text-muted mb-1">
               My Workspace
             </p>
-            <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">
+            <h1 className="text-2xl font-bold text-text-primary tracking-tight">
               {greeting()}, {user.name.split(' ')[0]}!
             </h1>
           </div>
@@ -160,12 +160,12 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
             {/* Row 2: My Projects + My Upcoming Tasks */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* My Projects */}
-              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
-                <h2 className="text-sm font-semibold text-neutral-700 mb-4 uppercase tracking-wider">
+              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-border-subtle">
+                <h2 className="text-sm font-semibold text-text-secondary mb-4 uppercase tracking-wider">
                   My Projects
                 </h2>
                 {data.myProjects.length === 0 ? (
-                  <p className="text-sm text-neutral-400 py-6 text-center">
+                  <p className="text-sm text-text-muted py-6 text-center">
                     You haven&apos;t been assigned to any projects yet
                   </p>
                 ) : (
@@ -174,11 +174,11 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
                       <li key={project.id}>
                         <Link
                           href={`/dashboard/projects/${project.id}`}
-                          className="flex items-center justify-between hover:bg-neutral-50 rounded-xl px-3 py-2.5 -mx-3 transition-colors group"
+                          className="flex items-center justify-between hover:bg-surface-highlight rounded-xl px-3 py-2.5 -mx-3 transition-colors group"
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-medium text-neutral-800 group-hover:text-neutral-900 truncate">
+                              <p className="text-sm font-medium text-text-primary group-hover:text-text-primary truncate">
                                 {project.name}
                               </p>
                               {project.isLead && (
@@ -189,7 +189,7 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <StatusBadge status={project.status} />
-                              <span className="text-xs text-neutral-400">{project.myTaskCount} tasks</span>
+                              <span className="text-xs text-text-muted">{project.myTaskCount} tasks</span>
                             </div>
                           </div>
                         </Link>
@@ -200,22 +200,22 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
               </div>
 
               {/* My Upcoming Tasks */}
-              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
-                <h2 className="text-sm font-semibold text-neutral-700 mb-4 uppercase tracking-wider">
+              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-border-subtle">
+                <h2 className="text-sm font-semibold text-text-secondary mb-4 uppercase tracking-wider">
                   My Upcoming Tasks
                 </h2>
                 {data.myUpcomingTasks.length === 0 ? (
-                  <p className="text-sm text-neutral-400 py-6 text-center">No upcoming tasks</p>
+                  <p className="text-sm text-text-muted py-6 text-center">No upcoming tasks</p>
                 ) : (
                   <ul className="space-y-2">
                     {data.myUpcomingTasks.map(task => (
                       <li key={task.id}>
                         <Link
                           href={`/dashboard/projects/${task.projectId}`}
-                          className="block hover:bg-neutral-50 rounded-xl px-3 py-2.5 -mx-3 transition-colors group"
+                          className="block hover:bg-surface-highlight rounded-xl px-3 py-2.5 -mx-3 transition-colors group"
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-medium text-neutral-800 group-hover:text-neutral-900 truncate flex-1">
+                            <p className="text-sm font-medium text-text-primary group-hover:text-text-primary truncate flex-1">
                               {task.title}
                             </p>
                             {task.isOverdue && (
@@ -226,8 +226,8 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <StatusBadge status={task.status} />
-                            <span className="text-xs text-neutral-400 truncate">{task.projectName}</span>
-                            <span className="text-xs text-neutral-400 ml-auto shrink-0">
+                            <span className="text-xs text-text-muted truncate">{task.projectName}</span>
+                            <span className="text-xs text-text-muted ml-auto shrink-0">
                               {formatDueDate(task.dueDate)}
                             </span>
                           </div>
@@ -240,12 +240,12 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
             </div>
 
             {/* Row 3: My Recent Tickets */}
-            <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
-              <h2 className="text-sm font-semibold text-neutral-700 mb-4 uppercase tracking-wider">
+            <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-border-subtle">
+              <h2 className="text-sm font-semibold text-text-secondary mb-4 uppercase tracking-wider">
                 My Recent Tickets
               </h2>
               {data.myRecentTickets.length === 0 ? (
-                <p className="text-sm text-neutral-400 py-6 text-center">
+                <p className="text-sm text-text-muted py-6 text-center">
                   You haven&apos;t raised any tickets yet
                 </p>
               ) : (
@@ -254,15 +254,15 @@ export default function EmployeeDashboard({ user }: EmployeeDashboardProps) {
                     <Link
                       key={ticket.id}
                       href={`/dashboard/tickets/${ticket.id}`}
-                      className="block hover:bg-neutral-50 rounded-xl border border-neutral-100 px-4 py-3 transition-colors group"
+                      className="block hover:bg-surface-highlight rounded-xl border border-border-subtle px-4 py-3 transition-colors group"
                     >
-                      <p className="text-sm font-medium text-neutral-800 group-hover:text-neutral-900 truncate mb-2">
+                      <p className="text-sm font-medium text-text-primary group-hover:text-text-primary truncate mb-2">
                         {ticket.title}
                       </p>
-                      <p className="text-xs text-neutral-400 truncate mb-2">{ticket.projectName}</p>
+                      <p className="text-xs text-text-muted truncate mb-2">{ticket.projectName}</p>
                       <div className="flex items-center justify-between">
                         <StatusBadge status={ticket.status} />
-                        <span className="text-[10px] text-neutral-400">{timeAgo(ticket.createdAt)}</span>
+                        <span className="text-[10px] text-text-muted">{timeAgo(ticket.createdAt)}</span>
                       </div>
                     </Link>
                   ))}

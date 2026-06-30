@@ -224,7 +224,7 @@ export default function Topbar() {
           {user && (
             <>
               {/* Status selector */}
-              <div className="relative hidden sm:block" ref={statusRef}>
+              <div className="relative hidden min-[1600px]:block" ref={statusRef}>
                 <button
                   type="button"
                   onClick={() => setStatusOpen((prev) => !prev)}

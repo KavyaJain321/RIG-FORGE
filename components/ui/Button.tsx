@@ -25,13 +25,15 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // gov-emphasis — Kept as alias for `primary` for backward compatibility.
 
 const variantClass: Record<ButtonVariant, string> = {
-  // Solid black — commanding authority for the primary CTA
+  // Solid high-contrast CTA. Light theme: black on light. Dark theme: inverted
+  // (near-white on dark) so it still pops. (bg-primary flips with the theme, so
+  // it can't be used here — it would go light-on-light text-white in dark.)
   primary:
-    'bg-primary text-white border-transparent hover:bg-[#2A2A2A]',
+    'bg-[#1A1A1A] text-white border-transparent hover:bg-[#2A2A2A] dark:bg-[#EDEDEA] dark:text-[#1A1A1A] dark:hover:bg-white',
 
   // Backward-compatible alias
   'gov-emphasis':
-    'bg-primary text-white border-transparent hover:bg-[#2A2A2A]',
+    'bg-[#1A1A1A] text-white border-transparent hover:bg-[#2A2A2A] dark:bg-[#EDEDEA] dark:text-[#1A1A1A] dark:hover:bg-white',
 
   // Lime with legible black text (contrast 11.97:1 vs prior 1.45:1)
   default:

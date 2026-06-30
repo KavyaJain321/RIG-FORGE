@@ -51,11 +51,11 @@ function StatCard({
         ? 'text-amber-600'
         : accent === 'blue'
           ? 'text-blue-600'
-          : 'text-neutral-900'
+          : 'text-text-primary'
 
   const content = (
-    <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100 hover:shadow-md transition-shadow">
-      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">{label}</p>
+    <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-border-subtle hover:shadow-md transition-shadow">
+      <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-2">{label}</p>
       <p className={`text-3xl font-bold ${accentClass}`}>{value}</p>
     </div>
   )
@@ -131,10 +131,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
 
         {/* Header */}
         <div>
-          <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-neutral-400 mb-1">
+          <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-text-muted mb-1">
             Admin Overview
           </p>
-          <h1 className="text-2xl font-bold text-neutral-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-text-primary tracking-tight">
             Dashboard
           </h1>
         </div>
@@ -168,12 +168,12 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             {/* Row 2: Who's Working + Onboarding Queue */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
               {/* Who's Working — wider col */}
-              <div className="lg:col-span-3 bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
-                <h2 className="text-sm font-semibold text-neutral-700 mb-4 uppercase tracking-wider">
+              <div className="lg:col-span-3 bg-surface-raised rounded-2xl p-5 shadow-sm border border-border-subtle">
+                <h2 className="text-sm font-semibold text-text-secondary mb-4 uppercase tracking-wider">
                   Who&apos;s Working
                 </h2>
                 {data.workingMembers.length === 0 ? (
-                  <p className="text-sm text-neutral-400 py-6 text-center">
+                  <p className="text-sm text-text-muted py-6 text-center">
                     No one is working right now
                   </p>
                 ) : (
@@ -183,7 +183,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                         <button
                           type="button"
                           onClick={() => setSelectedMemberId(member.id)}
-                          className="w-full flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-neutral-50 transition-colors text-left group"
+                          className="w-full flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-surface-highlight transition-colors text-left group"
                         >
                           <div className="relative shrink-0">
                             {member.avatarUrl ? (
@@ -193,19 +193,19 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                                 className="w-9 h-9 rounded-full object-cover"
                               />
                             ) : (
-                              <div className="w-9 h-9 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-semibold text-neutral-600">
+                              <div className="w-9 h-9 rounded-full bg-surface-mid flex items-center justify-center text-xs font-semibold text-text-secondary">
                                 {getInitials(member.name)}
                               </div>
                             )}
                             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-neutral-800 truncate group-hover:text-neutral-900">{member.name}</p>
-                            <p className="text-xs text-neutral-400 truncate">
+                            <p className="text-sm font-medium text-text-primary truncate group-hover:text-text-primary">{member.name}</p>
+                            <p className="text-xs text-text-muted truncate">
                               {member.primaryProject ?? 'No project'}
                             </p>
                           </div>
-                          <span className="text-neutral-300 group-hover:text-neutral-500 text-xs transition-colors">›</span>
+                          <span className="text-neutral-300 group-hover:text-text-muted text-xs transition-colors">›</span>
                         </button>
                       </li>
                     ))}
@@ -214,9 +214,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </div>
 
               {/* Onboarding Queue */}
-              <div className="lg:col-span-2 bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
+              <div className="lg:col-span-2 bg-surface-raised rounded-2xl p-5 shadow-sm border border-border-subtle">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider">
+                  <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
                     Onboarding Queue
                   </h2>
                   <Link
@@ -227,25 +227,25 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                   </Link>
                 </div>
                 {data.pendingOnboarding.length === 0 ? (
-                  <p className="text-sm text-neutral-400 py-6 text-center">No pending members</p>
+                  <p className="text-sm text-text-muted py-6 text-center">No pending members</p>
                 ) : (
                   <>
                     <ul className="space-y-3">
                       {data.pendingOnboarding.slice(0, 5).map(u => (
                         <li key={u.id} className="space-y-0.5">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium text-neutral-800 truncate">{u.name}</p>
-                            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500 shrink-0">
+                            <p className="text-sm font-medium text-text-primary truncate">{u.name}</p>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-surface-highlight text-text-muted shrink-0">
                               {u.role}
                             </span>
                           </div>
-                          <p className="text-xs text-neutral-400 truncate">{u.email}</p>
+                          <p className="text-xs text-text-muted truncate">{u.email}</p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] text-neutral-400">
+                            <span className="text-[10px] text-text-muted">
                               Joined {timeAgo(u.createdAt)}
                             </span>
                             <span
-                              className={`text-[10px] font-medium ${u.hasLoggedIn ? 'text-emerald-600' : 'text-neutral-400'}`}
+                              className={`text-[10px] font-medium ${u.hasLoggedIn ? 'text-emerald-600' : 'text-text-muted'}`}
                             >
                               {u.hasLoggedIn ? '● Has logged in' : '○ Not yet'}
                             </span>
@@ -269,30 +269,30 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             {/* Row 3: Active Projects + Open Tickets */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {/* Active Projects */}
-              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
-                <h2 className="text-sm font-semibold text-neutral-700 mb-4 uppercase tracking-wider">
+              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-border-subtle">
+                <h2 className="text-sm font-semibold text-text-secondary mb-4 uppercase tracking-wider">
                   Active Projects
                 </h2>
                 {data.activeProjects.length === 0 ? (
-                  <p className="text-sm text-neutral-400 py-6 text-center">No active projects</p>
+                  <p className="text-sm text-text-muted py-6 text-center">No active projects</p>
                 ) : (
                   <ul className="space-y-3">
                     {data.activeProjects.slice(0, 5).map(project => (
                       <li key={project.id}>
                         <Link
                           href={`/dashboard/projects/${project.id}`}
-                          className="flex items-center justify-between hover:bg-neutral-50 rounded-xl px-3 py-2 -mx-3 transition-colors group"
+                          className="flex items-center justify-between hover:bg-surface-highlight rounded-xl px-3 py-2 -mx-3 transition-colors group"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-neutral-800 group-hover:text-neutral-900 truncate">
+                            <p className="text-sm font-medium text-text-primary group-hover:text-text-primary truncate">
                               {project.name}
                             </p>
-                            <p className="text-xs text-neutral-400">
+                            <p className="text-xs text-text-muted">
                               Lead: {project.leadName ?? 'Unassigned'}
                             </p>
                           </div>
                           <div className="text-right shrink-0 ml-3">
-                            <p className="text-xs text-neutral-500">{project.memberCount} members</p>
+                            <p className="text-xs text-text-muted">{project.memberCount} members</p>
                             <p className="text-xs text-amber-600 font-medium">
                               {project.openTaskCount} open tasks
                             </p>
@@ -305,9 +305,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </div>
 
               {/* Open Tickets */}
-              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-neutral-100">
+              <div className="bg-surface-raised rounded-2xl p-5 shadow-sm border border-border-subtle">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-neutral-700 uppercase tracking-wider">
+                  <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
                     Open Tickets
                   </h2>
                   <Link
@@ -318,24 +318,24 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
                   </Link>
                 </div>
                 {data.recentOpenTickets.length === 0 ? (
-                  <p className="text-sm text-neutral-400 py-6 text-center">No open tickets</p>
+                  <p className="text-sm text-text-muted py-6 text-center">No open tickets</p>
                 ) : (
                   <ul className="space-y-3">
                     {data.recentOpenTickets.map(ticket => (
                       <li key={ticket.id}>
                         <Link
                           href={`/dashboard/tickets/${ticket.id}`}
-                          className="flex items-start justify-between hover:bg-neutral-50 rounded-xl px-3 py-2 -mx-3 transition-colors group"
+                          className="flex items-start justify-between hover:bg-surface-highlight rounded-xl px-3 py-2 -mx-3 transition-colors group"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-neutral-800 group-hover:text-neutral-900 truncate">
+                            <p className="text-sm font-medium text-text-primary group-hover:text-text-primary truncate">
                               {ticket.title}
                             </p>
-                            <p className="text-xs text-neutral-400 truncate">
+                            <p className="text-xs text-text-muted truncate">
                               {ticket.raisedByName} · {ticket.projectName}
                             </p>
                           </div>
-                          <span className="text-[10px] text-neutral-400 shrink-0 ml-3 mt-0.5">
+                          <span className="text-[10px] text-text-muted shrink-0 ml-3 mt-0.5">
                             {timeAgo(ticket.createdAt)}
                           </span>
                         </Link>
