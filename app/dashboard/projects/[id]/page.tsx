@@ -33,7 +33,7 @@ function mergeSummaryIntoDetail(detail: ProjectDetail, summary: ProjectSummary):
 function ProjectDetailSkeleton() {
   return (
     <div className="min-h-full">
-      <div className="bg-background-secondary border-b border-border-default px-8 pt-6 pb-0">
+      <div className="bg-background-secondary border-b border-border-default px-4 sm:px-6 lg:px-8 pt-6 pb-0">
         <div className="h-4 w-32 forge-shimmer bg-background-tertiary mb-6" />
         <div className="flex justify-between mb-4">
           <div className="h-9 w-64 max-w-[70%] forge-shimmer bg-background-tertiary" />
@@ -44,13 +44,13 @@ function ProjectDetailSkeleton() {
           <div className="h-5 w-16 forge-shimmer bg-background-tertiary" />
         </div>
         <div className="h-2 w-full max-w-md forge-shimmer bg-background-tertiary mb-6" />
-        <div className="flex border-b border-border-default -mx-8 px-8">
+        <div className="flex border-b border-border-default -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 overflow-x-auto">
           <div className="h-10 w-28 forge-shimmer bg-background-tertiary mb-0 mr-4" />
           <div className="h-10 w-28 forge-shimmer bg-background-tertiary mb-0 mr-4" />
           <div className="h-10 w-28 forge-shimmer bg-background-tertiary mb-0" />
         </div>
       </div>
-      <div className="px-8 py-6 space-y-3">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="h-10 w-full forge-shimmer bg-background-secondary border border-border-default" />
         ))}

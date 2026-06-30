@@ -754,7 +754,7 @@ export default function OverviewTab({ project, isAdmin, isLead, currentUserId, o
   }
 
   return (
-    <div className="px-8 py-6 flex flex-col gap-8">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-8">
       {/* ── Top row: description + links ── */}
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Description */}

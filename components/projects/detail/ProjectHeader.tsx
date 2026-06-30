@@ -71,7 +71,7 @@ export default function ProjectHeader({
   const deadline = getDeadlineDisplay(project.deadline)
 
   return (
-    <header className="w-full bg-background-secondary border-b border-border-default px-8 pt-6 pb-0">
+    <header className="w-full bg-background-secondary border-b border-border-default px-4 sm:px-6 lg:px-8 pt-6 pb-0">
       {/* Row 1 */}
       <div className="flex items-center justify-between mb-4">
         <button
@@ -101,10 +101,10 @@ export default function ProjectHeader({
         )}
       </div>
 
-      {/* Row 2 */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="min-w-0 flex-1 pr-4">
-          <h1 className="font-mono font-black text-3xl text-primary tracking-tight leading-none">
+      {/* Row 2 — stacks on mobile so the big title can't collide with the progress block */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-4">
+        <div className="min-w-0 md:flex-1 md:pr-4">
+          <h1 className="font-mono font-black text-2xl sm:text-3xl text-primary tracking-tight leading-none break-words">
             {project.name}
           </h1>
           <div className="mt-2 flex flex-wrap gap-2 items-center">
@@ -115,7 +115,7 @@ export default function ProjectHeader({
             )}
           </div>
         </div>
-        <div className="w-64 shrink-0">
+        <div className="w-full md:w-64 shrink-0">
           <p className="font-mono text-[10px] text-muted tracking-widest mb-2">OVERALL PROGRESS</p>
           <ContributionBar value={project.totalTasks > 0 ? Math.round((project.doneTasks / project.totalTasks) * 100) : 0} showPercentage={false} />
           <p className="font-mono text-xs text-secondary mt-1">
