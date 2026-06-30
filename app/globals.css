@@ -219,6 +219,12 @@ body {
   from { transform: translateX(100%); opacity: 0.85; }
   to   { transform: translateX(0);    opacity: 1; }
 }
+
+/* Mobile "More" sheet rises from the bottom edge. */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
 .panel-slide-in {
   animation: panel-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 
 import Topbar from '@/components/shared/Topbar'
+import MobileNav from '@/components/shared/MobileNav'
 import ForgieDock from '@/components/assistant/ForgieDock'
 import { APP_NAME } from '@/lib/branding'
 
@@ -23,11 +24,13 @@ export default function DashboardLayout({
     <div className="flex min-h-screen bg-background-primary">
       <div className="flex-1 min-w-0 flex flex-col">
         <Topbar />
-        <main className="flex-1 min-w-0">
+        {/* Bottom padding on mobile clears the fixed bottom nav (hidden on lg+). */}
+        <main className="flex-1 min-w-0 pb-14 lg:pb-0">
           {children}
         </main>
       </div>
       <ForgieDock />
+      <MobileNav />
     </div>
   )
 }

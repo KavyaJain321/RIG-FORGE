@@ -146,39 +146,8 @@ export default function Topbar() {
           {APP_SHORT}
         </Link>
 
-        {/* ── Mobile nav (hamburger) ─────────────────────────────────────── */}
-        <div className={`relative lg:hidden ${user?.mustChangePassword ? 'hidden' : ''}`} ref={mobileNavRef}>
-          <button
-            type="button"
-            aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
-            aria-expanded={mobileNavOpen}
-            onClick={() => setMobileNavOpen((prev) => !prev)}
-            className="h-9 px-3 rounded-full border border-border-default bg-surface-raised/70 hover:bg-surface-raised transition-colors font-mono text-xs text-text-secondary"
-          >
-            {mobileNavOpen ? 'CLOSE' : 'MENU'}
-          </button>
-
-          {mobileNavOpen && (
-            <div className="topbar-dropdown left-0 right-auto min-w-[220px]">
-              {navItems.map(({ href, label }) => {
-                const active = isNavActive(href, pathname)
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={[
-                      'topbar-dropdown-item',
-                      active ? 'font-semibold text-text-primary' : '',
-                    ].join(' ')}
-                    onClick={() => setMobileNavOpen(false)}
-                  >
-                    {label}
-                  </Link>
-                )
-              })}
-            </div>
-          )}
-        </div>
+        {/* Mobile navigation is the fixed bottom tab bar (components/shared/MobileNav).
+            The desktop tab row below is hidden under lg by .topbar-nav CSS. */}
 
         {/* ── Navigation tabs (desktop only) ──────────────────────────────── */}
         {user?.mustChangePassword ? (

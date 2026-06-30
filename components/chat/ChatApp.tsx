@@ -543,7 +543,10 @@ export default function ChatApp() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)]">
+    // Mobile: subtract the top bar (3.5rem) AND the fixed bottom nav (3.5rem),
+    // using dvh so the mobile URL bar doesn't clip the composer. Desktop: just
+    // the top bar (no bottom nav).
+    <div className="flex h-[calc(100dvh-7rem)] lg:h-[calc(100vh-3.5rem)]">
       <ConversationList
         conversations={conversations}
         activeId={activeId}

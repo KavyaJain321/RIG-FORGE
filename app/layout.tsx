@@ -40,6 +40,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#3F7A0A',
+  width: 'device-width',
+  initialScale: 1,
+  // Extend under the iOS home-indicator / notch so we can pad with safe-area insets.
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
