@@ -49,7 +49,7 @@ enum TicketStatus {
 }
 
 enum MessageVisibility {
-  TEAM       // all project members
+  TEAM // all project members
   LEAD_ADMIN // only project lead + admins
 }
 
@@ -74,43 +74,44 @@ enum NotificationType {
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
-  id            String     @id @default(cuid())
-  name          String
-  email         String     @unique      // RIG login identifier (e.g. name@rigforge.com) — NOT a real mailbox
-  personalEmail String?                 // deliverable Gmail (manual bootstrap). Authoritative source is the connected GoogleIntegration.email when present.
-  whatsappNumber String?   @unique       // WhatsApp number in E.164 format (+91XXXXXXXXXX). Unique so inbound WA messages resolve to exactly one user. (Nullable → many users may have none.)
-  whatsappVerified Boolean @default(false) // true only after the user confirms an OTP we sent to that number. Existing pre-OTP numbers stay false but still resolve inbound.
+  id                 String     @id @default(cuid())
+  organizationId     String     @default("rig360") // tenancy anchor (single-org for now)
+  name               String
+  email              String     @unique // RIG login identifier (e.g. name@rigforge.com) — NOT a real mailbox
+  personalEmail      String? // deliverable Gmail (manual bootstrap). Authoritative source is the connected GoogleIntegration.email when present.
+  whatsappNumber     String?    @unique // WhatsApp number in E.164 format (+91XXXXXXXXXX). Unique so inbound WA messages resolve to exactly one user. (Nullable → many users may have none.)
+  whatsappVerified   Boolean    @default(false) // true only after the user confirms an OTP we sent to that number. Existing pre-OTP numbers stay false but still resolve inbound.
   // ── WhatsApp OTP verification (transient; cleared on success/expiry) ──
-  waPendingNumber  String?              // candidate E.164 number awaiting OTP confirmation. NOT promoted to whatsappNumber until verified, so unverified numbers never resolve inbound.
-  waVerifyCodeHash String?              // bcrypt hash of the 6-digit code we sent
-  waVerifyExpiresAt DateTime?           // code expiry (~10 min after send)
-  waVerifyAttempts Int     @default(0)  // wrong-code attempts for the current code; locks at a cap
-  waVerifyLastSentAt DateTime?          // last OTP send, for resend rate-limiting
-  passwordHash  String
-  role          Role
+  waPendingNumber    String? // candidate E.164 number awaiting OTP confirmation. NOT promoted to whatsappNumber until verified, so unverified numbers never resolve inbound.
+  waVerifyCodeHash   String? // bcrypt hash of the 6-digit code we sent
+  waVerifyExpiresAt  DateTime? // code expiry (~10 min after send)
+  waVerifyAttempts   Int        @default(0) // wrong-code attempts for the current code; locks at a cap
+  waVerifyLastSentAt DateTime? // last OTP send, for resend rate-limiting
+  passwordHash       String
+  role               Role
   avatarUrl          String?
   currentStatus      UserStatus @default(NOT_WORKING)
   isActive           Boolean    @default(true)
   isOnboarding       Boolean    @default(false)
-  tempPassword       String?    // plaintext temp password shown to admins; cleared after first change
+  tempPassword       String? // plaintext temp password shown to admins; cleared after first change
   mustChangePassword Boolean    @default(false)
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  projects        ProjectMember[]
-  projectsLed     Project[]       @relation("ProjectLead")
-  tasks           Task[]
-  threads         ThreadMessage[]
-  notifications   Notification[]
-  ticketsRaised   Ticket[]        @relation("TicketsRaised")
-  ticketsHelped   Ticket[]        @relation("TicketsHelped")
-  ticketComments  TicketComment[]
-  dailyLogs       DailyLog[]
-  dailyActivities DailyActivity[]
-  conversations   AssistantConversation[]
-  assistantUsage  AssistantUsage[]
-  auditLogs       AssistantAuditLog[]
-  dailyLogDrafts  DailyLogDraft[]
+  projects          ProjectMember[]
+  projectsLed       Project[]               @relation("ProjectLead")
+  tasks             Task[]
+  threads           ThreadMessage[]
+  notifications     Notification[]
+  ticketsRaised     Ticket[]                @relation("TicketsRaised")
+  ticketsHelped     Ticket[]                @relation("TicketsHelped")
+  ticketComments    TicketComment[]
+  dailyLogs         DailyLog[]
+  dailyActivities   DailyActivity[]
+  conversations     AssistantConversation[]
+  assistantUsage    AssistantUsage[]
+  auditLogs         AssistantAuditLog[]
+  dailyLogDrafts    DailyLogDraft[]
   googleIntegration GoogleIntegration?
 
   // ── Native chat (Phase 1) ──
@@ -122,20 +123,23 @@ model User {
   blocksMade           Block[]              @relation("Blocker")
   blocksReceived       Block[]              @relation("Blocked")
   pushSubscriptions    PushSubscription[]   @relation("PushSubs")
+
+  @@index([organizationId])
 }
 
 model Project {
-  id          String        @id @default(cuid())
-  name        String
-  description String?
-  status      ProjectStatus
-  priority    Priority
-  deadline    DateTime?
-  leadId      String?
-  links       Json?
-  isActive    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  organizationId String        @default("rig360") // tenancy anchor (single-org for now)
+  name           String
+  description    String?
+  status         ProjectStatus
+  priority       Priority
+  deadline       DateTime?
+  leadId         String?
+  links          Json?
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   lead    User?           @relation("ProjectLead", fields: [leadId], references: [id])
   members ProjectMember[]
@@ -144,24 +148,28 @@ model Project {
   tickets Ticket[]
 
   @@index([leadId])
+  @@index([organizationId])
 }
 
 model ProjectMember {
-  id           String   @id @default(cuid())
-  userId       String
-  projectId    String
-  contribution Float    @default(0)
-  joinedAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  userId         String
+  projectId      String
+  contribution   Float    @default(0)
+  joinedAt       DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id])
   project Project @relation(fields: [projectId], references: [id])
 
   @@unique([userId, projectId])
   @@index([projectId])
+  @@index([organizationId])
 }
 
 model Task {
   id             String     @id @default(cuid())
+  organizationId String     @default("rig360") // tenancy anchor (single-org for now)
   title          String
   description    String?
   expectedOutput String?
@@ -175,115 +183,133 @@ model Task {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  assignee User?      @relation(fields: [assigneeId], references: [id])
-  project  Project    @relation(fields: [projectId], references: [id])
+  assignee User?       @relation(fields: [assigneeId], references: [id])
+  project  Project     @relation(fields: [projectId], references: [id])
   thread   TaskThread?
 
   @@index([projectId])
   @@index([assigneeId])
+  @@index([organizationId])
 }
 
 model Ticket {
-  id          String       @id @default(cuid())
-  title       String
-  description String
-  projectId   String
-  raisedById  String
-  helperId    String?
-  status      TicketStatus @default(OPEN)
-  createdAt   DateTime     @default(now())
-  acceptedAt  DateTime?
-  completedAt DateTime?
-  cancelledAt DateTime?
+  id             String       @id @default(cuid())
+  organizationId String       @default("rig360") // tenancy anchor (single-org for now)
+  title          String
+  description    String
+  projectId      String
+  raisedById     String
+  helperId       String?
+  status         TicketStatus @default(OPEN)
+  createdAt      DateTime     @default(now())
+  acceptedAt     DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
 
-  project  Project @relation(fields: [projectId], references: [id])
-  raisedBy User    @relation("TicketsRaised", fields: [raisedById], references: [id])
-  helper   User?   @relation("TicketsHelped", fields: [helperId], references: [id])
+  project  Project         @relation(fields: [projectId], references: [id])
+  raisedBy User            @relation("TicketsRaised", fields: [raisedById], references: [id])
+  helper   User?           @relation("TicketsHelped", fields: [helperId], references: [id])
   comments TicketComment[]
 
   @@index([projectId])
   @@index([raisedById])
   @@index([status])
+  @@index([organizationId])
 }
 
 model TicketComment {
-  id        String   @id @default(cuid())
-  ticketId  String
-  authorId  String
-  body      String
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  ticketId       String
+  authorId       String
+  body           String
+  createdAt      DateTime @default(now())
 
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   author User   @relation(fields: [authorId], references: [id])
 
   @@index([ticketId])
   @@index([authorId])
+  @@index([organizationId])
 }
 
 model DailyLog {
-  id          String   @id @default(cuid())
-  userId      String
-  date        DateTime @db.Date
-  workSummary String
-  notes       String?
-  isLocked    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  userId         String
+  date           DateTime @db.Date
+  workSummary    String
+  notes          String?
+  isLocked       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, date])
   @@index([userId])
+  @@index([organizationId])
 }
 
 model DailyActivity {
-  id         String    @id @default(cuid())
-  userId     String
-  date       DateTime  @db.Date
-  wasActive  Boolean   @default(false)
-  lastSeenAt DateTime?
+  id             String    @id @default(cuid())
+  organizationId String    @default("rig360") // tenancy anchor (single-org for now)
+  userId         String
+  date           DateTime  @db.Date
+  wasActive      Boolean   @default(false)
+  lastSeenAt     DateTime?
 
   user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, date])
   @@index([userId])
+  @@index([organizationId])
 }
 
 model WeeklyReport {
-  id            String   @id @default(cuid())
-  reportType    String   @default("WEEKLY")   // WEEKLY | PROJECT | EMPLOYEE
-  label         String?
-  weekStart     DateTime @db.Date
-  weekEnd       DateTime @db.Date
-  generatedAt   DateTime @default(now())
-  generatedById String?
-  filterIds     String[] @default([])
-  snapshot      Json
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  reportType     String   @default("WEEKLY") // WEEKLY | PROJECT | EMPLOYEE
+  label          String?
+  weekStart      DateTime @db.Date
+  weekEnd        DateTime @db.Date
+  generatedAt    DateTime @default(now())
+  generatedById  String?
+  filterIds      String[] @default([])
+  snapshot       Json
 
   @@index([weekStart])
   @@index([reportType])
+  @@index([organizationId])
 }
 
 model TaskThread {
-  id        String   @id @default(cuid())
-  taskId    String   @unique
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  taskId         String   @unique
+  createdAt      DateTime @default(now())
 
   task     Task            @relation(fields: [taskId], references: [id])
   messages ThreadMessage[]
+
+  @@index([organizationId])
 }
 
 model ProjectThread {
-  id        String   @id @default(cuid())
-  projectId String   @unique
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  projectId      String   @unique
+  createdAt      DateTime @default(now())
 
   project  Project         @relation(fields: [projectId], references: [id])
   messages ThreadMessage[]
+
+  @@index([organizationId])
 }
 
 model ThreadMessage {
   id              String            @id @default(cuid())
+  organizationId  String            @default("rig360") // tenancy anchor (single-org for now)
   content         String
   authorId        String
   taskThreadId    String?
@@ -291,7 +317,7 @@ model ThreadMessage {
   visibility      MessageVisibility @default(TEAM)
   fileUrl         String?
   fileName        String?
-  fileType        String?           // "link" | "file"
+  fileType        String? // "link" | "file"
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -302,22 +328,25 @@ model ThreadMessage {
   @@index([taskThreadId])
   @@index([projectThreadId])
   @@index([authorId])
+  @@index([organizationId])
 }
 
 model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  type      NotificationType
-  title     String
-  body      String
-  read      Boolean          @default(false)
-  linkTo    String?
-  createdAt DateTime         @default(now())
+  id             String           @id @default(cuid())
+  organizationId String           @default("rig360") // tenancy anchor (single-org for now)
+  userId         String
+  type           NotificationType
+  title          String
+  body           String
+  read           Boolean          @default(false)
+  linkTo         String?
+  createdAt      DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([read])
+  @@index([organizationId])
 }
 
 // ─── Forgie (AI Assistant) ────────────────────────────────────────────────────
@@ -343,14 +372,15 @@ enum AssistantChannel {
 }
 
 model AssistantConversation {
-  id        String   @id @default(cuid())
-  userId    String
-  channel   AssistantChannel @default(WEB)
-  title     String?  // auto-summarized after first exchange, null until then
-  isPinned  Boolean  @default(false)
-  isArchived Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String           @id @default(cuid())
+  organizationId String           @default("rig360") // tenancy anchor (single-org for now)
+  userId         String
+  channel        AssistantChannel @default(WEB)
+  title          String? // auto-summarized after first exchange, null until then
+  isPinned       Boolean          @default(false)
+  isArchived     Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   user      User                @relation(fields: [userId], references: [id])
   messages  AssistantMessage[]
@@ -359,17 +389,19 @@ model AssistantConversation {
   @@index([userId])
   @@index([userId, updatedAt(sort: Desc)])
   @@index([userId, channel])
+  @@index([organizationId])
 }
 
 model AssistantMessage {
   id             String               @id @default(cuid())
+  organizationId String               @default("rig360") // tenancy anchor (single-org for now)
   conversationId String
   role           AssistantMessageRole
-  content        String               // the text the user saw / sent
-  toolCalls      Json?                // structured tool invocations, if any
-  toolResults    Json?                // outputs returned by tools
-  provider       String?              // "groq" | "gemini" | "cerebras" | null for USER
-  model          String?              // e.g. "llama-3.3-70b-versatile"
+  content        String // the text the user saw / sent
+  toolCalls      Json? // structured tool invocations, if any
+  toolResults    Json? // outputs returned by tools
+  provider       String? // "groq" | "gemini" | "cerebras" | null for USER
+  model          String? // e.g. "llama-3.3-70b-versatile"
   inputTokens    Int?
   outputTokens   Int?
   latencyMs      Int?
@@ -379,34 +411,39 @@ model AssistantMessage {
 
   @@index([conversationId])
   @@index([createdAt])
+  @@index([organizationId])
 }
 
 model AssistantUsage {
-  id           String   @id @default(cuid())
-  userId       String
-  date         DateTime @db.Date
-  hour         Int      // 0-23 — for per-hour rate limiting
-  messageCount Int      @default(0)
-  inputTokens  Int      @default(0)
-  outputTokens Int      @default(0)
-  provider     String   // "groq" | "gemini" | "cerebras"
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  userId         String
+  date           DateTime @db.Date
+  hour           Int // 0-23 — for per-hour rate limiting
+  messageCount   Int      @default(0)
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  provider       String // "groq" | "gemini" | "cerebras"
 
   user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, date, hour, provider])
   @@index([userId, date])
+  @@index([organizationId])
 }
 
 model AssistantResponseCache {
-  id            String   @id @default(cuid())
-  cacheKey      String   @unique  // hash of (userId|query|userContext)
-  response      String              // the cached final assistant text
-  toolResults   Json?               // any tool results that produced it
-  hits          Int      @default(0)
-  expiresAt     DateTime            // typically createdAt + 5 min
-  createdAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  cacheKey       String   @unique // hash of (userId|query|userContext)
+  response       String // the cached final assistant text
+  toolResults    Json? // any tool results that produced it
+  hits           Int      @default(0)
+  expiresAt      DateTime // typically createdAt + 5 min
+  createdAt      DateTime @default(now())
 
   @@index([expiresAt])
+  @@index([organizationId])
 }
 
 // Every AI-triggered write action is recorded here. Lets admins answer
@@ -414,20 +451,22 @@ model AssistantResponseCache {
 // write turns out to be wrong. Records both successes and failures.
 model AssistantAuditLog {
   id             String   @id @default(cuid())
-  userId         String                  // the human who confirmed the action
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  userId         String // the human who confirmed the action
   conversationId String?
-  action         String                  // "create_task", "create_ticket", etc.
-  args           Json                    // exact arguments executed
-  result         Json?                   // returned data on success
+  action         String // "create_task", "create_ticket", etc.
+  args           Json // exact arguments executed
+  result         Json? // returned data on success
   success        Boolean  @default(true)
   error          String?
   createdAt      DateTime @default(now())
 
-  user           User                    @relation(fields: [userId], references: [id])
-  conversation   AssistantConversation?  @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  user         User                   @relation(fields: [userId], references: [id])
+  conversation AssistantConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([createdAt])
+  @@index([organizationId])
 }
 
 // AI-drafted daily logs awaiting user approval. Created by the
@@ -440,23 +479,25 @@ enum DailyLogDraftStatus {
 }
 
 model DailyLogDraft {
-  id              String              @id @default(cuid())
-  userId          String
-  date            DateTime            @db.Date
-  draftSummary    String              // the AI-drafted text
-  draftNotes      String?
-  evidence        Json                // raw activity used to draft (for transparency)
-  status          DailyLogDraftStatus @default(PENDING)
-  approvedAt      DateTime?
-  dismissedAt     DateTime?
-  createdDailyLogId String?           // link back if the user approved + a DailyLog was created
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id                String              @id @default(cuid())
+  organizationId    String              @default("rig360") // tenancy anchor (single-org for now)
+  userId            String
+  date              DateTime            @db.Date
+  draftSummary      String // the AI-drafted text
+  draftNotes        String?
+  evidence          Json // raw activity used to draft (for transparency)
+  status            DailyLogDraftStatus @default(PENDING)
+  approvedAt        DateTime?
+  dismissedAt       DateTime?
+  createdDailyLogId String? // link back if the user approved + a DailyLog was created
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 
   @@unique([userId, date])
   @@index([status])
+  @@index([organizationId])
 }
 
 // Per-user Google OAuth tokens. Stored after the user clicks "Connect
@@ -469,17 +510,20 @@ model DailyLogDraft {
 // The DB connection itself is TLS to Supabase, so they're protected
 // in transit and at rest by Supabase's encryption.
 model GoogleIntegration {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  email         String              // the Google email they connected
-  accessToken   String              // expires ~1h
-  refreshToken  String              // long-lived
-  expiresAt     DateTime
-  scopes        String              // space-separated granted scopes
-  connectedAt   DateTime @default(now())
-  lastUsedAt    DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  userId         String   @unique
+  email          String // the Google email they connected
+  accessToken    String // expires ~1h
+  refreshToken   String // long-lived
+  expiresAt      DateTime
+  scopes         String // space-separated granted scopes
+  connectedAt    DateTime @default(now())
+  lastUsedAt     DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 // Baileys auth state for the WhatsApp bridge.
@@ -494,14 +538,16 @@ model WhatsappAuth {
 // AI-generated daily team standup. One per day. Shown on the
 // /dashboard as a card; written by /api/cron/standup-digest at ~9am IST.
 model StandupDigest {
-  id              String   @id @default(cuid())
-  date            DateTime @db.Date @unique
-  summary         String              // the AI-drafted digest text
-  metrics         Json                // raw aggregate numbers used to generate it
-  generatedById   String?             // null = AI-generated by cron
-  generatedAt     DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  date           DateTime @unique @db.Date
+  summary        String // the AI-drafted digest text
+  metrics        Json // raw aggregate numbers used to generate it
+  generatedById  String? // null = AI-generated by cron
+  generatedAt    DateTime @default(now())
 
   @@index([date(sort: Desc)])
+  @@index([organizationId])
 }
 
 // ─── Native chat (Phase 1) ────────────────────────────────────────────────────
@@ -511,20 +557,20 @@ model StandupDigest {
 // backfill. Live updates are delivered via Supabase Realtime on these tables.
 
 enum ConversationType {
-  DIRECT   // 1:1 DM between exactly two users
-  GROUP    // named group chat, 2+ members
+  DIRECT // 1:1 DM between exactly two users
+  GROUP // named group chat, 2+ members
 }
 
 enum ConversationMemberRole {
-  OWNER    // group creator
-  ADMIN    // can rename + add/remove members
+  OWNER // group creator
+  ADMIN // can rename + add/remove members
   MEMBER
 }
 
 enum ChatMessageKind {
-  USER     // sent by a human (senderId set)
-  FORGIE   // AI reply (senderId null)
-  SYSTEM   // system notice, e.g. "X added Y" (senderId null)
+  USER // sent by a human (senderId set)
+  FORGIE // AI reply (senderId null)
+  SYSTEM // system notice, e.g. "X added Y" (senderId null)
 }
 
 enum ChatMessageType {
@@ -536,24 +582,24 @@ enum ChatMessageType {
 }
 
 model Conversation {
-  id             String           @id @default(cuid())
-  organizationId String           @default("rig360")  // tenancy anchor (single-org for now)
-  type           ConversationType
-  title          String?                              // group name; null for DMs (UI derives from the other member)
-  imageUrl       String?                              // group photo (Supabase Storage public URL); null for DMs
-  description    String?                              // group description / about
-  onlyAdminsCanSend Boolean       @default(false)    // group permission: only admins may send
-  inviteToken    String?          @unique             // invite-link token (null = no active link)
-  disappearingSeconds Int?                            // disappearing-messages TTL in seconds (null = off)
-  isForgie       Boolean          @default(false)     // the dedicated 1:1 Forgie (AI bot) chat
+  id                  String           @id @default(cuid())
+  organizationId      String           @default("rig360") // tenancy anchor (single-org for now)
+  type                ConversationType
+  title               String? // group name; null for DMs (UI derives from the other member)
+  imageUrl            String? // group photo (Supabase Storage public URL); null for DMs
+  description         String? // group description / about
+  onlyAdminsCanSend   Boolean          @default(false) // group permission: only admins may send
+  inviteToken         String?          @unique // invite-link token (null = no active link)
+  disappearingSeconds Int? // disappearing-messages TTL in seconds (null = off)
+  isForgie            Boolean          @default(false) // the dedicated 1:1 Forgie (AI bot) chat
   // For DIRECT convos, dmKey = the two user ids sorted + joined "a:b", so the
   // unique constraint guarantees exactly ONE DM thread per pair. Null for groups.
-  dmKey          String?
-  createdById    String?
-  isArchived     Boolean          @default(false)
-  lastMessageAt  DateTime?                            // denormalized for fast conversation-list sorting
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  dmKey               String?
+  createdById         String?
+  isArchived          Boolean          @default(false)
+  lastMessageAt       DateTime? // denormalized for fast conversation-list sorting
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
 
   createdBy User?                @relation("ChatCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   members   ConversationMember[]
@@ -570,13 +616,13 @@ model ConversationMember {
   conversationId String
   userId         String
   role           ConversationMemberRole @default(MEMBER)
-  lastReadAt     DateTime?                                 // drives unread counts
+  lastReadAt     DateTime? // drives unread counts
   isMuted        Boolean                @default(false)
-  muteUntil      DateTime?                                 // muted until this time (null = not muted)
-  isArchived     Boolean                @default(false)    // archived out of the main list
-  isPinned       Boolean                @default(false)    // pinned to the top of the chat list
-  clearedAt      DateTime?                                 // "clear chat" — hide messages before this
-  wallpaper      String?                                   // per-user chat background (preset key)
+  muteUntil      DateTime? // muted until this time (null = not muted)
+  isArchived     Boolean                @default(false) // archived out of the main list
+  isPinned       Boolean                @default(false) // pinned to the top of the chat list
+  clearedAt      DateTime? // "clear chat" — hide messages before this
+  wallpaper      String? // per-user chat background (preset key)
   joinedAt       DateTime               @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -591,25 +637,25 @@ model ChatMessage {
   id             String          @id @default(cuid())
   organizationId String          @default("rig360")
   conversationId String
-  senderId       String?                                  // null for FORGIE / SYSTEM messages
+  senderId       String? // null for FORGIE / SYSTEM messages
   kind           ChatMessageKind @default(USER)
   type           ChatMessageType @default(TEXT)
   content        String
-  replyToId      String?                                  // optional threaded reply
+  replyToId      String? // optional threaded reply
   editedAt       DateTime?
-  deletedAt      DateTime?                                // soft delete
-  deliveredAt    DateTime?                                // recipient device ack → double-grey tick
-  pinnedAt       DateTime?                                // pinned in the chat (null = not pinned)
-  fileName       String?                                  // original filename for FILE/AUDIO messages
-  fileSize       Int?                                     // size in bytes
-  linkPreview    Json?                                    // Open-Graph preview {url,title,description,image} for URLs
-  poll           Json?                                    // POLL payload {options:[{id,text}], multi, votes:{optionId:[userId]}}
+  deletedAt      DateTime? // soft delete
+  deliveredAt    DateTime? // recipient device ack → double-grey tick
+  pinnedAt       DateTime? // pinned in the chat (null = not pinned)
+  fileName       String? // original filename for FILE/AUDIO messages
+  fileSize       Int? // size in bytes
+  linkPreview    Json? // Open-Graph preview {url,title,description,image} for URLs
+  poll           Json? // POLL payload {options:[{id,text}], multi, votes:{optionId:[userId]}}
   createdAt      DateTime        @default(now())
 
-  conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User?         @relation("ChatSentMessages", fields: [senderId], references: [id], onDelete: SetNull)
-  replyTo      ChatMessage?  @relation("ChatReplies", fields: [replyToId], references: [id], onDelete: SetNull)
-  replies      ChatMessage[] @relation("ChatReplies")
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?             @relation("ChatSentMessages", fields: [senderId], references: [id], onDelete: SetNull)
+  replyTo      ChatMessage?      @relation("ChatReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      ChatMessage[]     @relation("ChatReplies")
   reactions    MessageReaction[]
   stars        MessageStar[]
 
@@ -619,57 +665,65 @@ model ChatMessage {
 
 // One emoji reaction per user per message (re-reacting replaces; same emoji toggles off).
 model MessageReaction {
-  id        String   @id @default(cuid())
-  messageId String
-  userId    String
-  emoji     String
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  messageId      String
+  userId         String
+  emoji          String
+  createdAt      DateTime @default(now())
 
   message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
   user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId])
   @@index([messageId])
+  @@index([organizationId])
 }
 
 // Per-user "starred"/favourite messages (private to each user).
 model MessageStar {
-  id        String   @id @default(cuid())
-  messageId String
-  userId    String
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  messageId      String
+  userId         String
+  createdAt      DateTime @default(now())
 
   message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
   user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId])
   @@index([userId])
+  @@index([organizationId])
 }
 
 // One-directional block: blocker no longer exchanges DMs with blocked.
 model Block {
-  id        String   @id @default(cuid())
-  blockerId String
-  blockedId String
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  blockerId      String
+  blockedId      String
+  createdAt      DateTime @default(now())
 
   blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
   blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
+  @@index([organizationId])
 }
 
 // A browser Web Push subscription (one per device/browser per user).
 model PushSubscription {
-  id        String   @id @default(cuid())
-  userId    String
-  endpoint  String   @unique
-  p256dh    String
-  auth      String
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360") // tenancy anchor (single-org for now)
+  userId         String
+  endpoint       String   @unique
+  p256dh         String
+  auth           String
+  createdAt      DateTime @default(now())
 
   user User @relation("PushSubs", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([organizationId])
 }
