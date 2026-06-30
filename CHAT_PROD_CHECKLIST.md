@@ -16,7 +16,12 @@ below. They are infra/security decisions that need the owner's call — they wer
    before subscribing. Prisma (table owner) bypasses RLS so the app is unaffected.
    **Verified:** a non-member sees 0 messages; a member still receives messages live.
    **➜ PROD STEPS:** (a) set `SUPABASE_JWT_SECRET` (prod project → Settings → API → JWT Secret) in
-   the prod env; (b) apply `prisma/rls/chat-rls.sql` against the prod DB.
+   the prod env; (b) apply `prisma/rls/chat-rls.sql` against the prod DB;
+   (c) **run `scripts/enable-rls.mjs` against prod** (DIRECT_URL = prod) — enables RLS on ALL public
+   tables (not just chat) so the anon REST API can't read/write User/Project/Ticket/etc. App is
+   unaffected (Prisma is the table owner, bypasses RLS). Applied to dev 2026-06-30 after Supabase
+   flagged `rls_disabled_in_public`. ⚠️ **Prod likely has the same exposure now** (its anon key shipped
+   in the deployed bundle) — apply this ASAP, even before full go-live.
 
 2. **SSRF hardening on link previews** — DONE. `lib/net/safe-fetch.ts` (`assertPublicUrl` +
    `safeFetch`) blocks non-public hosts (10/8, 127/8, 169.254/16, 172.16/12, 192.168/16, CGNAT,
