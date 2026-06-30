@@ -148,11 +148,23 @@ export default function ChatApp() {
   }, [me?.id])
 
   // Realtime: new messages, message updates (delivered tick), and read receipts.
+  // The socket is authenticated as the user (realtime token) so RLS scopes
+  // postgres_changes delivery to their own conversations.
   useEffect(() => {
     const supabase = getSupabaseClient()
     if (!supabase) return
-    const channel = supabase
-      .channel('rf-chat')
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    let cancelled = false
+    void (async () => {
+      try {
+        const r = await api<{ token: string }>('/api/chat/realtime-token')
+        if (r?.token) await supabase.realtime.setAuth(r.token)
+      } catch (e) {
+        console.error('[chat] realtime auth failed', e)
+      }
+      if (cancelled) return
+      channel = supabase
+        .channel('rf-chat')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'ChatMessage' },
@@ -216,8 +228,9 @@ export default function ChatApp() {
         { event: '*', schema: 'public', table: 'MessageReaction' },
         () => { void reloadActiveMessages() },
       )
-      .subscribe()
-    return () => { void supabase.removeChannel(channel) }
+        .subscribe()
+    })()
+    return () => { cancelled = true; if (channel) void supabase.removeChannel(channel) }
   }, [refreshConversations, reloadActiveMessages])
 
   const handleSend = useCallback(

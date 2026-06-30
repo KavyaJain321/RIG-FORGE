@@ -5,28 +5,27 @@ project** (`ugbjsnygfssctiuoyhks`). Before it ships to production, work through 
 below. They are infra/security decisions that need the owner's call — they were intentionally
 **not** done autonomously.
 
-## 🔴 Must-do before prod (security)
+## ✅ DONE (security) — implemented + verified on dev
 
-1. **Row-Level Security (RLS) on chat tables.** RLS is currently **OFF** on dev. Enable it on
-   `Conversation`, `ConversationMember`, `ChatMessage`, `MessageReaction`, `MessageStar`,
-   `Block`, `PushSubscription`. All app reads/writes go through Prisma (direct connection, bypasses
-   RLS) so the app keeps working — RLS matters for the **Supabase Realtime** path below.
+1. **RLS on chat tables + scoped realtime** — DONE. `prisma/rls/chat-rls.sql` enables RLS on
+   Conversation, ConversationMember, ChatMessage, MessageReaction, MessageStar, Block,
+   PushSubscription with membership-scoped SELECT policies (`rf_uid()` reads the JWT `sub`;
+   `rf_is_member`/`rf_can_see_msg` are SECURITY DEFINER to avoid recursion). The realtime socket
+   is authenticated per-user: `GET /api/chat/realtime-token` mints a Supabase JWT (sub=userId,
+   role=authenticated) signed with `SUPABASE_JWT_SECRET`; ChatApp calls `supabase.realtime.setAuth()`
+   before subscribing. Prisma (table owner) bypasses RLS so the app is unaffected.
+   **Verified:** a non-member sees 0 messages; a member still receives messages live.
+   **➜ PROD STEPS:** (a) set `SUPABASE_JWT_SECRET` (prod project → Settings → API → JWT Secret) in
+   the prod env; (b) apply `prisma/rls/chat-rls.sql` against the prod DB.
 
-2. **Scope Supabase Realtime to the user's conversations.** Today the browser subscribes to a
-   single `rf-chat` channel with the **anon key** and receives every `ChatMessage` INSERT/UPDATE
-   org-wide; the client filters by `conversationId` but the rows are still delivered over the wire.
-   For prod:
-   - Authenticate the realtime socket as the user (`supabase.realtime.setAuth(<supabase-jwt>)`),
-     minting a Supabase-compatible JWT (claim `sub` = userId) signed with the project's JWT secret,
-     or adopt Supabase Auth.
-   - Add RLS policies so `postgres_changes` only emits rows for conversations the user is a member
-     of (policy via a `ConversationMember` lookup on `auth.uid()`).
-   - This closes the main data-exposure gap in the realtime layer.
+2. **SSRF hardening on link previews** — DONE. `lib/net/safe-fetch.ts` (`assertPublicUrl` +
+   `safeFetch`) blocks non-public hosts (10/8, 127/8, 169.254/16, 172.16/12, 192.168/16, CGNAT,
+   multicast/reserved, ::1, ULA, link-local, v4-mapped-v6) and re-validates each redirect hop;
+   `fetchOgPreview()` uses it. No prod step needed (code).
 
-3. **SSRF hardening on link previews.** `fetchOgPreview()` in `lib/chat/service.ts` fetches
-   arbitrary user-supplied URLs server-side. Add a guard: resolve the host, block private/loopback/
-   link-local ranges (10/8, 172.16/12, 192.168/16, 127/8, 169.254/16, ::1, fc00::/7), cap redirects,
-   and keep the existing 5s timeout + size cap.
+3. **Disappearing-message deletion + push focus suppression** — DONE (`/api/cron/disappearing-cleanup`
+   hard-deletes past-TTL messages; SW skips notifications when the messages tab is focused).
+   **➜ PROD STEP:** schedule the new cron alongside the others.
 
 ## 🟠 Infra / config
 
