@@ -36,8 +36,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       .upload(path, buffer, { contentType: file.type, upsert: true })
     if (upErr) return errorResponse(`Upload failed: ${upErr.message}`, 500)
 
-    const { data } = admin.storage.from(BUCKET).getPublicUrl(path)
-    const imageUrl = data.publicUrl
+    // Bucket is private — store a stable authenticated-proxy path (not a public URL).
+    const imageUrl = `/api/chat/media/${path}`
 
     // Gates on admin + persists + posts "changed the group photo".
     await setGroupImage(params.id, payload.userId, imageUrl)

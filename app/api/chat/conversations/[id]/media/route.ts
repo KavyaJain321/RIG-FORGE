@@ -34,9 +34,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       .upload(path, buffer, { contentType: file.type || 'application/octet-stream', upsert: true })
     if (upErr) return errorResponse(`Upload failed: ${upErr.message}`, 500)
 
-    const { data } = admin.storage.from(BUCKET).getPublicUrl(path)
+    // Bucket is private — store a stable authenticated-proxy path (not a public URL).
+    const mediaUrl = `/api/chat/media/${path}`
     const mediaType = file.type.startsWith('image/') ? 'IMAGE' : file.type.startsWith('audio/') ? 'AUDIO' : 'FILE'
-    const message = await sendMediaMessage(params.id, payload.userId, mediaType, data.publicUrl, file.name, file.size)
+    const message = await sendMediaMessage(params.id, payload.userId, mediaType, mediaUrl, file.name, file.size)
     return successResponse({ message })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An unexpected error occurred'

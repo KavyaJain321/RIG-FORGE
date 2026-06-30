@@ -29,17 +29,22 @@ below. They are infra/security decisions that need the owner's call — they wer
 
 ## 🟠 Infra / config
 
-4. **Move off the dev Supabase project.** Point `DATABASE_URL`/`DIRECT_URL`,
-   `NEXT_PUBLIC_SUPABASE_URL`, anon + service-role keys at the production project, run
-   `prisma db push` (or a migration) there, and re-create the `chat-media` storage bucket
-   (public, 50 MB limit — or private + signed URLs, see #6).
+4. **Production database** — ✅ DECIDED (2026-06-30). `ugbjsnygfssctiuoyhks` is now the **main/prod
+   DB of record** (full schema in sync, RLS applied, realtime publication set, real data, private
+   `chat-media` bucket). Old prod `baipqxgirtzbftwwehee` is the backup/later-phase (no chat schema).
+   No migration needed — the deployed host just sets `DATABASE_URL`/`DIRECT_URL`,
+   `NEXT_PUBLIC_SUPABASE_URL`, anon + service-role + `SUPABASE_JWT_SECRET` keys at ugbj.
 
 5. **Paid Supabase + hosting tier.** Realtime concurrent-connection and storage limits on the free
    tier won't cover the team; size the plan before rollout.
 
-6. **`chat-media` bucket privacy.** The bucket is currently **public** (anyone with the URL can
-   fetch). For sensitive attachments, switch to a private bucket + short-lived signed URLs, and add
-   a cleanup job for media orphaned by delete-for-everyone / disappearing messages.
+6. **`chat-media` bucket privacy** — ✅ DONE (2026-06-30). Bucket is now **private**. Uploads store a
+   stable proxy path (`/api/chat/media/<area>/<convId>/<file>`) in `ChatMessage.content` /
+   `Conversation.imageUrl`; `app/api/chat/media/[...path]/route.ts` authenticates, checks
+   ConversationMember, and 302-redirects to a 300s signed URL. Verified member→302/non-member→403/
+   no-auth→401/old-public-URL→400. **➜ PROD STEP:** when re-creating the bucket on a fresh project,
+   create it **private**. *Still TODO:* a cleanup job for media orphaned by delete-for-everyone /
+   disappearing messages.
 
 7. **VAPID keys for Web Push.** Set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
    `VAPID_SUBJECT` in the prod environment (dev keys live in `.env.local`, which is gitignored).
