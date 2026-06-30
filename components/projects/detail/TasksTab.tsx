@@ -396,6 +396,7 @@ function TaskGroup({ label, tasks, currentUserId, canManage, onStatusChange, onE
       {tasks.length === 0 ? (
         <p className="text-xs text-muted px-4 pb-2 italic">No tasks</p>
       ) : (
+        <div className="overflow-x-auto">
         <table className="w-full">
           <tbody>
             {tasks.map((t) => (
@@ -411,6 +412,7 @@ function TaskGroup({ label, tasks, currentUserId, canManage, onStatusChange, onE
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   )

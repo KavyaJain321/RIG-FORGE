@@ -219,7 +219,7 @@ function ProjectCard({ project: p }: { project: ProjectReportProjectEntry }) {
 
       {/* Member breakdown table */}
       {p.members.length > 0 && (
-        <div className="border border-border-subtle rounded-lg overflow-hidden">
+        <div className="border border-border-subtle rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-surface-highlight">
               <tr>

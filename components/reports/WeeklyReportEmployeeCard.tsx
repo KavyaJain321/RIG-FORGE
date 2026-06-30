@@ -163,7 +163,7 @@ export function WeeklyReportEmployeeCard({
           </div>
 
           {/* Tasks Completed */}
-          <div>
+          <div className="overflow-x-auto">
             <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
               Tasks Completed This Week
             </h3>
@@ -192,7 +192,7 @@ export function WeeklyReportEmployeeCard({
           </div>
 
           {/* Tasks In Progress */}
-          <div>
+          <div className="overflow-x-auto">
             <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
               Tasks In Progress
             </h3>

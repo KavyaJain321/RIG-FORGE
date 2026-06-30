@@ -101,6 +101,7 @@ export default function AssistantAdminPage() {
         {stats.byProvider.length === 0 ? (
           <Empty>No assistant traffic yet.</Empty>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs font-mono uppercase tracking-widest text-text-muted">
@@ -125,6 +126,7 @@ export default function AssistantAdminPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Section>
 
@@ -133,6 +135,7 @@ export default function AssistantAdminPage() {
         {stats.topUsers.length === 0 ? (
           <Empty>No activity yet.</Empty>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs font-mono uppercase tracking-widest text-text-muted">
@@ -157,6 +160,7 @@ export default function AssistantAdminPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Section>
 
