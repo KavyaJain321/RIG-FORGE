@@ -24,7 +24,8 @@ const NotificationBell = forwardRef<HTMLDivElement, NotificationBellProps>(
           type="button"
           onClick={onClick}
           className={[
-            'w-full flex items-center gap-3 px-3 py-2 h-10 border-l-[3px] transition-colors',
+            'flex items-center gap-2 lg:gap-3 px-2 lg:px-3 py-2 h-10 rounded-full lg:rounded-none',
+            'lg:w-full border-l-0 lg:border-l-[3px] transition-colors',
             'font-mono text-xs tracking-widest uppercase',
             isOpen
               ? 'border-accent bg-background-tertiary'
@@ -53,10 +54,10 @@ const NotificationBell = forwardRef<HTMLDivElement, NotificationBellProps>(
             )}
           </span>
 
-          {/* Label */}
+          {/* Label — hidden on mobile so the topbar bell is just an icon + badge */}
           <span
             className={[
-              'flex-1 text-left',
+              'hidden lg:block flex-1 text-left',
               hasUnread ? 'text-text-primary font-semibold' : 'text-text-secondary',
             ].join(' ')}
           >

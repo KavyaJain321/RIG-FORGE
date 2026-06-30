@@ -119,8 +119,8 @@ export default function WhatsappVerifyCard({ whatsappNumber, verified, onChange 
   if (step === 'idle') {
     return (
       <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="font-mono text-xs flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <div className="font-mono text-xs flex items-center gap-2 flex-wrap">
             {whatsappNumber ? (
               <>
                 <span className="text-text-primary">{whatsappNumber}</span>
@@ -134,7 +134,7 @@ export default function WhatsappVerifyCard({ whatsappNumber, verified, onChange 
               <span className="text-text-muted italic">Not set</span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {whatsappNumber && !verified && (
               <button type="button" disabled={busy} onClick={() => void startVerification(whatsappNumber)} className={btn}>
                 VERIFY

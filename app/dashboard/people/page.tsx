@@ -151,7 +151,7 @@ function PeoplePageInner() {
   return (
     <div className="min-h-full">
       {/* ── Page header ──────────────────────────────────────── */}
-      <div className="px-8 pt-8 pb-6">
+      <div className="px-4 sm:px-6 lg:px-8 pt-8 pb-6">
         <div className="flex items-start justify-between">
           <div>
             <p className="font-mono text-xs text-muted tracking-widest">[ 01 — PEOPLE ]</p>
@@ -171,7 +171,7 @@ function PeoplePageInner() {
 
       {/* ── Filters bar (admin only) ──────────────────────────── */}
       {isAdmin && (
-        <div className="px-8 py-4 flex flex-wrap gap-3">
+        <div className="px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap gap-3">
           <input
             type="text"
             placeholder="Search by name..."
@@ -194,7 +194,7 @@ function PeoplePageInner() {
 
       {/* ── Employee search bar (name search only) ───────────── */}
       {!isAdmin && (
-        <div className="px-8 py-4">
+        <div className="px-4 sm:px-6 lg:px-8 py-4">
           <input
             type="text"
             placeholder="Search teammates..."
@@ -206,7 +206,7 @@ function PeoplePageInner() {
       )}
 
       {/* ── Content ──────────────────────────────────────────── */}
-      <div className="px-8 py-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -279,11 +279,11 @@ function PeoplePageInner() {
 
       {/* ── Load more (admin only for now) ────────────────────── */}
       {nextCursor && !loading && isAdmin && (
-        <div className="px-8 pb-8 flex justify-center">
+        <div className="px-4 sm:px-6 lg:px-8 pb-8 flex justify-center">
           <button
             onClick={() => void handleLoadMore()}
             disabled={loadingMore}
-            className="forge-card px-8 py-3 font-mono text-xs text-secondary hover:text-accent-ink transition-all duration-150 cursor-pointer disabled:opacity-50"
+            className="forge-card px-4 sm:px-6 lg:px-8 py-3 font-mono text-xs text-secondary hover:text-accent-ink transition-all duration-150 cursor-pointer disabled:opacity-50"
           >
             {loadingMore ? 'LOADING...' : `LOAD MORE — ${remaining}`}
           </button>
