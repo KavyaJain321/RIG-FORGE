@@ -28,6 +28,9 @@ export interface AuthUser {
   isOnboarding: boolean
   mustChangePassword: boolean
   createdAt: Date
+  // Per-org (white-label) branding, resolved from the caller's Organization.
+  orgName?: string
+  orgShort?: string
 }
 
 // ─── API Responses ────────────────────────────────────────────────────────────

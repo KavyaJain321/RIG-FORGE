@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { comparePassword, signToken, COOKIE_NAME } from '@/lib/auth'
+import { getOrgBranding } from '@/lib/org-branding'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { istDateOnly } from '@/lib/date-ist'
 import type { AuthUser, ApiResponse } from '@/lib/types'
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       })
     }
 
+    const branding = await getOrgBranding(user.organizationId)
     const authUser: AuthUser = {
       id: user.id,
       name: user.name,
@@ -53,6 +55,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
       isOnboarding: user.isOnboarding,
       mustChangePassword: user.mustChangePassword,
       createdAt: user.createdAt,
+      orgName: branding.orgName,
+      orgShort: branding.orgShort,
     }
 
     const response = successResponse(authUser)

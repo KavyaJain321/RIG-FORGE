@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { getOrgBranding } from '@/lib/org-branding'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { AuthUser, ApiResponse } from '@/lib/types'
 
@@ -15,6 +16,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
     const user = await prisma.user.findUnique({ where: { id: payload.userId } })
     if (!user) return errorResponse('User not found', 404)
 
+    const branding = await getOrgBranding(user.organizationId)
     const authUser: AuthUser = {
       id: user.id,
       name: user.name,
@@ -25,6 +27,8 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
       isOnboarding: user.isOnboarding,
       mustChangePassword: user.mustChangePassword,
       createdAt: user.createdAt,
+      orgName: branding.orgName,
+      orgShort: branding.orgShort,
     }
 
     return successResponse(authUser)

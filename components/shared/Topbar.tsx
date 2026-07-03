@@ -16,7 +16,7 @@ import NotificationDropdown from '@/components/notifications/NotificationDropdow
 import AskForgieButton from '@/components/assistant/AskForgieButton'
 import ChatPanel from '@/components/assistant/ChatPanel'
 import ThemeToggle from '@/components/shared/ThemeToggle'
-import { APP_NAME, APP_SHORT } from '@/lib/branding'
+import { useBranding } from '@/lib/use-branding'
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 
@@ -68,6 +68,7 @@ export default function Topbar() {
   const router = useRouter()
   useAuth()
   const { user, clearUser } = useAuthStore()
+  const { appName, appShort } = useBranding()
   useSocket()
 
   const navItems = user?.role === 'SUPER_ADMIN'
@@ -142,8 +143,8 @@ export default function Topbar() {
       <header className="topbar">
 
         {/* ── Logo mark ───────────────────────────────────────────────────── */}
-        <Link href="/dashboard" className="topbar-brand" title={APP_NAME}>
-          {APP_SHORT}
+        <Link href="/dashboard" className="topbar-brand" title={appName}>
+          {appShort}
         </Link>
 
         {/* Mobile navigation is the fixed bottom tab bar (components/shared/MobileNav).

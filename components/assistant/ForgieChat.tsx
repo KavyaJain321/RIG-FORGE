@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { useAssistantStore } from '@/store/assistantStore'
 import { useAuthStore } from '@/store/authStore'
-import { APP_NAME_UPPER } from '@/lib/branding'
+import { useBranding } from '@/lib/use-branding'
 import Message from './Message'
 import Composer from './Composer'
 import HistoryView from './HistoryView'
@@ -243,6 +243,7 @@ export default function ForgieChat({ showClose = false, onClose }: ForgieChatPro
 // ─── Atoms ───────────────────────────────────────────────────────────────────
 
 function EmptyState({ firstName }: { firstName: string }) {
+  const { appNameUpper } = useBranding()
   const examples = [
     "What's due this week?",
     "Who's on Childsafe?",
@@ -252,7 +253,7 @@ function EmptyState({ firstName }: { firstName: string }) {
   return (
     <div className="flex flex-col items-start gap-4 py-2">
       <p className="text-sm text-text-primary leading-relaxed">
-        Hi {firstName}. I&apos;m Forgie — {APP_NAME_UPPER}&apos;s resident know-it-all
+        Hi {firstName}. I&apos;m Forgie — {appNameUpper}&apos;s resident know-it-all
         (in the technical sense, hopefully).
       </p>
       <p className="text-sm text-text-primary leading-relaxed">
