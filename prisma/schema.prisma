@@ -736,6 +736,7 @@ model Organization {
   id        String   @id // the organizationId stamped on every table (e.g. "rig360")
   name      String
   slug      String   @unique
+  domain    String?  @unique // custom host (e.g. "forge.trijyaforge.com") → resolves this org's branding pre-login
   plan      String   @default("internal") // billing tier (later)
   branding  Json? // logo / colors / app-name overrides (later)
   isActive  Boolean  @default(true)

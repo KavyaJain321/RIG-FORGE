@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [brand, setBrand] = useState({ appName: APP_NAME, appNameUpper: APP_NAME_UPPER })
 
   // Always clear any existing session when visiting login page
   // User must re-authenticate every time
@@ -29,6 +30,17 @@ export default function LoginPage() {
     clearUser()
     void fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
   }, [clearUser])
+
+  // Resolve per-host white-label branding (e.g. forge.trijyaforge.com → Trijya Forge).
+  useEffect(() => {
+    void fetch('/api/branding')
+      .then((r) => r.json())
+      .then((j) => {
+        const n = j?.data?.appName as string | undefined
+        if (n) setBrand({ appName: n, appNameUpper: n.toUpperCase() })
+      })
+      .catch(() => {})
+  }, [])
 
   async function handleSubmit(): Promise<void> {
     if (isLoading) return
@@ -72,7 +84,7 @@ export default function LoginPage() {
       <Card className="relative z-10 w-full max-w-[460px] p-8 md:p-10">
         <div className="text-center">
           <p className="type-meta text-accent-ink">WORKFORCE INTELLIGENCE PLATFORM</p>
-          <h1 className="type-h1 mt-2">{APP_NAME}</h1>
+          <h1 className="type-h1 mt-2">{brand.appName}</h1>
           <p className="type-body-muted mt-2">Secure operational command access</p>
         </div>
 
@@ -127,7 +139,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-10 text-center">
-          <p className="type-meta">{APP_NAME_UPPER} v1.0 — INTERNAL USE ONLY</p>
+          <p className="type-meta">{brand.appNameUpper} v1.0 — INTERNAL USE ONLY</p>
           <p className="type-meta mt-1">UNAUTHORIZED ACCESS IS PROHIBITED</p>
         </div>
       </Card>
