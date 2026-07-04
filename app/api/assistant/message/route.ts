@@ -562,6 +562,20 @@ function buildActionLabel(
     case 'set_project_lead': {
       return `Change lead of ${projectName ?? 'project'}`
     }
+    case 'update_project': {
+      const fields: string[] = []
+      if (typeof args.name === 'string') fields.push('name')
+      if (args.description !== undefined) fields.push('description')
+      if (typeof args.status === 'string') fields.push(`status → ${args.status}`)
+      if (typeof args.priority === 'string') fields.push(`priority → ${args.priority}`)
+      if (args.deadline !== undefined) fields.push('deadline')
+      if (typeof args.newLeadId === 'string') fields.push('lead')
+      const what = fields.length > 0 ? fields.join(', ') : 'details'
+      return `Update ${projectName ?? 'project'} (${what})`
+    }
+    case 'archive_project': {
+      return `Archive ${projectName ?? 'project'}`
+    }
     default:
       return action
   }

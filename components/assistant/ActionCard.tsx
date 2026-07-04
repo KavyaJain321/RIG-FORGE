@@ -284,6 +284,16 @@ function buildResultText(action: string, result: unknown): string {
       }
       return `${ex.leadName ?? 'New lead'} is now lead of "${ex.projectName ?? 'project'}".`
     }
+    case 'update_project': {
+      const ex = result as { name?: string; updatedFields?: string[] }
+      const fields = Array.isArray(ex.updatedFields) && ex.updatedFields.length > 0
+        ? ` (${ex.updatedFields.join(', ')})` : ''
+      return `Updated "${ex.name ?? 'project'}"${fields}.`
+    }
+    case 'archive_project': {
+      const ex = result as { name?: string }
+      return `Project "${ex.name ?? ''}" archived.`
+    }
     default:
       return 'Done.'
   }

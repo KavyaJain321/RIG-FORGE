@@ -330,6 +330,55 @@ export function buildProposeTools(): ToolSet {
       execute: async (input) => ({ proposed: true, action: 'add_project_member', args: input }),
     }),
 
+    propose_update_project: tool({
+      description: [
+        'Propose editing an EXISTING project. NOT CHANGED until the user taps',
+        'Confirm. Use this whenever the user wants to change a project\'s',
+        'description, name, status, priority, deadline, or lead.',
+        '',
+        'PERMISSIONS (enforced again at the execute layer — respect them here so',
+        'you can tell the user upfront instead of proposing a card that will fail):',
+        '  • description → an ADMIN, SUPER_ADMIN, or the project\'s LEAD may change it.',
+        '  • name / status / priority / deadline / newLeadId → ADMIN or SUPER_ADMIN',
+        '    ONLY. If the caller is an EMPLOYEE (me.isAdmin is false in the grounded',
+        '    context) and is asking to change one of these, DO NOT propose — reply',
+        '    exactly: "Only admins and super admins can do this task."',
+        '',
+        'Pass ONLY the fields being changed. projectId must be an exact ID from the',
+        'grounded context or a list_projects result — never guess. To move the lead,',
+        'look up the person via list_members first and pass their id as newLeadId.',
+      ].join(' '),
+      inputSchema: z.object({
+        projectId: z.string().min(1).describe('Exact project ID to edit'),
+        name: z.string().min(1).max(100).optional().describe('Admin-only. New project name'),
+        description: z.string().max(500).nullable().optional()
+          .describe('Admin or lead. New description; pass null/empty to clear it'),
+        status: z.enum(['ACTIVE', 'ON_HOLD', 'COMPLETED', 'ARCHIVED']).optional()
+          .describe('Admin-only'),
+        priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional()
+          .describe('Admin-only'),
+        deadline: z.string().nullable().optional()
+          .describe('Admin-only. ISO date string, or null to clear'),
+        newLeadId: z.string().min(1).optional()
+          .describe('Admin-only. User ID of the new lead'),
+      }),
+      execute: async (input) => ({ proposed: true, action: 'update_project', args: input }),
+    }),
+
+    propose_archive_project: tool({
+      description: [
+        'Propose archiving (soft-deleting) a project. NOT ARCHIVED until the user',
+        'taps Confirm. ADMIN or SUPER_ADMIN ONLY — WhatsApp has no hard delete and',
+        'neither does this: the project is marked ARCHIVED and hidden, not erased.',
+        'If the caller is an EMPLOYEE (me.isAdmin false), DO NOT propose — reply',
+        'exactly: "Only admins and super admins can do this task."',
+      ].join(' '),
+      inputSchema: z.object({
+        projectId: z.string().min(1).describe('Exact project ID to archive'),
+      }),
+      execute: async (input) => ({ proposed: true, action: 'archive_project', args: input }),
+    }),
+
     propose_set_project_lead: tool({
       description: [
         'Propose changing the lead of an existing project. NOT CHANGED until',
@@ -1080,6 +1129,34 @@ When the user asks you to CREATE, ADD, RAISE, ASSIGN, OPEN, or CLOSE
 something, use the matching propose_* tool. These tools do NOT actually
 write — they signal the UI to show a confirmation card. Only when the
 user taps Confirm does the action happen.
+
+# Admin-only actions — gate BEFORE proposing
+
+Some actions can ONLY be done by an ADMIN or SUPER_ADMIN. Check me.isAdmin
+in the grounded context first. If me.isAdmin is false and the user asks for
+one of these, DO NOT call the propose_* tool — instead reply with exactly:
+
+  "Only admins and super admins can do this task."
+
+(You may add one short sentence suggesting they ask an admin.) The
+execute layer enforces this too, but refusing upfront gives a clean message
+instead of a card that fails on confirm.
+
+Admin/super-admin ONLY:
+- Creating a project (propose_create_project)
+- Archiving a project (propose_archive_project)
+- Changing a project's lead (propose_set_project_lead, or newLeadId on
+  propose_update_project)
+- Editing a project's name, status, priority, or deadline
+  (propose_update_project with those fields)
+- WhatsApp actions (all wa_* tools)
+
+Allowed for the project LEAD as well as admins:
+- Editing a project's DESCRIPTION (propose_update_project with only
+  description) and adding a member (propose_add_project_member).
+
+Everything else (tasks, tickets, description edits by the lead, chat,
+calendar/gmail/drive on the caller's own account) is available to any user.
 
 When using a propose_* tool:
 - Pull the projectId / taskId / userId from the grounded context, never

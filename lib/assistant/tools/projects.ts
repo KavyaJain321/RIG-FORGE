@@ -162,7 +162,7 @@ const HTML_TAG_RE = /<[^>]+>/i
 
 export async function createProject(caller: ToolUser, args: CreateProjectArgs) {
   if (!isAdminRole(caller.role)) {
-    throw new Error('Only admins can create projects')
+    throw new Error('Only admins and super admins can do this task.')
   }
 
   const name = args.name.trim()
@@ -297,7 +297,7 @@ export interface SetProjectLeadArgs {
 
 export async function setProjectLead(caller: ToolUser, args: SetProjectLeadArgs) {
   if (!isAdminRole(caller.role)) {
-    throw new Error('Only admins can change the project lead')
+    throw new Error('Only admins and super admins can do this task.')
   }
 
   const project = await prisma.project.findUnique({
@@ -345,6 +345,152 @@ export async function setProjectLead(caller: ToolUser, args: SetProjectLeadArgs)
     leadName: newLead.name,
     changed: true,
   }
+}
+
+// ─── update_project (gated — UI must confirm) ─────────────────────────────────
+//
+// Mirrors PATCH /api/projects/[id] exactly:
+//   • description + links → admin OR the project lead
+//   • name / status / priority / deadline / leadId → admin (or super-admin) only
+// An EMPLOYEE who isn't the lead can't touch anything. A lead who isn't an
+// admin can only edit the description/links; if they try to change an
+// admin-only field we refuse with the standard message so Forgie can relay it.
+
+export interface UpdateProjectArgs {
+  projectId: string
+  name?: string
+  description?: string | null
+  status?: 'ACTIVE' | 'ON_HOLD' | 'COMPLETED' | 'ARCHIVED'
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  deadline?: Date | null
+  newLeadId?: string
+}
+
+const ADMIN_ONLY_MSG = 'Only admins and super admins can do this task.'
+
+export async function updateProject(caller: ToolUser, args: UpdateProjectArgs) {
+  const project = await prisma.project.findUnique({
+    where: { id: args.projectId, isActive: true },
+    select: { id: true, name: true, leadId: true },
+  })
+  if (!project) throw new Error('Project not found')
+
+  const isAdmin = isAdminRole(caller.role)
+  const isLead = project.leadId === caller.userId
+
+  // Non-admin, non-lead → can't edit anything.
+  if (!isAdmin && !isLead) {
+    throw new Error('Only admins, super admins, or the project lead can edit a project.')
+  }
+
+  const wantsAdminOnlyField =
+    args.name !== undefined ||
+    args.status !== undefined ||
+    args.priority !== undefined ||
+    args.deadline !== undefined ||
+    args.newLeadId !== undefined
+
+  if (wantsAdminOnlyField && !isAdmin) {
+    // A lead tried to change name/status/priority/deadline/lead.
+    throw new Error(ADMIN_ONLY_MSG)
+  }
+
+  const data: Prisma.ProjectUpdateInput = {}
+
+  if (args.name !== undefined) {
+    const name = args.name.trim()
+    if (name.length === 0) throw new Error('Project name must not be empty')
+    if (name.length > 100) throw new Error('Project name must be at most 100 characters')
+    if (HTML_TAG_RE.test(name)) throw new Error('Project name must not contain HTML/script tags')
+    data.name = name
+  }
+
+  if (args.description !== undefined) {
+    const description = args.description === null ? null : args.description.trim()
+    if (description && description.length > 500) {
+      throw new Error('Project description must be at most 500 characters')
+    }
+    if (description && HTML_TAG_RE.test(description)) {
+      throw new Error('Project description must not contain HTML/script tags')
+    }
+    data.description = description
+  }
+
+  if (args.status !== undefined) data.status = args.status
+  if (args.priority !== undefined) data.priority = args.priority
+  if (args.deadline !== undefined) data.deadline = args.deadline
+
+  if (args.newLeadId !== undefined) {
+    const newLead = await prisma.user.findUnique({
+      where: { id: args.newLeadId, isActive: true },
+      select: { id: true },
+    })
+    if (!newLead) throw new Error('newLeadId must reference an active user')
+    data.lead = { connect: { id: newLead.id } }
+  }
+
+  if (Object.keys(data).length === 0) {
+    throw new Error('No fields to update were provided')
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const p = await tx.project.update({
+      where: { id: project.id },
+      data,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        status: true,
+        priority: true,
+        deadline: true,
+        leadId: true,
+      },
+    })
+    // Keep a reassigned lead as a member too, matching set_project_lead.
+    if (args.newLeadId !== undefined) {
+      await tx.projectMember.upsert({
+        where: { userId_projectId: { userId: args.newLeadId, projectId: project.id } },
+        create: { userId: args.newLeadId, projectId: project.id },
+        update: {},
+      })
+    }
+    return p
+  })
+
+  return {
+    id: updated.id,
+    name: updated.name,
+    description: updated.description,
+    status: updated.status,
+    priority: updated.priority,
+    deadline: updated.deadline,
+    updatedFields: Object.keys(data),
+  }
+}
+
+// ─── archive_project (gated — UI must confirm) ────────────────────────────────
+//
+// Admin-only. Mirrors DELETE /api/projects/[id]: soft-delete (isActive=false)
+// and mark ARCHIVED. There is no hard delete anywhere in the app.
+
+export async function archiveProject(caller: ToolUser, projectId: string) {
+  if (!isAdminRole(caller.role)) {
+    throw new Error(ADMIN_ONLY_MSG)
+  }
+
+  const project = await prisma.project.findUnique({
+    where: { id: projectId, isActive: true },
+    select: { id: true, name: true },
+  })
+  if (!project) throw new Error('Project not found')
+
+  await prisma.project.update({
+    where: { id: project.id },
+    data: { isActive: false, status: 'ARCHIVED' },
+  })
+
+  return { id: project.id, name: project.name, archived: true }
 }
 
 // ─── get_project_health ──────────────────────────────────────────────────────

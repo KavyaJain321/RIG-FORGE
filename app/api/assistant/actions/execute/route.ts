@@ -38,6 +38,8 @@ import {
   createProject,
   addProjectMember,
   setProjectLead,
+  updateProject,
+  archiveProject,
 } from '@/lib/assistant/tools/projects'
 import { createRepo, createIssue, isGithubEnabled } from '@/lib/assistant/tools/github'
 import { createEvent, cancelEvent, isUserGcalConnected } from '@/lib/assistant/tools/gcal'
@@ -184,6 +186,20 @@ const SetProjectLeadArgs = z.object({
   newLeadId: z.string().min(1),
 })
 
+const UpdateProjectArgs = z.object({
+  projectId: z.string().min(1),
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).nullable().optional(),
+  status: z.enum(['ACTIVE', 'ON_HOLD', 'COMPLETED', 'ARCHIVED']).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  deadline: z.string().nullable().optional(),
+  newLeadId: z.string().min(1).optional(),
+})
+
+const ArchiveProjectArgs = z.object({
+  projectId: z.string().min(1),
+})
+
 const WaSendMessageArgs = z.object({
   to: z.string().min(3),
   message: z.string().min(1).max(4000),
@@ -223,6 +239,8 @@ const Body = z.object({
     'create_project',
     'add_project_member',
     'set_project_lead',
+    'update_project',
+    'archive_project',
     'wa_send_message',
     'wa_create_group',
     'wa_remove_participants',
@@ -418,6 +436,36 @@ export async function POST(request: NextRequest) {
           throw new Error(`Invalid args for set_project_lead: ${a.error.issues[0]?.message ?? 'malformed'}`)
         }
         result = await setProjectLead(caller, a.data)
+        break
+      }
+      case 'update_project': {
+        const a = UpdateProjectArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for update_project: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        let deadline: Date | null | undefined
+        if (a.data.deadline === null || a.data.deadline === '') deadline = null
+        else if (typeof a.data.deadline === 'string') {
+          deadline = new Date(a.data.deadline)
+          if (isNaN(deadline.getTime())) throw new Error('deadline must be a valid ISO date string')
+        }
+        result = await updateProject(caller, {
+          projectId: a.data.projectId,
+          name: a.data.name,
+          description: a.data.description,
+          status: a.data.status,
+          priority: a.data.priority,
+          deadline,
+          newLeadId: a.data.newLeadId,
+        })
+        break
+      }
+      case 'archive_project': {
+        const a = ArchiveProjectArgs.safeParse(args)
+        if (!a.success) {
+          throw new Error(`Invalid args for archive_project: ${a.error.issues[0]?.message ?? 'malformed'}`)
+        }
+        result = await archiveProject(caller, a.data.projectId)
         break
       }
       case 'wa_send_message': {
