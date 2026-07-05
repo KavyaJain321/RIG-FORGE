@@ -6,8 +6,11 @@
  * by Supabase Realtime subscribing to the ChatMessage table — these functions
  * only own the durable writes/reads.
  *
- * `ORG` is the single-org tenancy anchor stamped on every row. When real
- * multi-tenancy lands, this becomes the caller's organizationId.
+ * The tenancy anchor stamped on every row is the caller's organizationId,
+ * resolved per-request via `getOrgId()` (bound by verifyToken from the JWT).
+ * It must be passed explicitly on nested inserts (conversation members, the
+ * seeded messages) because the Prisma org-scope extension only injects org at
+ * the top level and the DB column default is the origin org, not the caller's.
  */
 import { randomUUID } from 'node:crypto'
 
@@ -20,8 +23,6 @@ import { deleteObject, keyFromProxyPath } from '@/lib/storage/r2'
 import { getOrgId } from '@/lib/tenant-context'
 import { getOrgBranding } from '@/lib/org-branding'
 import { mentionsForgie, replyAsForgieInChat } from './forgie'
-
-const ORG = 'rig360'
 
 // Stable key for a 1:1 DM: the two user ids sorted + joined, so a unique
 // constraint guarantees exactly one DM thread per pair regardless of who
@@ -116,23 +117,24 @@ export async function listConversations(userId: string) {
 export async function getOrCreateDm(userId: string, otherUserId: string) {
   if (userId === otherUserId) throw new Error('Cannot start a DM with yourself')
 
+  const org = getOrgId()
   const dmKey = dmKeyFor(userId, otherUserId)
   const existing = await prisma.conversation.findFirst({
-    where: { organizationId: ORG, type: 'DIRECT', dmKey },
+    where: { organizationId: org, type: 'DIRECT', dmKey },
   })
   if (existing) return existing
 
   try {
     return await prisma.conversation.create({
       data: {
-        organizationId: ORG,
+        organizationId: org,
         type: 'DIRECT',
         dmKey,
         createdById: userId,
         members: {
           create: [
-            { organizationId: ORG, userId },
-            { organizationId: ORG, userId: otherUserId },
+            { organizationId: org, userId },
+            { organizationId: org, userId: otherUserId },
           ],
         },
       },
@@ -141,7 +143,7 @@ export async function getOrCreateDm(userId: string, otherUserId: string) {
     // Lost a create race — the other request made it first.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       const convo = await prisma.conversation.findFirst({
-        where: { organizationId: ORG, type: 'DIRECT', dmKey },
+        where: { organizationId: org, type: 'DIRECT', dmKey },
       })
       if (convo) return convo
     }
@@ -150,16 +152,17 @@ export async function getOrCreateDm(userId: string, otherUserId: string) {
 }
 
 export async function createGroup(userId: string, title: string, memberIds: string[]) {
+  const org = getOrgId()
   const ids = Array.from(new Set([userId, ...memberIds]))
   return prisma.conversation.create({
     data: {
-      organizationId: ORG,
+      organizationId: org,
       type: 'GROUP',
       title,
       createdById: userId,
       members: {
         create: ids.map((id) => ({
-          organizationId: ORG,
+          organizationId: org,
           userId: id,
           role: id === userId ? 'OWNER' : 'MEMBER',
         })),
@@ -177,30 +180,31 @@ function forgieWelcome(brandUpper: string): string {
 // The dedicated 1:1 Forgie (AI) chat for a user. Idempotent via the synthetic
 // dmKey "forgie:<userId>" + the (organizationId, dmKey) unique constraint.
 export async function getOrCreateForgieChat(userId: string) {
+  const org = getOrgId()
   const dmKey = `forgie:${userId}`
-  const existing = await prisma.conversation.findFirst({ where: { organizationId: ORG, dmKey } })
+  const existing = await prisma.conversation.findFirst({ where: { organizationId: org, dmKey } })
   if (existing) return existing
   try {
     const convo = await prisma.conversation.create({
       data: {
-        organizationId: ORG,
+        organizationId: org,
         type: 'DIRECT',
         isForgie: true,
         title: 'Forgie',
         dmKey,
         createdById: userId,
         lastMessageAt: new Date(),
-        members: { create: [{ organizationId: ORG, userId, role: 'OWNER', isPinned: true }] },
+        members: { create: [{ organizationId: org, userId, role: 'OWNER', isPinned: true }] },
       },
     })
-    const { orgName } = await getOrgBranding(getOrgId())
+    const { orgName } = await getOrgBranding(org)
     await prisma.chatMessage.create({
-      data: { organizationId: ORG, conversationId: convo.id, senderId: null, kind: 'FORGIE', type: 'TEXT', content: forgieWelcome(orgName.toUpperCase()) },
+      data: { organizationId: org, conversationId: convo.id, senderId: null, kind: 'FORGIE', type: 'TEXT', content: forgieWelcome(orgName.toUpperCase()) },
     })
     return convo
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      const convo = await prisma.conversation.findFirst({ where: { organizationId: ORG, dmKey } })
+      const convo = await prisma.conversation.findFirst({ where: { organizationId: org, dmKey } })
       if (convo) return convo
     }
     throw err
@@ -212,7 +216,7 @@ export async function forgieDmToUser(userId: string, content: string) {
   const convo = await getOrCreateForgieChat(userId)
   await prisma.$transaction([
     prisma.chatMessage.create({
-      data: { organizationId: ORG, conversationId: convo.id, senderId: null, kind: 'FORGIE', type: 'TEXT', content },
+      data: { organizationId: getOrgId(), conversationId: convo.id, senderId: null, kind: 'FORGIE', type: 'TEXT', content },
     }),
     prisma.conversation.update({ where: { id: convo.id }, data: { lastMessageAt: new Date() } }),
   ])
@@ -356,7 +360,7 @@ export async function sendMessage(
   const [message] = await prisma.$transaction([
     prisma.chatMessage.create({
       data: {
-        organizationId: ORG,
+        organizationId: getOrgId(),
         conversationId,
         senderId: userId,
         kind: 'USER',
@@ -412,7 +416,7 @@ async function userName(userId: string): Promise<string> {
 async function postSystemMessage(conversationId: string, content: string) {
   await prisma.$transaction([
     prisma.chatMessage.create({
-      data: { organizationId: ORG, conversationId, senderId: null, kind: 'SYSTEM', type: 'TEXT', content },
+      data: { organizationId: getOrgId(), conversationId, senderId: null, kind: 'SYSTEM', type: 'TEXT', content },
     }),
     prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } }),
   ])
@@ -453,7 +457,7 @@ export async function addGroupMembers(conversationId: string, userId: string, ne
   const toAdd = Array.from(new Set(newMemberIds)).filter((id) => id && !existingIds.has(id))
   if (toAdd.length === 0) return
   await prisma.conversationMember.createMany({
-    data: toAdd.map((id) => ({ organizationId: ORG, conversationId, userId: id, role: 'MEMBER' as MemberRole })),
+    data: toAdd.map((id) => ({ organizationId: getOrgId(), conversationId, userId: id, role: 'MEMBER' as MemberRole })),
     skipDuplicates: true,
   })
   const added = await prisma.user.findMany({ where: { id: { in: toAdd } }, select: { name: true } })
@@ -539,7 +543,7 @@ export async function sendMediaMessage(
   const [message] = await prisma.$transaction([
     prisma.chatMessage.create({
       data: {
-        organizationId: ORG,
+        organizationId: getOrgId(),
         conversationId,
         senderId: userId,
         kind: 'USER',
@@ -762,7 +766,7 @@ export async function joinViaInvite(token: string, userId: string): Promise<stri
     where: { conversationId_userId: { conversationId: convo.id, userId } },
   })
   if (existing) return convo.id
-  await prisma.conversationMember.create({ data: { organizationId: ORG, conversationId: convo.id, userId, role: 'MEMBER' } })
+  await prisma.conversationMember.create({ data: { organizationId: getOrgId(), conversationId: convo.id, userId, role: 'MEMBER' } })
   await postSystemMessage(convo.id, `${await userName(userId)} joined via invite link`)
   return convo.id
 }
@@ -839,7 +843,7 @@ export async function createPoll(
   const [message] = await prisma.$transaction([
     prisma.chatMessage.create({
       data: {
-        organizationId: ORG,
+        organizationId: getOrgId(),
         conversationId,
         senderId: userId,
         kind: 'USER',

@@ -19,8 +19,6 @@ import { buildForgieContext, renderContextBlock } from '@/lib/assistant/context'
 import { buildAllToolsAsync, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
 import { reserveRateLimit } from '@/lib/assistant/rate-limit'
 
-const ORG = 'rig360'
-
 // True when a message is addressed to Forgie (e.g. "@Forgie what's due?").
 export function mentionsForgie(text: string): boolean {
   return /@forgie\b/i.test(text)
@@ -29,7 +27,7 @@ export function mentionsForgie(text: string): boolean {
 async function postForgie(conversationId: string, content: string) {
   await prisma.$transaction([
     prisma.chatMessage.create({
-      data: { organizationId: ORG, conversationId, senderId: null, kind: 'FORGIE', type: 'TEXT', content },
+      data: { organizationId: getOrgId(), conversationId, senderId: null, kind: 'FORGIE', type: 'TEXT', content },
     }),
     prisma.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } }),
   ])
