@@ -17,7 +17,8 @@ import { prisma } from '@/lib/db'
 import { sendPushToUsers } from '@/lib/push/send'
 import { safeFetch } from '@/lib/net/safe-fetch'
 import { deleteObject, keyFromProxyPath } from '@/lib/storage/r2'
-import { APP_NAME_UPPER } from '@/lib/branding'
+import { getOrgId } from '@/lib/tenant-context'
+import { getOrgBranding } from '@/lib/org-branding'
 import { mentionsForgie, replyAsForgieInChat } from './forgie'
 
 const ORG = 'rig360'
@@ -167,8 +168,11 @@ export async function createGroup(userId: string, title: string, memberIds: stri
   })
 }
 
-const FORGIE_WELCOME =
-  `Hi! I'm Forgie 🤖 — your ${APP_NAME_UPPER} assistant. Ask me about your projects, tasks, tickets, standups, or team. I can take actions too (create tasks, log standups), and you can @Forgie me in any group.`
+// Resolved per-caller-org so each tenant's Forgie greets under its OWN name
+// (Rig Forge / Trijya Forge), never the neutral default or another org's name.
+function forgieWelcome(brandUpper: string): string {
+  return `Hi! I'm Forgie 🤖 — your ${brandUpper} assistant. Ask me about your projects, tasks, tickets, standups, or team. I can take actions too (create tasks, log standups), and you can @Forgie me in any group.`
+}
 
 // The dedicated 1:1 Forgie (AI) chat for a user. Idempotent via the synthetic
 // dmKey "forgie:<userId>" + the (organizationId, dmKey) unique constraint.
@@ -189,8 +193,9 @@ export async function getOrCreateForgieChat(userId: string) {
         members: { create: [{ organizationId: ORG, userId, role: 'OWNER', isPinned: true }] },
       },
     })
+    const { orgName } = await getOrgBranding(getOrgId())
     await prisma.chatMessage.create({
-      data: { organizationId: ORG, conversationId: convo.id, senderId: null, kind: 'FORGIE', type: 'TEXT', content: FORGIE_WELCOME },
+      data: { organizationId: ORG, conversationId: convo.id, senderId: null, kind: 'FORGIE', type: 'TEXT', content: forgieWelcome(orgName.toUpperCase()) },
     })
     return convo
   } catch (err) {

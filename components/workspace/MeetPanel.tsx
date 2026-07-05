@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react'
 
 import { useAuthStore } from '@/store/authStore'
-import { APP_NAME_UPPER } from '@/lib/branding'
+import { useBranding } from '@/lib/use-branding'
 import JitsiCall from './JitsiCall'
 
 export default function MeetPanel() {
   const user = useAuthStore((s) => s.user)
+  const { appNameUpper } = useBranding()
   const displayName = user?.name ?? 'Guest'
   const email = user?.email ?? null
   const avatarUrl = user?.avatarUrl ?? null
@@ -44,7 +45,7 @@ export default function MeetPanel() {
   function startCall() {
     const slug = topic.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 24)
     const rand = Math.random().toString(36).slice(2, 8)
-    setActiveRoom(`rigforge-${slug ? slug + '-' : ''}${rand}`)
+    setActiveRoom(`forge-${slug ? slug + '-' : ''}${rand}`)
   }
 
   function leave() {
@@ -88,7 +89,7 @@ export default function MeetPanel() {
     <div className="border border-border-default rounded-xl overflow-hidden">
       <div className="p-6">
         <p className="text-sm font-medium text-text-primary mb-1">Start a video call</p>
-        <p className="text-xs text-text-secondary mb-4">Runs entirely inside {APP_NAME_UPPER} — share the invite link to bring teammates into the same call.</p>
+        <p className="text-xs text-text-secondary mb-4">Runs entirely inside {appNameUpper} — share the invite link to bring teammates into the same call.</p>
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={topic}

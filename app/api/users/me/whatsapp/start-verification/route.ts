@@ -22,7 +22,7 @@ import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { normalizeWhatsappNumber, maskWhatsappNumber } from '@/lib/whatsapp/number'
 import { isWhatsAppEnabled, sendWhatsappMessage } from '@/lib/whatsapp/bridge'
-import { APP_NAME } from '@/lib/branding'
+import { getOrgBranding } from '@/lib/org-branding'
 
 const CODE_TTL_MS = 10 * 60 * 1000 // 10 minutes
 const RESEND_COOLDOWN_MS = 60 * 1000 // 60 seconds
@@ -77,8 +77,9 @@ export async function POST(request: NextRequest) {
     // Generate + deliver the code BEFORE persisting, so we never store a code
     // we couldn't actually send.
     const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0')
+    const { orgName } = await getOrgBranding(claims.organizationId)
     const message =
-      `Your ${APP_NAME} verification code is ${code}. It expires in 10 minutes. ` +
+      `Your ${orgName} verification code is ${code}. It expires in 10 minutes. ` +
       `If you didn't request this, you can ignore this message.`
 
     try {

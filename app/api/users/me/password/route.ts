@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db'
 import { verifyToken, getTokenFromCookies, signToken, COOKIE_NAME } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
-import { APP_NAME_UPPER } from '@/lib/branding'
+import { getOrgBranding } from '@/lib/org-branding'
 import type { AuthUser } from '@/lib/types'
 
 const MIN_PASSWORD_LENGTH = 8
@@ -101,11 +101,12 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         select: { id: true },
       })
       if (!alreadyWelcomed) {
+        const { orgName } = await getOrgBranding(claims.organizationId)
         await prisma.notification.create({
           data: {
             userId: user.id,
             type: 'WELCOME',
-            title: `Welcome to ${APP_NAME_UPPER}, ${user.name}!`,
+            title: `Welcome to ${orgName.toUpperCase()}, ${user.name}!`,
             body: 'Finish setting up your account: connect your Google account and verify your WhatsApp number so Forgie can work for you. Tap here to open your profile.',
             linkTo: '/dashboard/profile',
           },

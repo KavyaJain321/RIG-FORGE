@@ -13,12 +13,26 @@
  * 2022-11-28 API version pin.
  */
 
+import { getOrgId } from '@/lib/tenant-context'
+
 const GITHUB_API = 'https://api.github.com'
 const API_VERSION = '2022-11-28'
+
+// The GITHUB_TOKEN/GITHUB_ORG env pair is a single global GitHub account owned by
+// ONE tenant (the origin org — rig360 by default, overridable via GITHUB_ORG_ID).
+// Every other tenant does NOT share it: GitHub is simply disabled for them until
+// they connect their own, so no org can ever see another org's repos.
+const GITHUB_OWNER_ORG = process.env.GITHUB_ORG_ID || 'rig360'
+
+/** True only for the tenant that owns the env GitHub credentials. */
+function orgOwnsGithub(): boolean {
+  return getOrgId() === GITHUB_OWNER_ORG
+}
 
 // ─── Low-level fetch wrapper ─────────────────────────────────────────────────
 
 function getEnv(): { token: string; org: string } | null {
+  if (!orgOwnsGithub()) return null
   const token = process.env.GITHUB_TOKEN
   const org = process.env.GITHUB_ORG
   if (!token || !org) return null
@@ -37,7 +51,11 @@ interface GhFetchInit extends RequestInit {
 async function gh<T>(path: string, init: GhFetchInit = {}): Promise<T> {
   const env = getEnv()
   if (!env) {
-    throw new Error('GitHub is not configured (set GITHUB_TOKEN and GITHUB_ORG).')
+    throw new Error(
+      orgOwnsGithub()
+        ? 'GitHub is not configured (set GITHUB_TOKEN and GITHUB_ORG).'
+        : "GitHub isn't connected for your organization yet.",
+    )
   }
   const { allow404, ...rest } = init
   const res = await fetch(`${GITHUB_API}${path}`, {

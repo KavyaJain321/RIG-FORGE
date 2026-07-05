@@ -13,6 +13,8 @@ import { prisma } from '@/lib/db'
 import { isAssistantEnabled } from '@/lib/llm/provider'
 import { generate } from '@/lib/llm/generate'
 import { buildSystemPrompt } from '@/lib/assistant/prompts'
+import { getOrgId } from '@/lib/tenant-context'
+import { getOrgIdentity } from '@/lib/org-branding'
 import { buildForgieContext, renderContextBlock } from '@/lib/assistant/context'
 import { buildAllToolsAsync, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
 import { reserveRateLimit } from '@/lib/assistant/rate-limit'
@@ -49,6 +51,7 @@ export async function replyAsForgieInChat(conversationId: string, triggerUserId:
     if (!user) return
 
     const ctx = await buildForgieContext({ userId: user.id, userName: user.name, userRole: user.role })
+    const brand = await getOrgIdentity(getOrgId())
     const systemPrompt = [
       buildSystemPrompt({
         id: user.id,
@@ -57,7 +60,7 @@ export async function replyAsForgieInChat(conversationId: string, triggerUserId:
         projectCount: ctx.myProjects.length,
         openTaskCount: ctx.myTasks.filter((t) => t.status !== 'DONE').length,
         overdueTaskCount: ctx.myTasks.filter((t) => t.isOverdue).length,
-      }),
+      }, brand),
       '',
       renderContextBlock(ctx),
       '',

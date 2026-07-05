@@ -32,6 +32,8 @@ import { errorResponse } from '@/lib/api-helpers'
 import { isAssistantEnabled, reportRateLimit } from '@/lib/llm/provider'
 import { startStream, consumeStream } from '@/lib/llm/stream'
 import { buildSystemPrompt } from '@/lib/assistant/prompts'
+import { getOrgId } from '@/lib/tenant-context'
+import { getOrgIdentity } from '@/lib/org-branding'
 import { buildForgieContext, renderContextBlock } from '@/lib/assistant/context'
 import { reserveRateLimit, recordUsage } from '@/lib/assistant/rate-limit'
 import { lookupCache, storeCache, maybeSweepCache } from '@/lib/assistant/cache'
@@ -203,6 +205,7 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
           userRole: args.user.role,
         })
 
+        const brand = await getOrgIdentity(getOrgId())
         const systemPrompt = [
           buildSystemPrompt({
             id: args.user.id,
@@ -211,7 +214,7 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
             projectCount: forgieCtx.myProjects.length,
             openTaskCount: forgieCtx.myTasks.filter((t) => t.status !== 'DONE').length,
             overdueTaskCount: forgieCtx.myTasks.filter((t) => t.isOverdue).length,
-          }),
+          }, brand),
           '',
           renderContextBlock(forgieCtx),
           '',

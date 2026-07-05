@@ -26,6 +26,8 @@ import { generate } from '@/lib/llm/generate'
 
 import { buildForgieContext, renderContextBlock } from './context'
 import { buildSystemPrompt } from './prompts'
+import { getOrgId } from '@/lib/tenant-context'
+import { getOrgIdentity } from '@/lib/org-branding'
 import { buildAllToolsAsync } from './ai-sdk-tools'
 import { reserveRateLimit, recordUsage } from './rate-limit'
 import { sendWhatsappMessage } from '@/lib/whatsapp/bridge'
@@ -253,8 +255,9 @@ export async function handleIncomingWhatsapp(
       userRole: user.role,
     })
 
+    const brand = await getOrgIdentity(getOrgId())
     const systemPrompt = [
-      buildSystemPrompt({ id: user.id, name: user.name, role: user.role as Role }),
+      buildSystemPrompt({ id: user.id, name: user.name, role: user.role as Role }, brand),
       '',
       renderContextBlock(context),
       '',

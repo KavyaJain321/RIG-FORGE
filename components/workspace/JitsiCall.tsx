@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 
-import { APP_NAME_UPPER as BRAND } from '@/lib/branding'
+import { useBranding } from '@/lib/use-branding'
 
 type JitsiApi = {
   dispose: () => void
@@ -50,8 +50,11 @@ export default function JitsiCall({
   avatarUrl?: string | null
   onLeave: () => void
 }) {
+  const { appNameUpper } = useBranding()
   const containerRef = useRef<HTMLDivElement>(null)
   const apiRef = useRef<JitsiApi | null>(null)
+  const brandRef = useRef(appNameUpper)
+  brandRef.current = appNameUpper
   const onLeaveRef = useRef(onLeave)
   onLeaveRef.current = onLeave
   const nameRef = useRef(displayName)
@@ -93,9 +96,9 @@ export default function JitsiCall({
             DEFAULT_LOGO_URL: '',
             DEFAULT_WELCOME_PAGE_LOGO_URL: '',
             MOBILE_APP_PROMO: false,
-            APP_NAME: BRAND,
-            NATIVE_APP_NAME: BRAND,
-            PROVIDER_NAME: BRAND,
+            APP_NAME: brandRef.current,
+            NATIVE_APP_NAME: brandRef.current,
+            PROVIDER_NAME: brandRef.current,
           },
         })
         apiRef.current = api
