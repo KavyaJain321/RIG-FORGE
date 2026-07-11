@@ -68,9 +68,19 @@ function initPools(): Map<ProviderName, ProviderPool> {
     // router falls through to the cloud, instead of hanging ~20s. Local warm
     // generations finish in <2s, so this headroom never truncates a real reply.
     const localTimeoutMs = Number(process.env.LOCAL_LLM_TIMEOUT_MS ?? 12_000)
+    // When the box is fronted by a Cloudflare Tunnel behind Access, Render must
+    // present a service token so Cloudflare's edge lets the request through.
+    // Absent (e.g. direct Tailscale in local dev) → no headers, unchanged.
+    const cfAccessId = process.env.CF_ACCESS_CLIENT_ID?.trim()
+    const cfAccessSecret = process.env.CF_ACCESS_CLIENT_SECRET?.trim()
     const localFetch: typeof fetch = (input, init) => {
       const signals = [init?.signal, AbortSignal.timeout(localTimeoutMs)].filter(Boolean) as AbortSignal[]
-      return fetch(input, { ...init, signal: AbortSignal.any(signals) })
+      const headers = new Headers(init?.headers)
+      if (cfAccessId && cfAccessSecret) {
+        headers.set('CF-Access-Client-Id', cfAccessId)
+        headers.set('CF-Access-Client-Secret', cfAccessSecret)
+      }
+      return fetch(input, { ...init, headers, signal: AbortSignal.any(signals) })
     }
     map.set('local', {
       name: 'local',
