@@ -34,8 +34,8 @@ import { startStream, consumeStream } from '@/lib/llm/stream'
 import { buildSystemPrompt } from '@/lib/assistant/prompts'
 import { getOrgId } from '@/lib/tenant-context'
 import { getOrgIdentity } from '@/lib/org-branding'
-import { buildForgieContext, renderContextBlock } from '@/lib/assistant/context'
-import { tryRuleAnswer } from '@/lib/assistant/rules'
+import { buildForgieContext, buildForgieContextLite, renderContextBlock } from '@/lib/assistant/context'
+import { tryRuleAnswer, classifyFast, matchHelp, matchGreeting, normalize } from '@/lib/assistant/rules'
 import { reserveRateLimit, recordUsage } from '@/lib/assistant/rate-limit'
 import { lookupCache, storeCache, maybeSweepCache } from '@/lib/assistant/cache'
 import { isCacheableResponse } from '@/lib/assistant/cache-guard'
@@ -194,6 +194,43 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
               provider: 'cache',
               model: 'cache',
             })
+            await maybeAutoTitle(args.conversationId, args.content, priorCount)
+            controller.close()
+            return
+          }
+        }
+
+        // ── Ultra-fast lane (PRE-context) ──────────────────────────────────
+        // "help"/capabilities need no data and a bare greeting needs only the
+        // caller's own tasks (1 query), so answer these BEFORE the full
+        // multi-query context build. Keeps "hi" / "what can you do" in the
+        // tens-of-ms range instead of paying for the projects + tickets + org
+        // snapshot fetch. Anything uncertain → null → normal path below.
+        const fastIntent = classifyFast(args.content)
+        if (fastIntent) {
+          const fastAnswer =
+            fastIntent === 'help'
+              ? matchHelp(normalize(args.content))
+              : matchGreeting(
+                  normalize(args.content),
+                  await buildForgieContextLite({
+                    userId: args.user.id,
+                    userName: args.user.name,
+                    userRole: args.user.role,
+                  }),
+                )
+          if (fastAnswer) {
+            write(controller, { type: 'text', delta: fastAnswer })
+            write(controller, {
+              type: 'done',
+              provider: 'rule',
+              model: 'rule',
+              fallback: false,
+              latencyMs: 0,
+              pendingActions: [],
+              toolsUsed: [],
+            })
+            await persistAssistant(args.conversationId, fastAnswer, { provider: 'rule', model: 'rule' })
             await maybeAutoTitle(args.conversationId, args.content, priorCount)
             controller.close()
             return

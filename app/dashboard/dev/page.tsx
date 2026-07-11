@@ -70,6 +70,23 @@ interface Detail {
   actions: ActionLog[]
 }
 
+interface Latency {
+  windowDays: number
+  count: number
+  p50Ms: number
+  p95Ms: number
+  avgMs: number
+  avgInputTokens: number
+  sloP95Ms: number
+  sloBreached: boolean
+  byProvider: Array<{ provider: string | null; count: number; p50Ms: number; p95Ms: number; avgMs: number }>
+}
+
+function fmtMs(ms: number): string {
+  if (!ms) return '—'
+  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`
+}
+
 export default function DevDashboardPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
@@ -79,6 +96,7 @@ export default function DevDashboardPage() {
   const [instances, setInstances] = useState<{ id: string; label: string }[]>([])
   const [instance, setInstance] = useState<string>('rig360')
   const [unavailable, setUnavailable] = useState<string | null>(null)
+  const [latency, setLatency] = useState<Latency | null>(null)
 
   useEffect(() => {
     if (loading || !user) return
@@ -86,6 +104,7 @@ export default function DevDashboardPage() {
     setRows(null)
     setSelected(null)
     setUnavailable(null)
+    setLatency(null)
     void (async () => {
       try {
         const res = await fetch(`/api/dev/forgie-usage?instance=${encodeURIComponent(instance)}`, {
@@ -102,12 +121,14 @@ export default function DevDashboardPage() {
             instances?: { id: string; label: string }[]
             unavailable?: boolean
             reason?: string
+            latency?: Latency | null
           }
         }
         if (cancelled) return
         if (json.data?.instances) setInstances(json.data.instances)
         setUnavailable(json.data?.unavailable ? json.data.reason ?? 'Instance unavailable' : null)
         setRows(json.data?.users ?? [])
+        setLatency(json.data?.latency ?? null)
       } catch {
         if (!cancelled) setDenied(true)
       }
@@ -125,6 +146,7 @@ export default function DevDashboardPage() {
   const totalUsers = rows?.length ?? 0
   const totalChats = (rows ?? []).reduce((s, r) => s + r.webConversations + r.waConversations, 0)
   const totalActions = (rows ?? []).reduce((s, r) => s + r.actions, 0)
+  const companyLabel = instances.find((i) => i.id === instance)?.label ?? instance
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -171,6 +193,55 @@ export default function DevDashboardPage() {
         <StatCard label="Total conversations" value={totalChats} />
         <StatCard label="AI-executed actions" value={totalActions} />
       </div>
+
+      {/* Forgie latency — THIS company only (dev-only observability) */}
+      {latency && latency.count > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-mono uppercase tracking-widest text-text-muted">
+              Forgie latency — {companyLabel} · last {latency.windowDays}d
+            </h2>
+            <span className="text-[11px] text-text-muted">{latency.count.toLocaleString()} turns</span>
+          </div>
+          {latency.sloBreached && (
+            <div className="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+              ⚠ p95 is {fmtMs(latency.p95Ms)} — above the {fmtMs(latency.sloP95Ms)} target.
+            </div>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <LatCard label="Median (p50)" value={fmtMs(latency.p50Ms)} />
+            <LatCard label="p95" value={fmtMs(latency.p95Ms)} bad={latency.sloBreached} />
+            <LatCard label="Average" value={fmtMs(latency.avgMs)} />
+            <LatCard label="Avg input tokens" value={latency.avgInputTokens.toLocaleString()} />
+          </div>
+          {latency.byProvider.length > 0 && (
+            <div className="overflow-x-auto mt-3">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-mono uppercase tracking-widest text-text-muted">
+                    <th className="px-3 py-2">Provider</th>
+                    <th className="px-3 py-2 text-right">Turns</th>
+                    <th className="px-3 py-2 text-right">p50</th>
+                    <th className="px-3 py-2 text-right">p95</th>
+                    <th className="px-3 py-2 text-right">Avg</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle">
+                  {latency.byProvider.map((p) => (
+                    <tr key={p.provider ?? 'null'}>
+                      <td className="px-3 py-2 font-medium">{p.provider ?? '—'}</td>
+                      <td className="px-3 py-2 text-right">{p.count.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right text-text-secondary">{fmtMs(p.p50Ms)}</td>
+                      <td className="px-3 py-2 text-right text-text-secondary">{fmtMs(p.p95Ms)}</td>
+                      <td className="px-3 py-2 text-right text-text-secondary">{fmtMs(p.avgMs)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {(rows ?? []).map((r) => (
@@ -349,6 +420,15 @@ function StatCard({ label, value }: { label: string; value: number }) {
     <div className="bg-surface-raised border border-border-default rounded-lg p-4">
       <p className="text-xs text-text-muted uppercase tracking-wide mb-1">{label}</p>
       <p className="text-2xl font-bold text-text-primary">{value.toLocaleString()}</p>
+    </div>
+  )
+}
+
+function LatCard({ label, value, bad }: { label: string; value: string; bad?: boolean }) {
+  return (
+    <div className={`bg-surface-raised border rounded-lg p-4 ${bad ? 'border-red-300' : 'border-border-default'}`}>
+      <p className="text-xs text-text-muted uppercase tracking-wide mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${bad ? 'text-red-600' : 'text-text-primary'}`}>{value}</p>
     </div>
   )
 }

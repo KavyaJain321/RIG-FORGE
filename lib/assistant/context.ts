@@ -137,6 +137,36 @@ export async function buildForgieContext(args: BuildArgs): Promise<ForgieContext
   }
 }
 
+/**
+ * Minimal context for the pre-LLM fast lane: fetches ONLY the caller's own
+ * tasks (a single query) instead of the full projects + tickets + org-snapshot
+ * build. Used to answer greetings instantly. Projects/tickets come back empty —
+ * callers must only use this for intents that read `myTasks`/`user`.
+ */
+export async function buildForgieContextLite(args: BuildArgs): Promise<ForgieContext> {
+  const caller = { userId: args.userId, role: args.userRole }
+  const myTasks = await listTasks(caller, { mineOnly: true, limit: 20 })
+  return {
+    user: {
+      id: args.userId,
+      name: args.userName,
+      role: args.userRole,
+      isAdmin: isAdminRole(args.userRole),
+    },
+    myProjects: [],
+    myTasks: myTasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      dueDate: t.dueDate?.toISOString() ?? null,
+      projectName: t.projectName,
+      isOverdue: t.isOverdue,
+    })),
+    myTickets: [],
+  }
+}
+
 // ─── Admin-only org snapshot ─────────────────────────────────────────────────
 
 async function loadOrgSnapshot(): Promise<ForgieContext['orgSnapshot']> {

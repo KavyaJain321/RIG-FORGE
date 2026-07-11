@@ -11,6 +11,7 @@
  */
 
 import { type NextRequest } from 'next/server'
+import { Prisma } from '@prisma/client'
 
 import { getTokenFromCookies, verifyToken, isDeveloperEmail } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
@@ -126,5 +127,51 @@ export async function GET(request: NextRequest) {
     return tb - ta
   })
 
-  return successResponse({ users: rows, instances, instance: inst.id })
+  // ── Forgie response latency for THIS company only (dev-only observability) ──
+  // Uses the instance's own client + org pin so numbers never mix across
+  // companies. Supplementary — a failure here must not break the usage view.
+  // ONE raw query via GROUPING SETS (provider-NULL row = overall rollup); two
+  // concurrent $queryRaw would collide on prepared statements through pgbouncer.
+  let latency: {
+    windowDays: number; count: number; p50Ms: number; p95Ms: number; avgMs: number
+    avgInputTokens: number; sloP95Ms: number; sloBreached: boolean
+    byProvider: Array<{ provider: string | null; count: number; p50Ms: number; p95Ms: number; avgMs: number }>
+  } | null = null
+  try {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const orgFilter = inst.organizationId
+      ? Prisma.sql`AND "organizationId" = ${inst.organizationId}`
+      : Prisma.empty
+    const latRows = await db.$queryRaw<Array<{ provider: string | null; n: number; p50: number; p95: number; avg_ms: number; avg_in: number }>>(Prisma.sql`
+      SELECT provider, count(*)::int AS n,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY "latencyMs")::int AS p50,
+        percentile_cont(0.95) WITHIN GROUP (ORDER BY "latencyMs")::int AS p95,
+        round(avg("latencyMs"))::int AS avg_ms,
+        round(avg("inputTokens"))::int AS avg_in
+      FROM "AssistantMessage"
+      WHERE role::text = 'ASSISTANT' AND "latencyMs" > 0 AND "createdAt" >= ${since} ${orgFilter}
+      GROUP BY GROUPING SETS ((), (provider))`)
+    const overall = latRows.find((r) => r.provider === null)
+    if (overall && overall.n > 0) {
+      const SLO_P95_MS = Number(process.env.ASSISTANT_SLO_P95_MS ?? 10_000)
+      latency = {
+        windowDays: 7,
+        count: overall.n,
+        p50Ms: overall.p50,
+        p95Ms: overall.p95,
+        avgMs: overall.avg_ms,
+        avgInputTokens: overall.avg_in,
+        sloP95Ms: SLO_P95_MS,
+        sloBreached: (overall.p95 ?? 0) > SLO_P95_MS,
+        byProvider: latRows
+          .filter((r) => r.provider !== null)
+          .sort((a, b) => b.n - a.n)
+          .map((r) => ({ provider: r.provider, count: r.n, p50Ms: r.p50, p95Ms: r.p95, avgMs: r.avg_ms })),
+      }
+    }
+  } catch {
+    latency = null // non-fatal; usage view still renders
+  }
+
+  return successResponse({ users: rows, instances, instance: inst.id, latency })
 }

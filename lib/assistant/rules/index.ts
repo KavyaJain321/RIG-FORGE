@@ -71,7 +71,7 @@ function bullet(lines: string[], cap = 8): string {
 // Greeting — only when the message is *essentially just* a greeting (post-normalise
 // it's empty or a tiny hello token), so "hi what's due" doesn't get swallowed.
 const GREETING_ONLY = /^(hi|hey|hello|yo|hii+|heya|namaste|hola|good (morning|afternoon|evening)|sup|whats up|what's up)?$/
-function matchGreeting(n: string, ctx: ForgieContext): string | null {
+export function matchGreeting(n: string, ctx: ForgieContext): string | null {
   if (!GREETING_ONLY.test(n)) return null
   const first = ctx.user.name.split(' ')[0]
   const open = ctx.myTasks.filter((t) => t.status !== 'DONE').length
@@ -87,7 +87,7 @@ function matchGreeting(n: string, ctx: ForgieContext): string | null {
 // Precise: bare "help" only when it IS the request — not the word "help"
 // appearing inside a sentence like "do short standups help a team".
 const HELP = /^help( me)?$|\bwhat can (you|u) do\b|\byour capabilities\b|\bwhat do you do\b|\bhow do you (work|help me)\b|\bwhat are you\b|\bwhat can i ask\b/
-function matchHelp(n: string): string | null {
+export function matchHelp(n: string): string | null {
   if (!HELP.test(n)) return null
   return [
     "I'm Forgie — I track the team's work. I can quickly tell you about:",
@@ -164,6 +164,20 @@ function matchProjects(n: string, ctx: ForgieContext): string | null {
  * Try to answer deterministically. Returns the answer text, or null to defer
  * to the LLM. `channel` lets WhatsApp reuse the same rules.
  */
+/**
+ * Cheap PRE-context classifier. Identifies the intents that need little or no
+ * data — `help` (none) and `greeting` (only the caller's own tasks) — so the
+ * route can answer them BEFORE the full multi-query context build. Everything
+ * else returns null and takes the normal build → rules → LLM path.
+ */
+export function classifyFast(raw: string): 'help' | 'greeting' | null {
+  const n = normalize(raw)
+  if (GREETING_ONLY.test(n)) return 'greeting' // bare hi/hello — trips no guards
+  if (shouldDefer(n)) return null // writes / multi-intent / negation / follow-up → LLM
+  if (HELP.test(n)) return 'help'
+  return null
+}
+
 export function tryRuleAnswer(raw: string, ctx: ForgieContext): string | null {
   const n = normalize(raw)
   // Guards first — never rule-handle writes, multi-intent, negation, follow-ups.
