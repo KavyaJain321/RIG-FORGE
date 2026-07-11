@@ -35,8 +35,10 @@ import { buildSystemPrompt } from '@/lib/assistant/prompts'
 import { getOrgId } from '@/lib/tenant-context'
 import { getOrgIdentity } from '@/lib/org-branding'
 import { buildForgieContext, renderContextBlock } from '@/lib/assistant/context'
+import { tryRuleAnswer } from '@/lib/assistant/rules'
 import { reserveRateLimit, recordUsage } from '@/lib/assistant/rate-limit'
 import { lookupCache, storeCache, maybeSweepCache } from '@/lib/assistant/cache'
+import { isCacheableResponse } from '@/lib/assistant/cache-guard'
 import { buildAllToolsAsync, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
 import { signActionToken } from '@/lib/assistant/action-token'
 
@@ -205,6 +207,28 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
           userRole: args.user.role,
         })
 
+        // ── Rule-first fast lane (Phase 1) ─────────────────────────────────
+        // Deterministically answer common, safe, read-only questions straight
+        // from the context — no LLM. High precision: anything uncertain returns
+        // null and falls through to the model below.
+        const ruleAnswer = tryRuleAnswer(args.content, forgieCtx)
+        if (ruleAnswer) {
+          write(controller, { type: 'text', delta: ruleAnswer })
+          write(controller, {
+            type: 'done',
+            provider: 'rule',
+            model: 'rule',
+            fallback: false,
+            latencyMs: 0,
+            pendingActions: [],
+            toolsUsed: [],
+          })
+          await persistAssistant(args.conversationId, ruleAnswer, { provider: 'rule', model: 'rule' })
+          await maybeAutoTitle(args.conversationId, args.content, priorCount)
+          controller.close()
+          return
+        }
+
         const brand = await getOrgIdentity(getOrgId())
         const systemPrompt = [
           buildSystemPrompt({
@@ -359,10 +383,8 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
         // happen when it gets confused mid-reasoning), emit a gentle nudge
         // so the user isn't staring at a blank response.
         if (fullText.trim().length === 0 && pendingActions.length === 0) {
-          const nudge =
-            "Sorry — I didn't manage to put together a reply for that one. Mind rephrasing, or giving me a little more detail?"
-          write(controller, { type: 'text', delta: nudge })
-          fullText = nudge
+          write(controller, { type: 'text', delta: NUDGE_MESSAGE })
+          fullText = NUDGE_MESSAGE
         }
 
         // ── Persist assistant message ──────────────────────────────────────
@@ -382,7 +404,15 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
         // Don't cache replies that proposed actions: a cache hit replays
         // text only (pendingActions: []), so the confirmation card would
         // silently vanish on replay.
-        if (priorCount <= 1 && metadata?.provider && fullText && pendingActions.length === 0) {
+        // Only cache genuine successful model answers. Excludes fallbacks/nudges
+        // and empty/very-short replies via isCacheableResponse — otherwise a
+        // transient failure gets cached and replayed (provider=cache) for the TTL.
+        if (
+          priorCount <= 1 &&
+          metadata?.provider &&
+          pendingActions.length === 0 &&
+          isCacheableResponse(fullText)
+        ) {
           void storeCache({
             userId: args.user.id,
             role: args.user.role,
@@ -477,6 +507,10 @@ async function persistAssistant(
       console.warn('[persistAssistant] failed:', err)
     })
 }
+
+// Shown when the model streamed no text and proposed no action card.
+const NUDGE_MESSAGE =
+  "Sorry — I didn't manage to put together a reply for that one. Mind rephrasing, or giving me a little more detail?"
 
 function pickFallbackMessage(reason: string): string {
   switch (reason) {

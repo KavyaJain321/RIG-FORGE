@@ -12,6 +12,9 @@
 
 import { createHash } from 'crypto'
 import { prisma } from '@/lib/db'
+import { isCacheableResponse } from '@/lib/assistant/cache-guard'
+
+export { isCacheableResponse } from '@/lib/assistant/cache-guard'
 
 const TTL_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -69,6 +72,11 @@ export async function storeCache(args: {
   query: string
   response: string
 }): Promise<void> {
+  // Defense-in-depth: enforce the same cacheability rule the route gate uses,
+  // so a canned fallback/error or degenerate short reply can never be persisted
+  // and replayed for the whole TTL even if a caller forgets to check.
+  if (!isCacheableResponse(args.response)) return
+
   const cacheKey = buildCacheKey(args)
   const now = new Date()
   const expiresAt = new Date(now.getTime() + TTL_MS)
