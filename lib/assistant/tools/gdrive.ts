@@ -49,22 +49,46 @@ export async function searchDrive(userId: string, args: DriveSearchArgs) {
   const auth = await getAuthorizedClient(userId)
   const drive = google.drive({ version: 'v3', auth })
 
-  // Build the Drive query DSL
-  const clauses: string[] = []
+  // Build the Drive query DSL. `fullText contains` searches file *content*,
+  // which requires the restricted drive.readonly scope. New connections use
+  // drive.metadata.readonly, which rejects fullText — so we build the query
+  // with fullText (best results for legacy readonly connections) and retry
+  // name-only if Drive rejects it.
   const safeQuery = args.query.replace(/[\\']/g, '\\$&')
-  clauses.push(`(name contains '${safeQuery}' or fullText contains '${safeQuery}')`)
-  if (args.mimeType) clauses.push(`mimeType = '${args.mimeType}'`)
-  if (args.parentFolderId) clauses.push(`'${args.parentFolderId}' in parents`)
-  if (!args.includeTrashed) clauses.push(`trashed = false`)
+  const extraClauses: string[] = []
+  if (args.mimeType) extraClauses.push(`mimeType = '${args.mimeType}'`)
+  if (args.parentFolderId) extraClauses.push(`'${args.parentFolderId}' in parents`)
+  if (!args.includeTrashed) extraClauses.push(`trashed = false`)
 
   const limit = Math.min(Math.max(args.limit ?? 15, 1), 50)
+  const fields =
+    'files(id, name, mimeType, modifiedTime, size, webViewLink, owners(displayName, emailAddress), parents)'
 
-  const res = await drive.files.list({
-    q: clauses.join(' and '),
-    pageSize: limit,
-    fields: 'files(id, name, mimeType, modifiedTime, size, webViewLink, owners(displayName, emailAddress), parents)',
-    orderBy: 'modifiedTime desc',
-  })
+  const buildQ = (withFullText: boolean) =>
+    [
+      withFullText
+        ? `(name contains '${safeQuery}' or fullText contains '${safeQuery}')`
+        : `name contains '${safeQuery}'`,
+      ...extraClauses,
+    ].join(' and ')
+
+  let res
+  try {
+    res = await drive.files.list({
+      q: buildQ(true),
+      pageSize: limit,
+      fields,
+      orderBy: 'modifiedTime desc',
+    })
+  } catch {
+    // Metadata-only scope — fullText search not permitted. Retry name-only.
+    res = await drive.files.list({
+      q: buildQ(false),
+      pageSize: limit,
+      fields,
+      orderBy: 'modifiedTime desc',
+    })
+  }
 
   return {
     query: args.query,
@@ -158,26 +182,36 @@ export async function getFile(userId: string, args: GetFileArgs) {
   const mime = meta.data.mimeType ?? ''
   const size = meta.data.size ? parseInt(meta.data.size, 10) : 0
 
-  // Only attempt to fetch content for text/markdown-ish files under 100 KB
+  // Only attempt to fetch content for text/markdown-ish files under 100 KB.
+  // Reading file *contents* requires the restricted drive.readonly scope. New
+  // connections use drive.metadata.readonly (metadata only), so content reads
+  // fail — we catch that and return content=null so the caller links out to
+  // Drive instead. Legacy readonly connections still get inline content.
   let content: string | null = null
+  let contentUnavailable = false
   const textish = mime.startsWith('text/') ||
     mime === 'application/json' ||
     mime === 'application/xml'
 
-  if (textish && size > 0 && size < 100_000) {
-    const body = await drive.files.get({
-      fileId: args.fileId,
-      alt: 'media',
-    }, { responseType: 'text' })
-    content = typeof body.data === 'string' ? body.data : String(body.data)
-  } else if (mime === GOOGLE_DOC_MIME) {
-    // Export Google Docs as plain text
-    const body = await drive.files.export({
-      fileId: args.fileId,
-      mimeType: 'text/plain',
-    }, { responseType: 'text' })
-    const text = typeof body.data === 'string' ? body.data : String(body.data)
-    content = text.length > 100_000 ? text.slice(0, 100_000) + '\n\n... (truncated)' : text
+  try {
+    if (textish && size > 0 && size < 100_000) {
+      const body = await drive.files.get({
+        fileId: args.fileId,
+        alt: 'media',
+      }, { responseType: 'text' })
+      content = typeof body.data === 'string' ? body.data : String(body.data)
+    } else if (mime === GOOGLE_DOC_MIME) {
+      // Export Google Docs as plain text
+      const body = await drive.files.export({
+        fileId: args.fileId,
+        mimeType: 'text/plain',
+      }, { responseType: 'text' })
+      const text = typeof body.data === 'string' ? body.data : String(body.data)
+      content = text.length > 100_000 ? text.slice(0, 100_000) + '\n\n... (truncated)' : text
+    }
+  } catch {
+    // Metadata-only scope — no content access. Fall through with content=null.
+    contentUnavailable = true
   }
 
   return {
@@ -188,6 +222,7 @@ export async function getFile(userId: string, args: GetFileArgs) {
     modifiedTime: meta.data.modifiedTime,
     url: meta.data.webViewLink,
     content,
+    contentUnavailable,
     isTextish: textish || mime === GOOGLE_DOC_MIME,
   }
 }

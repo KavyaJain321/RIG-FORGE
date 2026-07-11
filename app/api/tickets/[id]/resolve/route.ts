@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies, isAdminRole } from '@/lib/auth'
+import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 /**
@@ -30,7 +31,7 @@ export async function POST(
     const ticket = await prisma.ticket.findUnique({ where: { id: params.id } })
     if (!ticket) return errorResponse('Ticket not found', 404)
 
-    const isAdmin  = isAdminRole(payload.role)
+    const isAdmin  = tokenCan(payload, 'tickets.manage')
     const isRaiser = ticket.raisedById === payload.userId
     const isHelper = ticket.helperId === payload.userId
     if (!isAdmin && !isRaiser && !isHelper) return errorResponse('Forbidden', 403)

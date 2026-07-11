@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
-import { isAdminRole } from '@/lib/roles'
+import { userCan } from '@/lib/permissions'
 import TicketCard from '@/components/tickets/TicketCard'
 import RaiseTicketModal from '@/components/tickets/RaiseTicketModal'
 
@@ -13,7 +13,7 @@ type TabType = 'OPEN' | 'ACCEPTED' | 'COMPLETED'
 interface Ticket {
   id: string; title: string; description: string; status: string
   projectName: string; raisedByName: string; raisedById: string
-  helperName: string | null; createdAt: string
+  helperName: string | null; helperId: string | null; createdAt: string
   commentCount?: number; hasResponse?: boolean
 }
 
@@ -193,7 +193,7 @@ function EmployeeTickets() {
           <div>
             <h1 className="type-h3">My Tickets</h1>
             <p className="font-mono text-xs text-text-muted mt-1">
-              Track tickets you have raised
+              Tickets you&apos;ve raised or been assigned to help with
             </p>
           </div>
           <button
@@ -291,5 +291,5 @@ export default function TicketsPage() {
 
   if (loading || !user) return null
 
-  return isAdminRole(user.role) ? <AdminTickets /> : <EmployeeTickets />
+  return userCan(user, 'tickets.manage') ? <AdminTickets /> : <EmployeeTickets />
 }

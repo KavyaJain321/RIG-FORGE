@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
-import { isAdminRole } from '@/lib/roles'
+import { userCan } from '@/lib/permissions'
 import TicketStatusBadge from '@/components/tickets/TicketStatusBadge'
 
 interface TicketDetail {
@@ -12,7 +12,7 @@ interface TicketDetail {
   projectId: string; projectName: string
   raisedById: string; raisedByName: string; raisedByAvatar: string | null
   helperId: string | null; helperName: string | null; helperAvatar: string | null
-  createdAt: string; acceptedAt: string | null; completedAt: string | null; cancelledAt: string | null
+  createdAt: string; editedAt: string | null; acceptedAt: string | null; completedAt: string | null; cancelledAt: string | null
 }
 
 interface TicketComment {
@@ -46,6 +46,19 @@ export default function TicketDetailPage() {
   const [confirmComplete, setConfirmComplete] = useState(false)
   const [confirmResolve, setConfirmResolve] = useState(false)
 
+  // Edit ticket details
+  const [editing, setEditing] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  // Assign to teammate (admin)
+  const [assignableUsers, setAssignableUsers] = useState<{ id: string; name: string }[]>([])
+  const [assignTo, setAssignTo] = useState('')
+  const [assigning, setAssigning] = useState(false)
+  const [assignError, setAssignError] = useState<string | null>(null)
+
   const fetchTicket = useCallback(async () => {
     setFetching(true)
     try {
@@ -72,12 +85,30 @@ export default function TicketDetailPage() {
     }
   }, [loading, user, router, fetchTicket, fetchComments])
 
-  // Employees can only view their own tickets — redirect if forbidden
+  // Non-admins may view tickets they raised OR were assigned to — redirect otherwise
   useEffect(() => {
-    if (ticket && user && !isAdminRole(user.role) && ticket.raisedById !== user.id) {
+    if (
+      ticket && user &&
+      !userCan(user, 'tickets.manage') &&
+      ticket.raisedById !== user.id &&
+      ticket.helperId !== user.id
+    ) {
       router.replace('/dashboard/tickets')
     }
   }, [ticket, user, router])
+
+  // Admins: load the roster of teammates a ticket can be assigned to.
+  useEffect(() => {
+    if (!user || !userCan(user, 'tickets.manage')) return
+    void (async () => {
+      try {
+        const res = await fetch('/api/users?limit=100', { credentials: 'include' })
+        const json = await res.json() as { data: { items?: { id: string; name: string }[] } | { id: string; name: string }[] | null }
+        const items = Array.isArray(json.data) ? json.data : (json.data?.items ?? [])
+        setAssignableUsers(items.map((u) => ({ id: u.id, name: u.name })))
+      } catch { /* non-fatal */ }
+    })()
+  }, [user])
 
   async function doAction(endpoint: string) {
     if (!ticket) return
@@ -90,6 +121,66 @@ export default function TicketDetailPage() {
       setConfirmAccept(false)
       setConfirmComplete(false)
       setConfirmResolve(false)
+    }
+  }
+
+  async function doAssign() {
+    if (!ticket || !assignTo || assigning) return
+    setAssigning(true)
+    setAssignError(null)
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}/assign`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ helperId: assignTo }),
+      })
+      const json = await res.json() as { data: { helperName: string } | null; error: string | null }
+      if (!res.ok || json.error) {
+        setAssignError(json.error ?? 'Failed to assign ticket')
+        return
+      }
+      setAssignTo('')
+      await fetchTicket()
+    } catch {
+      setAssignError('Network error. Please try again.')
+    } finally {
+      setAssigning(false)
+    }
+  }
+
+  function startEdit() {
+    if (!ticket) return
+    setEditTitle(ticket.title)
+    setEditDesc(ticket.description)
+    setEditError(null)
+    setEditing(true)
+  }
+
+  async function saveEdit() {
+    if (!ticket || savingEdit) return
+    if (editTitle.trim().length < 5) { setEditError('Title must be at least 5 characters'); return }
+    if (editDesc.trim().length < 20) { setEditError('Description must be at least 20 characters'); return }
+    setSavingEdit(true)
+    setEditError(null)
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: editTitle.trim(), description: editDesc.trim() }),
+      })
+      const json = await res.json() as { data: { title: string; description: string; editedAt: string } | null; error: string | null }
+      if (!res.ok || !json.data) {
+        setEditError(json.error ?? 'Failed to save changes')
+        return
+      }
+      setTicket((prev) => prev ? { ...prev, title: json.data!.title, description: json.data!.description, editedAt: json.data!.editedAt } : prev)
+      setEditing(false)
+    } catch {
+      setEditError('Network error. Please try again.')
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -129,12 +220,13 @@ export default function TicketDetailPage() {
 
   const isRaiser  = ticket.raisedById === user.id
   const isHelper  = ticket.helperId === user.id
-  const isAdmin   = isAdminRole(user.role)
+  const isAdmin   = userCan(user, 'tickets.manage')
   const isOpen    = ticket.status === 'OPEN'
   const isAccepted = ticket.status === 'ACCEPTED'
   const isClosed   = ticket.status === 'COMPLETED' || ticket.status === 'CANCELLED'
   const canReply   = !isClosed && (isAdmin || isRaiser || isHelper)
   const canResolve = !isClosed && (isAdmin || isRaiser || isHelper)
+  const canEdit    = !isClosed && isAdmin
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
@@ -144,21 +236,68 @@ export default function TicketDetailPage() {
         </button>
 
         <div className="bg-surface-raised border border-border-default rounded-card p-6">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <h1 className="font-mono text-base text-text-primary flex-1">{ticket.title}</h1>
-            <TicketStatusBadge status={ticket.status} />
-          </div>
+          {editing ? (
+            /* ── Edit mode ─────────────────────────────────────── */
+            <div className="mb-6 space-y-3">
+              <div>
+                <p className="font-mono text-xs text-text-muted uppercase tracking-widest mb-1">Title</p>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full bg-background-primary border border-border-default rounded-card px-3 py-2 font-mono text-sm text-text-primary focus:outline-none focus:border-accent"
+                />
+              </div>
+              <div>
+                <p className="font-mono text-xs text-text-muted uppercase tracking-widest mb-1">Description</p>
+                <textarea
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  rows={6}
+                  className="w-full bg-background-primary border border-border-default rounded-card px-3 py-2 font-mono text-sm text-text-secondary leading-relaxed focus:outline-none focus:border-accent resize-y"
+                />
+              </div>
+              {editError && <p className="font-mono text-xs text-status-danger">{editError}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setEditing(false)} disabled={savingEdit}
+                  className="h-9 px-4 bg-background-tertiary border border-border-default rounded-card font-mono text-xs text-text-secondary disabled:opacity-50">
+                  Cancel
+                </button>
+                <button type="button" onClick={() => void saveEdit()} disabled={savingEdit}
+                  className="h-9 px-4 bg-accent text-white font-mono text-xs rounded-card hover:opacity-90 disabled:opacity-50">
+                  {savingEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ── Read mode ─────────────────────────────────────── */
+            <>
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <h1 className="font-mono text-base text-text-primary flex-1">{ticket.title}</h1>
+                <div className="flex items-center gap-3 shrink-0">
+                  {canEdit && (
+                    <button type="button" onClick={startEdit}
+                      className="font-mono text-xs text-text-muted hover:text-accent-ink transition-colors">
+                      Edit
+                    </button>
+                  )}
+                  <TicketStatusBadge status={ticket.status} />
+                </div>
+              </div>
 
-          <div className="flex flex-wrap gap-4 mb-6 font-mono text-xs text-text-muted">
-            <span>Raised by: <span className="text-text-secondary">{isRaiser ? 'You' : ticket.raisedByName}</span></span>
-            <span>Project: <span className="text-text-secondary">{ticket.projectName}</span></span>
-            <span>Raised: <span className="text-text-secondary">{fmt(ticket.createdAt)}</span></span>
-          </div>
+              <div className="flex flex-wrap gap-4 mb-6 font-mono text-xs text-text-muted">
+                <span>Raised by: <span className="text-text-secondary">{isRaiser ? 'You' : ticket.raisedByName}</span></span>
+                <span>Project: <span className="text-text-secondary">{ticket.projectName}</span></span>
+                <span>Raised: <span className="text-text-secondary">{fmt(ticket.createdAt)}</span></span>
+                {ticket.editedAt && <span className="text-text-muted italic">· edited {fmt(ticket.editedAt)}</span>}
+              </div>
 
-          <div className="border-t border-border-default pt-4 mb-6">
-            <p className="font-mono text-xs text-text-muted uppercase tracking-widest mb-2">Description</p>
-            <p className="font-mono text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{ticket.description}</p>
-          </div>
+              <div className="border-t border-border-default pt-4 mb-6">
+                <p className="font-mono text-xs text-text-muted uppercase tracking-widest mb-2">Description</p>
+                <p className="font-mono text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{ticket.description}</p>
+              </div>
+            </>
+          )}
 
           {/* Accepted info */}
           {ticket.helperId && (
@@ -167,6 +306,44 @@ export default function TicketDetailPage() {
               <p className="font-mono text-sm text-text-secondary">
                 {isHelper ? 'You are helping' : ticket.helperName}
                 {ticket.acceptedAt && <span className="text-text-muted ml-2">· accepted {fmt(ticket.acceptedAt)}</span>}
+              </p>
+            </div>
+          )}
+
+          {/* Assign to teammate — admins only, while the ticket is open/in-progress */}
+          {isAdmin && !isClosed && (
+            <div className="border-t border-border-default pt-4 mb-6">
+              <p className="font-mono text-xs text-text-muted uppercase tracking-widest mb-2">
+                {ticket.helperId ? 'Reassign to teammate' : 'Assign to teammate'}
+              </p>
+              <div className="flex gap-2">
+                <select
+                  value={assignTo}
+                  onChange={(e) => setAssignTo(e.target.value)}
+                  disabled={assigning}
+                  className="flex-1 h-9 bg-background-primary border border-border-default rounded-card px-2 font-mono text-xs text-text-primary focus:outline-none focus:border-accent disabled:opacity-50"
+                >
+                  <option value="">Select a teammate…</option>
+                  {assignableUsers
+                    .filter((u) => u.id !== ticket.raisedById)
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}{u.id === ticket.helperId ? ' (current)' : ''}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => void doAssign()}
+                  disabled={!assignTo || assigning}
+                  className="h-9 px-4 bg-accent text-white font-mono text-xs rounded-card hover:opacity-90 disabled:opacity-50"
+                >
+                  {assigning ? 'Assigning…' : 'Assign'}
+                </button>
+              </div>
+              {assignError && <p className="font-mono text-xs text-status-danger mt-2">{assignError}</p>}
+              <p className="font-mono text-[11px] text-text-muted mt-2">
+                They&apos;ll be notified and sent a message about the assignment.
               </p>
             </div>
           )}

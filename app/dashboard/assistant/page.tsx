@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { useAuth } from '@/hooks/useAuth'
-import { isAdminRole } from '@/lib/roles'
+import { userCan } from '@/lib/permissions'
 
 interface Stats {
   totals: { conversations: number; messages: number; auditEntries: number }
@@ -40,14 +40,14 @@ export default function AssistantAdminPage() {
 
   // Gate to admins only
   useEffect(() => {
-    if (!loading && user && !isAdminRole(user.role)) {
+    if (!loading && user && !userCan(user, 'assistant.admin')) {
       router.replace('/dashboard')
     }
   }, [user, loading, router])
 
   // Load stats once authenticated
   useEffect(() => {
-    if (loading || !user || !isAdminRole(user.role)) return
+    if (loading || !user || !userCan(user, 'assistant.admin')) return
     void (async () => {
       try {
         const res = await fetch('/api/assistant/admin/stats', { credentials: 'include' })
@@ -66,7 +66,7 @@ export default function AssistantAdminPage() {
   if (loading || !user) {
     return <div className="p-8 text-sm text-text-muted">Loading...</div>
   }
-  if (!isAdminRole(user.role)) return null
+  if (!userCan(user, 'assistant.admin')) return null
   if (error) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">

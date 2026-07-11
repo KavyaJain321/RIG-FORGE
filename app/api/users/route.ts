@@ -1,7 +1,8 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { MemberSummary, PaginatedResponse } from '@/lib/types'
 
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
     const statusFilter = searchParams.get('status') ?? ''
 
     // ── ADMIN / SUPER_ADMIN PATH ───────────────────────────────────────────────
-    if (isAdminRole(payload.role)) {
+    if (tokenCan(payload, 'members.view')) {
       const where = {
         isActive: true,
         ...(search && {

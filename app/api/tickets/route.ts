@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies, isAdminRole } from '@/lib/auth'
+import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -19,10 +20,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (status) where.status = status
     if (projectId) where.projectId = projectId
 
-    const isAdmin = isAdminRole(payload.role)
-    // Employees can only ever see their own raised tickets; admins
-    // can opt-in via ?mine=1.
-    if (!isAdmin || mine) {
+    const isAdmin = tokenCan(payload, 'tickets.manage')
+    // Non-admins see tickets they raised OR were assigned to help with.
+    // Admins see everything, or just their own raised tickets via ?mine=1.
+    if (!isAdmin) {
+      where.OR = [{ raisedById: payload.userId }, { helperId: payload.userId }]
+    } else if (mine) {
       where.raisedById = payload.userId
     }
 

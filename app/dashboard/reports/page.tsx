@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 import { useAuth } from '@/hooks/useAuth'
-import { isAdminRole } from '@/lib/roles'
+import { userCan } from '@/lib/permissions'
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
 import type { WeeklyReportSummary, ApiResponse, DailyLogEntry } from '@/lib/types'
 
@@ -619,6 +619,6 @@ export default function ReportsPage() {
     </div>
   )
 
-  if (isAdminRole(user.role)) return <AdminReportsSection />
+  if (userCan(user, 'reports.view')) return <AdminReportsSection />
   return <WeeklyNoteSection />
 }

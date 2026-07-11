@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
 import { isAdminRole } from '@/lib/roles'
+import { userCan } from '@/lib/permissions'
 import { useSocket } from '@/hooks/useSocket'
 import Avatar from '@/components/ui/Avatar'
 import StatusDot from '@/components/ui/StatusDot'
@@ -71,11 +72,15 @@ export default function Topbar() {
   const { appName, appShort } = useBranding()
   useSocket()
 
-  const navItems = user?.role === 'SUPER_ADMIN'
+  const baseNav = user?.role === 'SUPER_ADMIN'
     ? SUPER_ADMIN_NAV
     : user?.role === 'ADMIN'
       ? ADMIN_NAV
       : EMPLOYEE_NAV
+  // Hide capability-gated tabs (e.g. Onboarding) a custom role lacks.
+  const navItems = baseNav.filter(
+    (i) => i.href !== '/dashboard/onboarding' || userCan(user, 'onboarding.approve'),
+  )
 
   const [statusOpen, setStatusOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)

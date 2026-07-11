@@ -15,6 +15,8 @@ export interface TokenPayload {
   isOnboarding: boolean
   mustChangePassword: boolean
   organizationId: string
+  /** Present only when the user has an assigned custom role (see lib/permissions.ts tokenCan). */
+  capabilities?: string[]
 }
 
 // Re-exported from the client-safe module so server code can keep importing it

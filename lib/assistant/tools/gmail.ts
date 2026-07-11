@@ -97,17 +97,36 @@ export async function getMessage(userId: string, args: GetMessageArgs) {
   const auth = await getAuthorizedClient(userId)
   const gmail = google.gmail({ version: 'v1', auth })
 
-  const r = await gmail.users.messages.get({
-    userId: 'me',
-    id: args.messageId,
-    format: 'full',
-  })
+  // Try 'full' (reads the body) — works for legacy connections that still hold
+  // the gmail.readonly scope. New connections use gmail.metadata, which rejects
+  // 'full'/'raw'; we fall back to 'metadata' (headers + snippet, no body).
+  let r
+  let bodyAvailable = true
+  try {
+    r = await gmail.users.messages.get({
+      userId: 'me',
+      id: args.messageId,
+      format: 'full',
+    })
+  } catch {
+    bodyAvailable = false
+    r = await gmail.users.messages.get({
+      userId: 'me',
+      id: args.messageId,
+      format: 'metadata',
+      metadataHeaders: ['From', 'To', 'Cc', 'Subject', 'Date'],
+    })
+  }
 
   const headers = r.data.payload?.headers ?? []
   const get = (name: string) =>
     headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? null
 
-  const body = extractPlainText(r.data.payload)
+  // With metadata-only access we can't read the body — return the snippet and a
+  // flag so the caller/LLM knows the full body isn't available.
+  const body = bodyAvailable
+    ? extractPlainText(r.data.payload)
+    : (r.data.snippet ?? '')
 
   return {
     id: args.messageId,
@@ -118,6 +137,7 @@ export async function getMessage(userId: string, args: GetMessageArgs) {
     subject: get('Subject'),
     date: get('Date'),
     body: body.length > 5000 ? body.slice(0, 5000) + '\n\n... (truncated)' : body,
+    bodyTruncatedToSnippet: !bodyAvailable,
     labels: r.data.labelIds ?? [],
   }
 }

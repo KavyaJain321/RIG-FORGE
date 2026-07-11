@@ -2,7 +2,8 @@ import { type NextRequest, NextResponse } from 'next/server'
 import type { Priority, TaskStatus } from '@prisma/client'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { buildTaskSummary } from '@/lib/tasks'
 
@@ -64,7 +65,7 @@ export async function PATCH(
     }
     const data = body as Record<string, unknown>
 
-    const isAdmin    = isAdminRole(payload.role)
+    const isAdmin    = tokenCan(payload, 'tasks.manage')
     const isLead     = task.project.leadId === payload.userId
     const isAssignee = task.assigneeId === payload.userId
 
@@ -198,7 +199,7 @@ export async function DELETE(
     const task = await loadTask(params.id)
     if (!task) return errorResponse('Task not found', 404)
 
-    const isAdmin = isAdminRole(payload.role)
+    const isAdmin = tokenCan(payload, 'tasks.manage')
     const isLead  = task.project.leadId === payload.userId
     if (!isAdmin && !isLead) {
       return errorResponse('Only admins or the project lead can delete tasks', 403)

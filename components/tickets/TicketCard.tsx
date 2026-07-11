@@ -7,7 +7,7 @@ interface TicketCardProps {
   ticket: {
     id: string; title: string; description: string; status: string
     projectName: string; raisedByName: string; raisedById: string
-    helperName: string | null; createdAt: string
+    helperName: string | null; helperId?: string | null; createdAt: string
     commentCount?: number; hasResponse?: boolean
   }
   currentUserId: string
@@ -25,6 +25,7 @@ function timeAgo(dateStr: string): string {
 export default function TicketCard({ ticket, currentUserId }: TicketCardProps) {
   const router = useRouter()
   const isOwn = ticket.raisedById === currentUserId
+  const isAssignedToMe = ticket.helperId != null && ticket.helperId === currentUserId && !isOwn
 
   return (
     <div
@@ -43,6 +44,11 @@ export default function TicketCard({ ticket, currentUserId }: TicketCardProps) {
             <span className="font-mono text-[10px] text-text-muted">
               {isOwn ? 'Your ticket' : `by ${ticket.raisedByName}`}
             </span>
+            {isAssignedToMe && (
+              <span className="font-mono text-[10px] text-accent-ink font-semibold">
+                ★ Assigned to you
+              </span>
+            )}
             <span className="font-mono text-[10px] text-text-muted">
               □ {ticket.projectName}
             </span>

@@ -1,7 +1,8 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { decryptSecret } from '@/lib/secret-box'
 import type { MemberDetail } from '@/lib/types'
@@ -23,7 +24,7 @@ export async function GET(
     if (!payload) return errorResponse('Invalid or expired token', 401)
 
     const { userId } = params
-    const isAdmin = isAdminRole(payload.role)
+    const isAdmin = tokenCan(payload, 'members.view')
     const isSuperAdmin = payload.role === 'SUPER_ADMIN'
     const isOwnProfile = payload.userId === userId
 
@@ -51,8 +52,12 @@ export async function GET(
           currentStatus: true,
           isOnboarding: true,
           createdAt: true,
-          // Only expose temp password fields to admin viewers
-          ...(isAdmin && { tempPassword: true, mustChangePassword: true }),
+          // Only expose temp password + custom-role fields to admin viewers
+          ...(isAdmin && {
+            tempPassword: true,
+            mustChangePassword: true,
+            customRole: { select: { id: true, name: true } },
+          }),
         },
       }),
       prisma.projectMember.findMany({
@@ -219,6 +224,7 @@ export async function GET(
     const typedUserRecord = userRecord as typeof userRecord & {
       tempPassword?: string | null
       mustChangePassword?: boolean
+      customRole?: { id: string; name: string } | null
     }
 
     // ADMIN cannot see SUPER_ADMIN's temp password (nobody can reset superadmin)
@@ -245,6 +251,8 @@ export async function GET(
       ...(isAdmin && {
         mustChangePassword: typedUserRecord.mustChangePassword ?? false,
         tempPassword: canSeeTempPassword ? decryptSecret(typedUserRecord.tempPassword) : null,
+        customRoleId: typedUserRecord.customRole?.id ?? null,
+        customRoleName: typedUserRecord.customRole?.name ?? null,
       }),
     }
 

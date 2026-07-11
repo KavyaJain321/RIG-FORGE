@@ -2,8 +2,9 @@ import { type NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 
 import { prisma } from '@/lib/db'
-import { hashPassword, isAdminRole } from '@/lib/auth'
-import { authenticateActive } from '@/lib/authz'
+import { hashPassword } from '@/lib/auth'
+import { authenticateCapable } from '@/lib/authz'
+import { can } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { encryptSecret } from '@/lib/secret-box'
 
@@ -38,8 +39,8 @@ export async function POST(
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
   try {
-    const caller = await authenticateActive(request)
-    if (!caller || !isAdminRole(caller.role)) return errorResponse('Admin access required', 403)
+    const caller = await authenticateCapable(request)
+    if (!caller || !can(caller.capabilities, 'members.reset_password')) return errorResponse('Admin access required', 403)
 
     const { id: targetId } = params
     if (!targetId) return errorResponse('User ID is required', 400)

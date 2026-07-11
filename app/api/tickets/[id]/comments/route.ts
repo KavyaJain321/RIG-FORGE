@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies, isAdminRole } from '@/lib/auth'
+import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
@@ -27,7 +28,7 @@ async function authorize(request: NextRequest, ticketId: string): Promise<AuthOk
   })
   if (!ticket) return { ok: false, error: errorResponse('Ticket not found', 404) }
 
-  const isAdmin  = isAdminRole(payload.role)
+  const isAdmin  = tokenCan(payload, 'tickets.manage')
   const isRaiser = ticket.raisedById === payload.userId
   const isHelper = ticket.helperId === payload.userId
   if (!isAdmin && !isRaiser && !isHelper) {

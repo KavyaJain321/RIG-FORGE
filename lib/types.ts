@@ -28,6 +28,10 @@ export interface AuthUser {
   isOnboarding: boolean
   mustChangePassword: boolean
   createdAt: Date
+  // Effective fine-grained capabilities (from custom role, if any). Used to
+  // gate UI controls. Undefined = legacy shape (admin=all, employee=none).
+  capabilities?: string[]
+  customRoleName?: string | null
   // Per-org (white-label) branding, resolved from the caller's Organization.
   orgName?: string
   orgShort?: string
@@ -155,6 +159,8 @@ export interface MemberDetail {
   role: AppRole
   tempPassword?: string | null        // only present for admin/superadmin viewers
   mustChangePassword?: boolean        // only present for admin/superadmin viewers
+  customRoleId?: string | null        // assigned custom role (admin viewers only)
+  customRoleName?: string | null      // assigned custom role name (admin viewers only)
   avatarUrl: string | null
   currentStatus: 'WORKING' | 'NOT_WORKING'
   lastSeenAt: Date | null

@@ -4,20 +4,16 @@
  * "Finish setting up" prompt shown on the dashboard after login.
  *
  * Soft nudge (never blocking, unlike the password gate): appears only while the
- * user still has something to do — connect Google and/or verify a WhatsApp
- * number — and is dismissible for the session. Disappears on its own once both
- * are done.
+ * user still has something to do — connect Google — and is dismissible for the
+ * session. Disappears on its own once done.
  */
 
 import { useEffect, useState } from 'react'
 import type { ApiResponse } from '@/lib/types'
-import WhatsappVerifyCard from '@/components/profile/WhatsappVerifyCard'
 
 interface SetupStatus {
   google: { configured: boolean; connected: boolean }
-  whatsapp: { enabled: boolean; number: string | null; hasNumber: boolean; verified: boolean }
   needsGoogle: boolean
-  needsWhatsapp: boolean
   complete: boolean
 }
 
@@ -26,7 +22,6 @@ const DISMISS_KEY = 'rf-setup-prompt-dismissed'
 export default function SetupPrompt() {
   const [status, setStatus] = useState<SetupStatus | null>(null)
   const [dismissed, setDismissed] = useState(false)
-  const [showWa, setShowWa] = useState(false)
 
   async function load() {
     try {
@@ -45,7 +40,7 @@ export default function SetupPrompt() {
     void load()
   }, [])
 
-  if (dismissed || !status || status.complete) return null
+  if (dismissed || !status || !status.needsGoogle) return null
 
   function dismiss() {
     setDismissed(true)
@@ -87,39 +82,6 @@ export default function SetupPrompt() {
           </div>
         )}
 
-        {status.needsWhatsapp && (
-          <div className="border border-border-subtle rounded-lg px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-text-primary">
-                  Verify your WhatsApp number
-                </p>
-                <p className="text-xs text-text-secondary">
-                  {status.whatsapp.hasNumber
-                    ? 'Confirm your number so Forgie recognises you on WhatsApp.'
-                    : 'Add and verify a number to chat with Forgie on WhatsApp.'}
-                </p>
-              </div>
-              {!showWa && (
-                <button
-                  onClick={() => setShowWa(true)}
-                  className="shrink-0 font-mono text-xs border border-border-default px-4 py-2 text-text-muted tracking-widest hover:border-accent hover:text-accent-ink transition-colors"
-                >
-                  {status.whatsapp.hasNumber ? 'VERIFY' : 'ADD'}
-                </button>
-              )}
-            </div>
-            {showWa && (
-              <div className="mt-3">
-                <WhatsappVerifyCard
-                  whatsappNumber={status.whatsapp.number}
-                  verified={status.whatsapp.verified}
-                  onChange={() => void load()}
-                />
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   )

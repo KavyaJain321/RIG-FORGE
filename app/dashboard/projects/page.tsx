@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { useAuth } from '@/hooks/useAuth'
-import { isAdminRole } from '@/lib/roles'
+import { userCan } from '@/lib/permissions'
 import ProjectFilters from '@/components/projects/ProjectFilters'
 import ProjectListRow from '@/components/projects/ProjectListRow'
 import ProjectRowSkeleton from '@/components/projects/ProjectRowSkeleton'
@@ -113,7 +113,9 @@ export default function ProjectsPage() {
   const [showModal, setShowModal] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
-  const isAdmin = user?.role ? isAdminRole(user.role) : false
+  // Create/edit controls require projects.manage; the "all projects" view + label uses projects.view_all.
+  const isAdmin = userCan(user, 'projects.manage')
+  const canViewAll = userCan(user, 'projects.view_all')
 
   // ── Auth redirect ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -208,7 +210,7 @@ export default function ProjectsPage() {
   const emptySubline =
     debouncedSearch || statusFilter || priorityFilter
       ? 'No projects match your current filters'
-      : isAdmin
+      : canViewAll
         ? 'Create your first project to get started'
         : 'You have not been assigned to any projects yet'
 
@@ -224,7 +226,7 @@ export default function ProjectsPage() {
       {/* ── Page header ────────────────────────────────────────────────────── */}
       <div className="pb-6">
         <p className="type-meta text-accent-ink">Delivery Portfolio</p>
-        <h1 className="type-h1">{isAdmin ? 'Projects' : 'My Projects'}</h1>
+        <h1 className="type-h1">{canViewAll ? 'Projects' : 'My Projects'}</h1>
         <p className="type-body-muted mt-1">{total} active projects</p>
       </div>
 

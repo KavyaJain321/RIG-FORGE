@@ -12,9 +12,9 @@
 
 import { type NextRequest } from 'next/server'
 
-import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken, isDeveloperEmail } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { listInstances, getInstance, getInstanceClient } from '@/lib/dev/instances'
 
 export async function GET(request: NextRequest) {
   const token = getTokenFromCookies(request)
@@ -23,26 +23,56 @@ export async function GET(request: NextRequest) {
   if (!claims) return errorResponse('Invalid or expired session', 401)
   if (!isDeveloperEmail(claims.email)) return errorResponse('Not found', 404)
 
-  const [users, convGroups, msgGroups, actionGroups] = await Promise.all([
-    prisma.user.findMany({
-      select: { id: true, name: true, email: true, role: true, whatsappNumber: true, isActive: true },
-      orderBy: { name: 'asc' },
-    }),
-    prisma.assistantConversation.groupBy({
-      by: ['userId', 'channel'],
-      _count: { _all: true },
-      _max: { updatedAt: true },
-    }),
-    // Messages joined through conversation owner — count per (user, channel).
-    prisma.assistantConversation.findMany({
-      select: { userId: true, channel: true, _count: { select: { messages: true } } },
-    }),
-    prisma.assistantAuditLog.groupBy({
-      by: ['userId'],
-      _count: { _all: true },
-      _max: { createdAt: true },
-    }),
-  ])
+  // Which company/instance are we inspecting? Defaults to the primary instance.
+  const instanceId = new URL(request.url).searchParams.get('instance')
+  const inst = getInstance(instanceId)
+  if (!inst) return errorResponse('Unknown instance', 400)
+  const db = getInstanceClient(inst)
+  const instances = listInstances().map((i) => ({ id: i.id, label: i.label }))
+
+  // These are UNSCOPED clients (see lib/dev/instances.ts), so when an instance
+  // pins an org we filter explicitly — otherwise a shared schema would leak other
+  // orgs' users into this company's view.
+  const orgWhere = inst.organizationId ? { organizationId: inst.organizationId } : {}
+
+  let users, convGroups, msgGroups, actionGroups
+  try {
+    ;[users, convGroups, msgGroups, actionGroups] = await Promise.all([
+      db.user.findMany({
+        where: orgWhere,
+        select: { id: true, name: true, email: true, role: true, whatsappNumber: true, isActive: true },
+        orderBy: { name: 'asc' },
+      }),
+      db.assistantConversation.groupBy({
+        by: ['userId', 'channel'],
+        where: orgWhere,
+        _count: { _all: true },
+        _max: { updatedAt: true },
+      }),
+      // Messages joined through conversation owner — count per (user, channel).
+      db.assistantConversation.findMany({
+        where: orgWhere,
+        select: { userId: true, channel: true, _count: { select: { messages: true } } },
+      }),
+      db.assistantAuditLog.groupBy({
+        by: ['userId'],
+        where: orgWhere,
+        _count: { _all: true },
+        _max: { createdAt: true },
+      }),
+    ])
+  } catch (error) {
+    // Most likely the target company's schema doesn't exist in this deployment's
+    // database (e.g. trijya isn't provisioned in prod). Surface it clearly rather
+    // than 500-ing, and still return the instance list so the switcher works.
+    return successResponse({
+      users: [],
+      instances,
+      instance: inst.id,
+      unavailable: true,
+      reason: error instanceof Error ? error.message : 'Instance is not reachable',
+    })
+  }
 
   // Conversation counts + last-active per user/channel
   const webConvs = new Map<string, number>()
@@ -96,5 +126,5 @@ export async function GET(request: NextRequest) {
     return tb - ta
   })
 
-  return successResponse({ users: rows })
+  return successResponse({ users: rows, instances, instance: inst.id })
 }

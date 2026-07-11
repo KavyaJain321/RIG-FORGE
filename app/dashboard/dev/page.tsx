@@ -76,24 +76,46 @@ export default function DevDashboardPage() {
   const [rows, setRows] = useState<UserRow[] | null>(null)
   const [denied, setDenied] = useState(false)
   const [selected, setSelected] = useState<UserRow | null>(null)
+  const [instances, setInstances] = useState<{ id: string; label: string }[]>([])
+  const [instance, setInstance] = useState<string>('rig360')
+  const [unavailable, setUnavailable] = useState<string | null>(null)
 
   useEffect(() => {
     if (loading || !user) return
+    let cancelled = false
+    setRows(null)
+    setSelected(null)
+    setUnavailable(null)
     void (async () => {
       try {
-        const res = await fetch('/api/dev/forgie-usage', { credentials: 'include' })
+        const res = await fetch(`/api/dev/forgie-usage?instance=${encodeURIComponent(instance)}`, {
+          credentials: 'include',
+        })
         if (res.status === 404 || res.status === 403) {
           setDenied(true)
           router.replace('/dashboard')
           return
         }
-        const json = (await res.json()) as { data?: { users: UserRow[] } }
+        const json = (await res.json()) as {
+          data?: {
+            users: UserRow[]
+            instances?: { id: string; label: string }[]
+            unavailable?: boolean
+            reason?: string
+          }
+        }
+        if (cancelled) return
+        if (json.data?.instances) setInstances(json.data.instances)
+        setUnavailable(json.data?.unavailable ? json.data.reason ?? 'Instance unavailable' : null)
         setRows(json.data?.users ?? [])
       } catch {
-        setDenied(true)
+        if (!cancelled) setDenied(true)
       }
     })()
-  }, [loading, user, router])
+    return () => {
+      cancelled = true
+    }
+  }, [loading, user, router, instance])
 
   if (loading || (!rows && !denied)) {
     return <div className="p-8 text-sm text-text-muted">Loading…</div>
@@ -107,16 +129,41 @@ export default function DevDashboardPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-6">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-text-primary">Forgie — Developer Console</h1>
-          <span className="text-[10px] font-mono uppercase tracking-widest bg-[#1A1A1A] text-white px-2 py-0.5 rounded">
-            hidden
-          </span>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-text-primary">Forgie — Developer Console</h1>
+            <span className="text-[10px] font-mono uppercase tracking-widest bg-[#1A1A1A] text-white px-2 py-0.5 rounded">
+              hidden
+            </span>
+          </div>
+
+          {instances.length > 1 && (
+            <label className="flex items-center gap-2 text-xs text-text-secondary">
+              <span className="font-mono uppercase tracking-widest text-text-muted">Company</span>
+              <select
+                value={instance}
+                onChange={(e) => setInstance(e.target.value)}
+                className="bg-surface-raised border border-border-default rounded-lg px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent-ink"
+              >
+                {instances.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         <p className="text-sm text-text-secondary mt-1">
           Every user's Forgie activity — web &amp; WhatsApp chats and the actions Forgie ran for them.
           Visible only to allowlisted developer accounts.
         </p>
+        {unavailable && (
+          <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            This company's data isn't reachable from this deployment ({unavailable}). Its schema may not
+            be provisioned here.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -161,25 +208,38 @@ export default function DevDashboardPage() {
         ))}
       </div>
 
-      {selected && <DetailPanel row={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <DetailPanel row={selected} instance={instance} onClose={() => setSelected(null)} />
+      )}
     </div>
   )
 }
 
 // ─── Detail slide-over ─────────────────────────────────────────────────────────
 
-function DetailPanel({ row, onClose }: { row: UserRow; onClose: () => void }) {
+function DetailPanel({
+  row,
+  instance,
+  onClose,
+}: {
+  row: UserRow
+  instance: string
+  onClose: () => void
+}) {
   const [detail, setDetail] = useState<Detail | null>(null)
   const [tab, setTab] = useState<'WEB' | 'WHATSAPP' | 'ACTIONS'>('WEB')
   const [openConv, setOpenConv] = useState<string | null>(null)
 
   useEffect(() => {
     void (async () => {
-      const res = await fetch(`/api/dev/forgie-usage/${row.id}`, { credentials: 'include' })
+      const res = await fetch(
+        `/api/dev/forgie-usage/${row.id}?instance=${encodeURIComponent(instance)}`,
+        { credentials: 'include' },
+      )
       const json = (await res.json()) as { data?: Detail }
       setDetail(json.data ?? null)
     })()
-  }, [row.id])
+  }, [row.id, instance])
 
   const convs = detail?.conversations ?? []
   const webConvs = convs.filter((c) => c.channel === 'WEB')

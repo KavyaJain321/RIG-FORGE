@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
 import { useAuth } from '@/hooks/useAuth'
-import { isAdminRole } from '@/lib/roles'
+import { userCan } from '@/lib/permissions'
 import { WeeklyReportEmployeeCard } from '@/components/reports/WeeklyReportEmployeeCard'
 import type {
   WeeklyReportSnapshot,
@@ -50,11 +50,11 @@ export default function ReportDetailPage() {
   const printRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!loading && user && !isAdminRole(user.role)) router.replace('/dashboard')
+    if (!loading && user && !userCan(user, 'reports.view')) router.replace('/dashboard')
   }, [user, loading, router])
 
   useEffect(() => {
-    if (!loading && user && isAdminRole(user.role) && weekId) {
+    if (!loading && user && userCan(user, 'reports.view') && weekId) {
       fetch(`/api/reports/${weekId}`)
         .then((r) => r.json())
         .then((body) => {
@@ -71,7 +71,7 @@ export default function ReportDetailPage() {
 
   // ── Loading / Error states ──────────────────────────────────────────────────
   if (loading || !user) return <Spinner />
-  if (!isAdminRole(user.role)) return null
+  if (!userCan(user, 'reports.view')) return null
   if (fetchError) return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <BackLink /><div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">{fetchError}</div>

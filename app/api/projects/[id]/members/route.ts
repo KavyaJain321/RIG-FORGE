@@ -1,7 +1,8 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { fetchProjectDetail } from '@/lib/projects'
 
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     })
     if (!project) return errorResponse('Project not found', 404)
 
-    if (!isAdminRole(payload.role)) {
+    if (!tokenCan(payload, 'projects.view_all')) {
       const membership = await prisma.projectMember.findUnique({
         where: { userId_projectId: { userId: payload.userId, projectId } },
         select: { id: true },
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid or expired token', 401)
 
-    if (!isAdminRole(payload.role)) {
+    if (!tokenCan(payload, 'projects.manage')) {
       return errorResponse('Only admins can add members to projects', 403)
     }
 

@@ -20,6 +20,8 @@ interface MemberSlideOverProps {
   onClose: () => void
   /** Called after a successful removal so the parent can refresh its list. */
   onRemoved?: (userId: string) => void
+  /** Called after a successful role change so the parent can update its list. */
+  onRoleChanged?: (userId: string, role: string) => void
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -68,7 +70,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = false, currentUserId, onClose, onRemoved }: MemberSlideOverProps) {
+export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = false, currentUserId, onClose, onRemoved, onRoleChanged }: MemberSlideOverProps) {
   // CLIENT-SIDE GUARD: employee cannot view another user's profile
   // The API also enforces this (403), but we also never open the panel
   if (memberId && !isAdmin && currentUserId && memberId !== currentUserId) {
@@ -91,6 +93,10 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
   // Remove member state
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [removing, setRemoving] = useState(false)
+
+  // Change role state
+  const [changingRole, setChangingRole] = useState(false)
+  const [customRoles, setCustomRoles] = useState<{ id: string; name: string }[]>([])
 
   const { addToast } = useToast()
 
@@ -125,6 +131,20 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
       setNotifBody('')
     }
   }, [memberId, fetchMember])
+
+  // Super-admins: load available custom roles for the assignment control.
+  useEffect(() => {
+    if (!memberId || !isSuperAdmin) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch('/api/admin/roles', { credentials: 'include' })
+        const json = (await res.json()) as ApiResponse<{ id: string; name: string }[]>
+        if (!cancelled && res.ok && json.data) setCustomRoles(json.data)
+      } catch { /* non-fatal */ }
+    })()
+    return () => { cancelled = true }
+  }, [memberId, isSuperAdmin])
 
   // ── Keyboard: Escape to close ──────────────────────────────────────────────
 
@@ -198,6 +218,62 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
     } finally {
       setRemoving(false)
       setConfirmingRemove(false)
+    }
+  }
+
+  const handleChangeRole = async (newRole: 'ADMIN' | 'EMPLOYEE') => {
+    if (!member || changingRole || member.role === newRole) return
+    setChangingRole(true)
+    try {
+      const res = await fetch(`/api/users/${member.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      })
+      const json = await res.json() as ApiResponse<{ id: string; name: string; role: string }>
+      if (!res.ok || json.error || !json.data) {
+        addToast('error', json.error ?? 'Failed to change role')
+        return
+      }
+      setMember((prev) => (prev ? { ...prev, role: json.data!.role as MemberDetail['role'] } : prev))
+      onRoleChanged?.(member.id, json.data.role)
+      addToast('success', `${member.name} is now ${json.data.role === 'ADMIN' ? 'an Admin' : 'an Employee'}`)
+    } catch {
+      addToast('error', 'Network error')
+    } finally {
+      setChangingRole(false)
+    }
+  }
+
+  const handleAssignCustomRole = async (customRoleId: string | null) => {
+    if (!member || changingRole) return
+    setChangingRole(true)
+    try {
+      const res = await fetch(`/api/users/${member.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customRoleId }),
+      })
+      const json = await res.json() as ApiResponse<{ id: string; name: string; role: string; customRoleId: string | null }>
+      if (!res.ok || json.error || !json.data) {
+        addToast('error', json.error ?? 'Failed to assign role')
+        return
+      }
+      const assigned = customRoles.find((r) => r.id === json.data!.customRoleId)
+      setMember((prev) => (prev ? {
+        ...prev,
+        role: json.data!.role as MemberDetail['role'],
+        customRoleId: json.data!.customRoleId,
+        customRoleName: assigned?.name ?? null,
+      } : prev))
+      onRoleChanged?.(member.id, json.data.role)
+      addToast('success', assigned ? `${member.name} assigned to ${assigned.name}` : `${member.name}'s custom role cleared`)
+    } catch {
+      addToast('error', 'Network error')
+    } finally {
+      setChangingRole(false)
     }
   }
 
@@ -495,6 +571,69 @@ export default function MemberSlideOver({ memberId, isAdmin, isSuperAdmin = fals
               {isAdmin && (
                 <div className="space-y-4">
                   <SectionHeading>Admin Actions</SectionHeading>
+
+                  {/* Change role — SUPER_ADMIN only. Not shown for other SUPER_ADMINs
+                       or the viewer's own profile. Toggles between EMPLOYEE and ADMIN. */}
+                  {isSuperAdmin &&
+                    member.role !== 'SUPER_ADMIN' &&
+                    member.id !== currentUserId && (
+                    <div className="forge-card p-4 space-y-3">
+                      <p className="font-mono text-xs text-secondary font-semibold tracking-wide">
+                        Change Role
+                      </p>
+                      <p className="font-mono text-[10px] text-muted leading-relaxed">
+                        Current role: <span className="text-accent-ink">{member.role}</span>
+                      </p>
+                      <div className="flex gap-2">
+                        {(['EMPLOYEE', 'ADMIN'] as const).map((r) => {
+                          const active = member.role === r
+                          return (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => void handleChangeRole(r)}
+                              disabled={changingRole || active}
+                              className={`flex-1 font-mono text-xs tracking-widest py-2 border transition-colors disabled:cursor-not-allowed ${
+                                active
+                                  ? 'border-accent text-accent-ink bg-accent/10 opacity-100'
+                                  : 'border-border-default text-secondary hover:border-accent hover:text-accent-ink disabled:opacity-40'
+                              }`}
+                            >
+                              {changingRole && !active ? '...' : r}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <p className="font-mono text-[10px] text-muted leading-relaxed">
+                        Admins can manage members, projects, tickets and reports. Takes effect on the user&apos;s next request.
+                      </p>
+
+                      {/* Custom role assignment */}
+                      {customRoles.length > 0 && (
+                        <div className="pt-1 border-t border-border-default mt-1">
+                          <p className="font-mono text-[10px] text-muted tracking-widest uppercase mt-2 mb-1.5">
+                            Custom Role
+                          </p>
+                          <select
+                            value={member.customRoleId ?? ''}
+                            onChange={(e) => void handleAssignCustomRole(e.target.value || null)}
+                            disabled={changingRole}
+                            className="w-full border border-border-default bg-background-primary px-2 py-1.5 font-mono text-xs text-primary focus:outline-none focus:border-accent disabled:opacity-40"
+                          >
+                            <option value="">— No custom role —</option>
+                            {customRoles.map((r) => (
+                              <option key={r.id} value={r.id}>{r.name}</option>
+                            ))}
+                          </select>
+                          {member.customRoleName && (
+                            <p className="font-mono text-[10px] text-accent-ink mt-1">
+                              Currently: {member.customRoleName}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Password management (not shown for SUPER_ADMIN accounts) */}
                   {member.role !== 'SUPER_ADMIN' &&

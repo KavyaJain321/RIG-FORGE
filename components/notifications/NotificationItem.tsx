@@ -9,6 +9,7 @@ function getTypeSymbol(type: string): string {
     case 'WELCOME':                return '👋'
     case 'TICKET_RAISED':         return '■'
     case 'TICKET_ACCEPTED':       return '○'
+    case 'TICKET_ASSIGNED':       return '◆'
     case 'TICKET_COMPLETED':      return '✓'
     case 'TICKET_CANCELLED':      return '✕'
     case 'TASK_ASSIGNED':         return '◆'
@@ -35,6 +36,7 @@ function getTypeColor(type: string): string {
     case 'ONBOARDING_APPROVED':   return 'text-accent-ink'
     case 'TICKET_CANCELLED':
     case 'TASK_OVERDUE':          return 'text-status-danger'
+    case 'TICKET_ASSIGNED':
     case 'TASK_ASSIGNED':
     case 'PROJECT_MEMBER_ADDED':
     case 'PROJECT_LEAD_ASSIGNED': return 'text-accent-ink'

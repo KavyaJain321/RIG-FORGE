@@ -43,8 +43,15 @@ export async function GET(request: NextRequest) {
     connectedAt: integ?.connectedAt ?? null,
     features: {
       calendar: scopes.includes('calendar.events') || scopes.includes('calendar.freebusy'),
-      gmail: scopes.includes('gmail.send') || scopes.includes('gmail.readonly'),
-      drive: scopes.includes('drive.file') || scopes.includes('drive.readonly'),
+      gmail:
+        scopes.includes('gmail.send') ||
+        scopes.includes('gmail.metadata') ||
+        scopes.includes('gmail.readonly'),
+      drive:
+        scopes.includes('drive.file') ||
+        scopes.includes('drive.metadata.readonly') ||
+        scopes.includes('drive.readonly'),
+      contacts: scopes.includes('contacts.readonly') || scopes.includes('contacts'),
     },
   })
 }

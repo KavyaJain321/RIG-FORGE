@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { comparePassword, signToken, COOKIE_NAME } from '@/lib/auth'
+import { resolveCapabilities } from '@/lib/permissions'
 import { getOrgBranding } from '@/lib/org-branding'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { istDateOnly } from '@/lib/date-ist'
@@ -17,13 +18,22 @@ export async function POST(request: NextRequest): Promise<NextResponse<ApiRespon
     if (!email || typeof email !== 'string' || email.trim().length === 0) return errorResponse('email is required', 400)
     if (!password || typeof password !== 'string' || password.length === 0) return errorResponse('password is required', 400)
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } })
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() },
+      include: { customRole: { select: { permissions: true } } },
+    })
     if (!user) return errorResponse('Invalid email or password', 401)
     if (!user.isActive) return errorResponse('Account is deactivated', 403)
     const valid = await comparePassword(password, user.passwordHash)
     if (!valid) return errorResponse('Invalid email or password', 401)
 
-    const token = signToken({ userId: user.id, email: user.email, role: user.role, isOnboarding: user.isOnboarding, mustChangePassword: user.mustChangePassword, organizationId: user.organizationId })
+    // Embed capabilities in the token ONLY for users with a custom role, so
+    // normal admins/employees keep their legacy (undefined) access shape.
+    const capabilities = user.customRole
+      ? [...resolveCapabilities(user.role, user.customRole)]
+      : undefined
+
+    const token = signToken({ userId: user.id, email: user.email, role: user.role, isOnboarding: user.isOnboarding, mustChangePassword: user.mustChangePassword, organizationId: user.organizationId, capabilities })
     if (!token) return errorResponse('Authentication service unavailable', 503)
 
     // If approved user: set WORKING + create daily activity.

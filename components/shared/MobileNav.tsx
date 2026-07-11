@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState, type ReactNode } from 'react'
 
 import { useAuthStore } from '@/store/authStore'
-import { isAdminRole } from '@/lib/roles'
+import { userCan } from '@/lib/permissions'
 
 // ── Icons (inline SVG so we don't pull an icon lib into the bundle) ──────────
 const ic = 'h-[22px] w-[22px]'
@@ -40,7 +40,7 @@ export default function MobileNav() {
 
   // Hidden until the user is approved (mirrors the desktop nav gate).
   if (!user || user.mustChangePassword) return null
-  const admin = isAdminRole(user.role)
+  const canOnboard = userCan(user, 'onboarding.approve')
 
   // 4 thumb-priority tabs + a More sheet for the rest.
   const primary: Item[] = [
@@ -53,7 +53,7 @@ export default function MobileNav() {
     { href: '/dashboard/workspace', label: 'Workspace', icon: <IconGrid /> },
     { href: '/dashboard/people', label: 'People', icon: <IconUsers /> },
     { href: '/dashboard/reports', label: 'Reports', icon: <IconReport /> },
-    admin
+    canOnboard
       ? { href: '/dashboard/onboarding', label: 'Onboarding', icon: <IconUserPlus /> }
       : { href: '/dashboard/profile', label: 'Profile', icon: <IconUser /> },
   ]

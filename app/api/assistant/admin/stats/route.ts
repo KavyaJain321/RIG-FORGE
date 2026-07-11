@@ -13,7 +13,8 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { RESERVATION_PROVIDER } from '@/lib/assistant/rate-limit'
 
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
   if (!token) return errorResponse('Authentication required', 401)
   const claims = verifyToken(token)
   if (!claims) return errorResponse('Invalid or expired session', 401)
-  if (!isAdminRole(claims.role)) return errorResponse('Admin access required', 403)
+  if (!tokenCan(claims, 'assistant.admin')) return errorResponse('Admin access required', 403)
 
   const now = new Date()
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)

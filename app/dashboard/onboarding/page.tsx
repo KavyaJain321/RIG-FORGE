@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { useAuth } from '@/hooks/useAuth'
+import { userCan } from '@/lib/permissions'
 import GenerateUserModal from '@/components/onboarding/GenerateUserModal'
 import PendingUserCard from '@/components/onboarding/PendingUserCard'
 
@@ -48,7 +49,8 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (!loading) {
       if (!user) { router.push('/login'); return }
-      if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') { router.push('/dashboard'); return }
+      // Page hosts both approvals (onboarding.approve) and user generation (members.manage).
+      if (!userCan(user, 'onboarding.approve') && !userCan(user, 'members.manage')) { router.push('/dashboard'); return }
       void fetchData()
     }
   }, [loading, user, router, fetchData])

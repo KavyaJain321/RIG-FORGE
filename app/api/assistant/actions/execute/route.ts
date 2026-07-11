@@ -27,8 +27,8 @@ import { type NextRequest } from 'next/server'
 import { z } from 'zod'
 
 import { prisma } from '@/lib/db'
-import { isAdminRole } from '@/lib/auth'
-import { authenticateActive } from '@/lib/authz'
+import { authenticateCapable } from '@/lib/authz'
+import { can } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { verifyActionToken } from '@/lib/assistant/action-token'
 
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
   // ── Auth ─────────────────────────────────────────────────────────────────
   // Re-validate role + isActive against the live DB (not just the JWT), so a
   // deactivated/demoted user can't execute privileged writes with a stale token.
-  const caller = await authenticateActive(request)
+  const caller = await authenticateCapable(request)
   if (!caller) return errorResponse('Authentication required', 401)
 
   // ── Parse + validate body ────────────────────────────────────────────────
@@ -472,7 +472,7 @@ export async function POST(request: NextRequest) {
         if (!isWhatsAppEnabled()) {
           throw new Error('WhatsApp bridge is not configured on this server.')
         }
-        if (!isAdminRole(caller.role)) {
+        if (!can(caller.capabilities, 'whatsapp.send')) {
           throw new Error('Only admins can send WhatsApp messages from Forgie.')
         }
         const a = WaSendMessageArgs.safeParse(args)
@@ -487,7 +487,7 @@ export async function POST(request: NextRequest) {
         if (!isWhatsAppEnabled()) {
           throw new Error('WhatsApp bridge is not configured on this server.')
         }
-        if (!isAdminRole(caller.role)) {
+        if (!can(caller.capabilities, 'whatsapp.send')) {
           throw new Error('Only admins can create WhatsApp groups from Forgie.')
         }
         const a = WaCreateGroupArgs.safeParse(args)
@@ -502,7 +502,7 @@ export async function POST(request: NextRequest) {
         if (!isWhatsAppEnabled()) {
           throw new Error('WhatsApp bridge is not configured on this server.')
         }
-        if (!isAdminRole(caller.role)) {
+        if (!can(caller.capabilities, 'whatsapp.send')) {
           throw new Error('Only admins can remove WhatsApp participants from Forgie.')
         }
         const a = WaRemoveParticipantsArgs.safeParse(args)
@@ -517,7 +517,7 @@ export async function POST(request: NextRequest) {
         if (!isWhatsAppEnabled()) {
           throw new Error('WhatsApp bridge is not configured on this server.')
         }
-        if (!isAdminRole(caller.role)) {
+        if (!can(caller.capabilities, 'whatsapp.send')) {
           throw new Error('Only admins can have Forgie leave WhatsApp groups.')
         }
         const a = WaLeaveGroupArgs.safeParse(args)

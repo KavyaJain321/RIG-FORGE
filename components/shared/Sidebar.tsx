@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/store/authStore'
 import { isAdminRole } from '@/lib/roles'
+import { userCan } from '@/lib/permissions'
 import LogoutLogModal from '@/components/shared/LogoutLogModal'
 import { APP_NAME } from '@/lib/branding'
 
@@ -34,6 +35,18 @@ const EMPLOYEE_NAV = [
 function isNavActive(itemHref: string, pathname: string): boolean {
   if (itemHref === '/dashboard') return pathname === '/dashboard'
   return pathname.startsWith(itemHref)
+}
+
+// Nav tabs that require a specific capability (custom roles may lack them even
+// with an admin base role). Untracked tabs are always shown.
+const NAV_CAP: Record<string, string> = {
+  '/dashboard/onboarding': 'onboarding.approve',
+}
+function visibleNav(
+  items: ReadonlyArray<{ href: string; label: string }>,
+  user: { role: string; capabilities?: string[] | null } | null | undefined,
+): { href: string; label: string }[] {
+  return items.filter((i) => !NAV_CAP[i.href] || userCan(user, NAV_CAP[i.href]))
 }
 
 function getInitials(name: string): string {
@@ -103,7 +116,7 @@ function SidebarContent({ onNavClick, onLogoutClick }: SidebarContentProps) {
   const pathname = usePathname()
   useAuth() // populates authStore
   const { user } = useAuthStore()
-  const navItems = user?.role && isAdminRole(user.role) ? ADMIN_NAV : EMPLOYEE_NAV
+  const navItems = visibleNav(user?.role && isAdminRole(user.role) ? ADMIN_NAV : EMPLOYEE_NAV, user)
 
   return (
     <div className="flex flex-col h-full">

@@ -1,6 +1,7 @@
 import { type NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
-import { verifyToken, getTokenFromCookies, isAdminRole } from '@/lib/auth'
+import { verifyToken, getTokenFromCookies } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { WeeklyReportSummary } from '@/lib/types'
 
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
 
   const currentUser = verifyToken(token)
   if (!currentUser) return errorResponse('Unauthorized', 401)
-  if (!isAdminRole(currentUser.role)) return errorResponse('Forbidden', 403)
+  if (!tokenCan(currentUser, 'reports.view')) return errorResponse('Forbidden', 403)
 
   try {
     const reports = await prisma.weeklyReport.findMany({

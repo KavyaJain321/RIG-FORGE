@@ -49,4 +49,3 @@ scripts/_*.mjs
 whatsapp-bridge/auth_info_multi/
 whatsapp-bridge/baileys_store.json
 whatsapp-bridge/.env
-.next-trijya

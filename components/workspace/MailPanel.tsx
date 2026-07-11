@@ -20,6 +20,7 @@ interface FullMsg {
   subject: string | null
   date: string | null
   body: string
+  bodyTruncatedToSnippet?: boolean
 }
 type Compose = { to: string; subject: string; body: string }
 
@@ -226,7 +227,14 @@ export default function MailPanel() {
               {forgieBusy && <p className="text-xs text-accent-ink mt-2">Forgie is thinking…</p>}
               {forgieOut && <div className="mt-2 p-2.5 rounded-lg bg-bubble-mine text-bubble-mine-ink text-sm whitespace-pre-wrap">🤖 {forgieOut}</div>}
             </div>
-            <div className="flex-1 overflow-y-auto p-5 text-sm text-text-primary whitespace-pre-wrap break-words">{selected.body}</div>
+            <div className="flex-1 overflow-y-auto p-5 text-sm text-text-primary whitespace-pre-wrap break-words">
+              {selected.bodyTruncatedToSnippet && (
+                <p className="mb-3 text-[11px] text-text-muted not-italic">
+                  Preview only — open in Gmail to read the full email.
+                </p>
+              )}
+              {selected.body}
+            </div>
           </>
         )}
       </div>

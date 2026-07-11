@@ -2,7 +2,8 @@ import { type NextRequest } from 'next/server'
 import type { Prisma, Priority, TaskStatus } from '@prisma/client'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { isMemberOfProject } from '@/lib/projects'
 import { buildTaskSummary } from '@/lib/tasks'
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
     if (!project) return errorResponse('Project not found', 400)
 
     // Only admin/super_admin or this project's lead can create tasks.
-    const isAdmin = isAdminRole(payload.role)
+    const isAdmin = tokenCan(payload, 'tasks.manage')
     const isLead  = project.leadId === payload.userId
     if (!isAdmin && !isLead) {
       return errorResponse('Only admins or the project lead can create tasks', 403)

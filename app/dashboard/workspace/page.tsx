@@ -6,12 +6,14 @@ import MailPanel from '@/components/workspace/MailPanel'
 import CodePanel from '@/components/workspace/CodePanel'
 import MeetPanel from '@/components/workspace/MeetPanel'
 import DrivePanel from '@/components/workspace/DrivePanel'
+import ContactsPanel from '@/components/workspace/ContactsPanel'
 
 const TABS = [
   { key: 'mail', label: '📬 Mail' },
   { key: 'code', label: '⌥ Code' },
   { key: 'meet', label: '📹 Meet' },
   { key: 'drive', label: '📁 Drive' },
+  { key: 'contacts', label: '👥 Contacts' },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
@@ -46,6 +48,7 @@ export default function WorkspacePage() {
       {tab === 'code' && <CodePanel />}
       {tab === 'meet' && <MeetPanel />}
       {tab === 'drive' && <DrivePanel />}
+      {tab === 'contacts' && <ContactsPanel />}
     </div>
   )
 }

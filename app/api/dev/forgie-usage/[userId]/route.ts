@@ -8,9 +8,9 @@
 
 import { type NextRequest } from 'next/server'
 
-import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken, isDeveloperEmail } from '@/lib/auth'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { getInstance, getInstanceClient } from '@/lib/dev/instances'
 
 export async function GET(
   request: NextRequest,
@@ -22,16 +22,22 @@ export async function GET(
   if (!claims) return errorResponse('Invalid or expired session', 401)
   if (!isDeveloperEmail(claims.email)) return errorResponse('Not found', 404)
 
+  // Inspect the same company/instance the list view was fetched from.
+  const instanceId = new URL(request.url).searchParams.get('instance')
+  const inst = getInstance(instanceId)
+  if (!inst) return errorResponse('Unknown instance', 400)
+  const db = getInstanceClient(inst)
+
   const { userId } = params
 
-  const user = await prisma.user.findUnique({
+  const user = await db.user.findUnique({
     where: { id: userId },
     select: { id: true, name: true, email: true, role: true, whatsappNumber: true },
   })
   if (!user) return errorResponse('User not found', 404)
 
   const [conversations, actions] = await Promise.all([
-    prisma.assistantConversation.findMany({
+    db.assistantConversation.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
       select: {
@@ -57,7 +63,7 @@ export async function GET(
         },
       },
     }),
-    prisma.assistantAuditLog.findMany({
+    db.assistantAuditLog.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 200,

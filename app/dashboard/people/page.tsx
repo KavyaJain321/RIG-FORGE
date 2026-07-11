@@ -4,8 +4,10 @@ import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 import { useAuth } from '@/hooks/useAuth'
+import { userCan } from '@/lib/permissions'
 import MemberCard from '@/components/people/MemberCard'
 import MemberSlideOver from '@/components/people/MemberSlideOver'
+import RolesManager from '@/components/people/RolesManager'
 import StatusDot from '@/components/ui/StatusDot'
 import Badge from '@/components/ui/Badge'
 import Avatar from '@/components/ui/Avatar'
@@ -57,7 +59,7 @@ function PeoplePageInner() {
   // Slide-over: driven by ?member= URL param
   // Only open if user is ADMIN or viewing own profile
   const rawSelectedId = searchParams.get('member')
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN'
+  const isAdmin = userCan(user, 'members.view')
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   // For employees, only allow slide-over for own profile
   const selectedId = isAdmin
@@ -70,6 +72,7 @@ function PeoplePageInner() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [role, setRole] = useState('')
   const [status, setStatus] = useState('')
+  const [rolesManagerOpen, setRolesManagerOpen] = useState(false)
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -159,11 +162,22 @@ function PeoplePageInner() {
               TEAM MEMBERS
             </h1>
           </div>
-          <div className="forge-card px-4 py-2 text-right">
-            <p className="font-mono font-bold text-2xl text-accent-ink forge-text-glow leading-none">
-              {total}
-            </p>
-            <p className="font-mono text-xs text-muted mt-1">ACTIVE MEMBERS</p>
+          <div className="flex items-center gap-3">
+            {isSuperAdmin && (
+              <button
+                type="button"
+                onClick={() => setRolesManagerOpen(true)}
+                className="forge-card px-4 py-2 font-mono text-xs text-accent-ink tracking-widest hover:border-accent transition-colors"
+              >
+                MANAGE ROLES
+              </button>
+            )}
+            <div className="forge-card px-4 py-2 text-right">
+              <p className="font-mono font-bold text-2xl text-accent-ink forge-text-glow leading-none">
+                {total}
+              </p>
+              <p className="font-mono text-xs text-muted mt-1">ACTIVE MEMBERS</p>
+            </div>
           </div>
         </div>
         <div className="border-t border-border-default mt-6" />
@@ -298,7 +312,18 @@ function PeoplePageInner() {
         currentUserId={user?.id}
         onClose={closeMember}
         onRemoved={(id) => setMembers((prev) => prev.filter((m) => m.id !== id))}
+        onRoleChanged={(id, role) =>
+          setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, role: role as MemberSummary['role'] } : m)))
+        }
       />
+
+      {/* ── Roles & Permissions manager (super-admin) ──────────── */}
+      {isSuperAdmin && (
+        <RolesManager
+          open={rolesManagerOpen}
+          onClose={() => setRolesManagerOpen(false)}
+        />
+      )}
     </div>
   )
 }

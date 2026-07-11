@@ -31,6 +31,14 @@ export function isGoogleReauthError(e: unknown): boolean {
   return e instanceof Error && e.message === GOOGLE_REAUTH_REQUIRED
 }
 
+// NOTE: We deliberately avoid Google's RESTRICTED scopes (gmail.readonly,
+// drive.readonly) — those trigger an annual paid CASA security assessment on
+// publish. Every scope below is at most SENSITIVE, so publishing to Production
+// needs only Google's (free) standard OAuth verification, no CASA.
+//   - gmail.metadata  → headers + snippets (NOT full bodies)
+//   - drive.metadata.readonly → list/search file metadata (NOT file contents)
+// The tradeoff (no full email-body read, no Drive file-content read) is handled
+// gracefully in lib/assistant/tools/gmail.ts + gdrive.ts.
 export const GOOGLE_SCOPES = [
   'openid',
   'email',
@@ -38,24 +46,40 @@ export const GOOGLE_SCOPES = [
   // Calendar (P7)
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/calendar.freebusy',
-  // Gmail (P8)
+  // Gmail (P8) — send + metadata-only read (sensitive, not restricted)
   'https://www.googleapis.com/auth/gmail.send',
-  'https://www.googleapis.com/auth/gmail.readonly',
-  // Drive (P8) — drive.file = only files the app creates; drive.readonly = read everything
+  'https://www.googleapis.com/auth/gmail.metadata',
+  // Drive (P8) — drive.file = only files the app creates; drive.metadata.readonly
+  // = list/search metadata of all files (sensitive, not restricted — no content read)
   'https://www.googleapis.com/auth/drive.file',
-  'https://www.googleapis.com/auth/drive.readonly',
+  'https://www.googleapis.com/auth/drive.metadata.readonly',
+  // Contacts (People API) — read-only. Sensitive scope (not restricted → no CASA).
+  'https://www.googleapis.com/auth/contacts.readonly',
 ] as const
 
 // Per-feature scope checks so we can gate tools per user when their stored
 // integration was authorized BEFORE these scopes existed (legacy connections).
 export function scopesIncludeGmail(scopes: string): boolean {
-  return scopes.includes('gmail.send') || scopes.includes('gmail.readonly')
+  // gmail.readonly kept for legacy connections authorized before the downgrade.
+  return (
+    scopes.includes('gmail.send') ||
+    scopes.includes('gmail.metadata') ||
+    scopes.includes('gmail.readonly')
+  )
 }
 export function scopesIncludeDrive(scopes: string): boolean {
-  return scopes.includes('drive.file') || scopes.includes('drive.readonly')
+  // drive.readonly kept for legacy connections authorized before the downgrade.
+  return (
+    scopes.includes('drive.file') ||
+    scopes.includes('drive.metadata.readonly') ||
+    scopes.includes('drive.readonly')
+  )
 }
 export function scopesIncludeCalendar(scopes: string): boolean {
   return scopes.includes('calendar.events') || scopes.includes('calendar.freebusy')
+}
+export function scopesIncludeContacts(scopes: string): boolean {
+  return scopes.includes('contacts.readonly') || scopes.includes('contacts')
 }
 
 export function isGoogleConfigured(): boolean {

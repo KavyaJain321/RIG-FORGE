@@ -1,7 +1,8 @@
 import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
-import { getTokenFromCookies, verifyToken, isAdminRole } from '@/lib/auth'
+import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type {
   WeeklyReportSnapshot,
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   const currentUser = verifyToken(token)
   if (!currentUser) return errorResponse('Unauthorized', 401)
-  if (!isAdminRole(currentUser.role)) return errorResponse('Forbidden', 403)
+  if (!tokenCan(currentUser, 'reports.manage')) return errorResponse('Forbidden', 403)
 
   let body: {
     type?: string

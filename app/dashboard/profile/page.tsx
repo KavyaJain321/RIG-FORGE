@@ -9,7 +9,6 @@ import { isAdminRole } from '@/lib/roles'
 import type { ApiResponse } from '@/lib/types'
 import type { ProfileResponse } from '@/app/api/users/me/profile/route'
 import GoogleConnectCard from '@/components/assistant/GoogleConnectCard'
-import WhatsappVerifyCard from '@/components/profile/WhatsappVerifyCard'
 import PersonalEmailCard from '@/components/profile/PersonalEmailCard'
 
 // ─── Day labels ────────────────────────────────────────────────────────────
@@ -262,8 +261,6 @@ export default function ProfilePage() {
 
   const {
     user: profileUser,
-    whatsappNumber,
-    whatsappVerified,
     personalEmail,
     projects,
     activityThisWeek,
@@ -329,31 +326,13 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* ── Personal Contact (WhatsApp) ──────────────────────────────── */}
+      {/* ── Personal Contact ─────────────────────────────────────────── */}
       <div className="bg-background-secondary border border-border-default p-6">
         <h2 className="font-mono text-xs tracking-widest text-text-muted mb-4">
           PERSONAL CONTACT
         </h2>
 
         <div>
-          <label className="font-mono text-[10px] text-text-muted tracking-widest block mb-2">
-            WHATSAPP NUMBER
-          </label>
-
-          <WhatsappVerifyCard
-            whatsappNumber={whatsappNumber}
-            verified={whatsappVerified}
-            onChange={() => void fetchProfile()}
-          />
-
-          <p className="font-mono text-[10px] text-text-muted mt-3">
-            Used by Forgie when admins ask it to WhatsApp you, and to recognise
-            you when you message Forgie on WhatsApp. We verify it with a one-time
-            code. Not shown to teammates.
-          </p>
-        </div>
-
-        <div className="mt-6">
           <label className="font-mono text-[10px] text-text-muted tracking-widest block mb-2">
             PERSONAL EMAIL
           </label>

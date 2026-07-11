@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { hashPassword, isAdminRole } from '@/lib/auth'
-import { authenticateActive } from '@/lib/authz'
+import { hashPassword } from '@/lib/auth'
+import { authenticateCapable } from '@/lib/authz'
+import { can } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { encryptSecret } from '@/lib/secret-box'
 import crypto from 'crypto'
@@ -28,8 +29,8 @@ function generateSecurePassword(): string {
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const payload = await authenticateActive(request)
-    if (!payload || !isAdminRole(payload.role)) return errorResponse('Admin access required', 403)
+    const payload = await authenticateCapable(request)
+    if (!payload || !can(payload.capabilities, 'members.manage')) return errorResponse('Admin access required', 403)
 
     let body: unknown
     try { body = await request.json() } catch { return errorResponse('Invalid JSON', 400) }

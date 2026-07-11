@@ -57,6 +57,7 @@ enum NotificationType {
   WELCOME
   TICKET_RAISED
   TICKET_ACCEPTED
+  TICKET_ASSIGNED
   TICKET_COMPLETED
   TICKET_CANCELLED
   TASK_ASSIGNED
@@ -113,6 +114,10 @@ model User {
   auditLogs         AssistantAuditLog[]
   dailyLogDrafts    DailyLogDraft[]
   googleIntegration GoogleIntegration?
+
+  // ── Custom roles (fine-grained permissions) ──
+  customRoleId String?
+  customRole   CustomRole? @relation(fields: [customRoleId], references: [id])
 
   // ── Native chat (Phase 1) ──
   chatMemberships      ConversationMember[] @relation("ChatMemberships")
@@ -202,6 +207,7 @@ model Ticket {
   helperId       String?
   status         TicketStatus @default(OPEN)
   createdAt      DateTime     @default(now())
+  editedAt       DateTime? // set when title/description edited after creation
   acceptedAt     DateTime?
   completedAt    DateTime?
   cancelledAt    DateTime?
@@ -725,6 +731,30 @@ model PushSubscription {
   user User @relation("PushSubs", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([organizationId])
+}
+
+// ─── Custom roles (fine-grained, per-org permissions) ──────────────────────────
+// Admin-defined roles (e.g. "Manager") that refine the coarse Role enum.
+//   - baseRole  : the enum role legacy (not-yet-capability-aware) gates fall back
+//                 to, so assigning a custom role never breaks existing checks.
+//   - permissions: capability keys (see lib/permissions.ts CAPABILITIES) that
+//                 capability-aware gates honor for finer control.
+// SUPER_ADMIN always bypasses this (full access); custom roles apply to ADMIN/
+// EMPLOYEE base users only.
+model CustomRole {
+  id             String   @id @default(cuid())
+  organizationId String   @default("rig360")
+  name           String // display name, e.g. "Manager"
+  baseRole       Role     @default(EMPLOYEE) // legacy-gate fallback
+  permissions    String[] // capability keys granted by this role
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  users User[]
+
+  @@unique([organizationId, name])
   @@index([organizationId])
 }
 
