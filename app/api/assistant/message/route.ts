@@ -29,7 +29,7 @@ import type { Role } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { errorResponse } from '@/lib/api-helpers'
-import { isAssistantEnabled, reportRateLimit } from '@/lib/llm/provider'
+import { isAssistantEnabled, reportRateLimit, reportProviderExhausted } from '@/lib/llm/provider'
 import { startStream, consumeStream } from '@/lib/llm/stream'
 import { buildSystemPrompt } from '@/lib/assistant/prompts'
 import { getOrgId } from '@/lib/tenant-context'
@@ -280,7 +280,12 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
         // mid-response would be jarring.
         let fullText = ''
         let metadata: Awaited<ReturnType<typeof consumeStream>> | null = null
-        const STREAM_ATTEMPT_BUDGET = 6
+        // MUST exceed the TOTAL number of API keys across all providers, or a
+        // provider whose keys all fail the same way (e.g. Groq's 12k TPM 413)
+        // consumes the budget before the next provider (Gemini) is ever reached
+        // — silently breaking cross-provider fallback. 11 keys today (1 local +
+        // 5 groq + 5 gemini); 16 leaves margin.
+        const STREAM_ATTEMPT_BUDGET = 16
         const failureLog: Array<{ provider: string; reason: string }> = []
 
         for (let attempt = 0; attempt < STREAM_ATTEMPT_BUDGET; attempt++) {
@@ -298,7 +303,19 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
               fullText += delta
               write(controller, { type: 'text', delta })
             })
-            // Success — stream completed without throwing.
+            // Empty output with no tool call = the model produced nothing usable
+            // (small local models occasionally stall on the big tool prompt).
+            // Nothing was streamed to the client yet, so treat it as a soft
+            // failure and try the NEXT provider rather than surfacing a nudge.
+            const producedNothing =
+              fullText.trim().length === 0 && (metadata.toolCalls?.length ?? 0) === 0
+            if (producedNothing) {
+              failureLog.push({ provider: start.provider, reason: 'empty_output' })
+              reportRateLimit(start.provider, start.apiKey)
+              metadata = null
+              continue
+            }
+            // Success — stream completed with usable content.
             break
           } catch (err) {
             const reason = err instanceof Error ? err.message : String(err)
@@ -308,9 +325,14 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
               `errored ${fullText ? `after ${fullText.length} chars — committing partial response` : 'before any text — retrying'}: ${reason.slice(0, 200)}`,
             )
 
-            // Mark this specific key cooling so the next attempt picks
-            // a different key (or falls through to the next provider).
-            reportRateLimit(start.provider, start.apiKey)
+            // Provider-wide failures (413 "request too large" / TPM cap) can't be
+            // fixed by another key — cool the WHOLE provider and jump to the next.
+            // Otherwise just cool this key.
+            if (/request too large|tokens per minute|context length|too many tokens|\b413\b/i.test(reason)) {
+              reportProviderExhausted(start.provider)
+            } else {
+              reportRateLimit(start.provider, start.apiKey)
+            }
 
             if (fullText.length > 0) {
               // Some content already shown to the user — don't restart from

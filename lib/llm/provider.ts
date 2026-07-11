@@ -20,7 +20,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
 
-export type ProviderName = 'groq' | 'gemini' | 'cerebras'
+export type ProviderName = 'local' | 'groq' | 'gemini' | 'cerebras'
 
 const COOLDOWN_MS = 60_000  // mark a key cool for 60s after a 429
 
@@ -53,6 +53,39 @@ let pools: Map<ProviderName, ProviderPool> | null = null
 
 function initPools(): Map<ProviderName, ProviderPool> {
   const map = new Map<ProviderName, ProviderPool>()
+
+  // ── Local self-hosted LLM (vLLM on TRIJYA-3, OpenAI-compatible) ──
+  // The fast, private, unlimited primary. Enabled by pointing LOCAL_LLM_BASE_URL
+  // at the vLLM server (e.g. http://100.86.39.4:8000/v1). vLLM doesn't require a
+  // real API key; LOCAL_LLM_API_KEY defaults to a placeholder. When the GPU box
+  // is offline/preempted the call errors and the router falls through to the
+  // cloud providers automatically — no code path is a hard dependency on it.
+  const localBaseURL = process.env.LOCAL_LLM_BASE_URL?.trim()
+  if (localBaseURL) {
+    const localKey = process.env.LOCAL_LLM_API_KEY?.trim() || 'sk-local'
+    // Hard cap on a local call so a hung/unreachable box (e.g. Ollama down but
+    // the machine still up → the port silently drops packets) fails FAST and the
+    // router falls through to the cloud, instead of hanging ~20s. Local warm
+    // generations finish in <2s, so this headroom never truncates a real reply.
+    const localTimeoutMs = Number(process.env.LOCAL_LLM_TIMEOUT_MS ?? 12_000)
+    const localFetch: typeof fetch = (input, init) => {
+      const signals = [init?.signal, AbortSignal.timeout(localTimeoutMs)].filter(Boolean) as AbortSignal[]
+      return fetch(input, { ...init, signal: AbortSignal.any(signals) })
+    }
+    map.set('local', {
+      name: 'local',
+      keys: [{ key: localKey, cooldownUntil: 0 }],
+      cursor: 0,
+      model: process.env.LOCAL_LLM_MODEL ?? 'forgie',
+      buildModel: (apiKey, modelName) =>
+        createOpenAICompatible({
+          name: 'local',
+          apiKey,
+          baseURL: localBaseURL,
+          fetch: localFetch,
+        })(modelName),
+    })
+  }
 
   const groqKeys = parseKeyList(process.env.GROQ_API_KEYS)
   if (groqKeys.length > 0) {
@@ -108,11 +141,12 @@ export function isAssistantEnabled(): boolean {
 }
 
 export function getProviderOrder(): ProviderName[] {
-  const raw = process.env.ASSISTANT_PROVIDER_ORDER ?? 'groq,gemini,cerebras'
+  // Local first when configured, then the cloud fallbacks.
+  const raw = process.env.ASSISTANT_PROVIDER_ORDER ?? 'local,groq,gemini,cerebras'
   return raw
     .split(',')
     .map((s) => s.trim().toLowerCase())
-    .filter((s): s is ProviderName => s === 'groq' || s === 'gemini' || s === 'cerebras')
+    .filter((s): s is ProviderName => s === 'local' || s === 'groq' || s === 'gemini' || s === 'cerebras')
 }
 
 // Pick the next available key in a pool. Returns null if all are cooling down.
@@ -171,6 +205,20 @@ export function selectNextModel(): SelectedModel | null {
 export function reportRateLimit(provider: ProviderName, apiKey: string): void {
   const pool = getPools().get(provider)
   if (pool) markKeyRateLimited(pool, apiKey)
+}
+
+/**
+ * Cool DOWN an entire provider (all its keys) for one cooldown window. Use for
+ * provider-wide failures that another key can't fix — e.g. Groq's "request too
+ * large" 413 (every key shares the same per-model TPM cap). Without this the
+ * router wastes an attempt per key and can burn its whole budget before
+ * reaching the next provider.
+ */
+export function reportProviderExhausted(provider: ProviderName): void {
+  const pool = getPools().get(provider)
+  if (!pool) return
+  const until = Date.now() + COOLDOWN_MS
+  for (const k of pool.keys) k.cooldownUntil = until
 }
 
 // ─── Diagnostics (for admin debug UI later) ──────────────────────────────────

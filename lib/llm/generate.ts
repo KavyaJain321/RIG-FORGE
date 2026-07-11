@@ -44,6 +44,9 @@ export interface GenerateResult {
 // exits early as soon as selectNextModel() returns null.
 const MAX_FALLBACK_ATTEMPTS = 10
 const MAX_TOOL_STEPS = 3         // up to 3 tool calls per LLM turn
+// Phase-0 reliability guardrails (see lib/llm/stream.ts).
+const MAX_OUTPUT_TOKENS = Number(process.env.ASSISTANT_MAX_OUTPUT_TOKENS ?? 800)
+const REQUEST_TIMEOUT_MS = Number(process.env.ASSISTANT_REQUEST_TIMEOUT_MS ?? 45_000)
 
 export interface GenerateOptions {
   /** Optional tools the LLM may call mid-generation. */
@@ -89,6 +92,8 @@ export async function generate(
           ...(systemText && { system: systemText }),
           messages: convo,
           temperature: 0.85,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
           ...(options.tools && {
             tools: options.tools,
             stopWhen: stepCountIs(MAX_TOOL_STEPS),
@@ -106,6 +111,8 @@ export async function generate(
           ...(systemText && { system: systemText }),
           messages: convo,
           temperature: 0.85,
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         })
       }
 

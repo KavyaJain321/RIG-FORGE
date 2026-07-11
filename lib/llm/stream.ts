@@ -41,6 +41,16 @@ const MAX_FALLBACK_ATTEMPTS = 10
 // Capping at 3 caused the model to stall mid-chain and produce no text at all.
 const MAX_TOOL_STEPS = 6
 
+// ── Phase-0 reliability guardrails ──────────────────────────────────────────
+// Cap output so a runaway generation can't stream for minutes (avg output is
+// ~200 tokens; 800 is generous headroom). Env-overridable.
+const MAX_OUTPUT_TOKENS = Number(process.env.ASSISTANT_MAX_OUTPUT_TOKENS ?? 800)
+// Hard per-attempt wall-clock budget for the whole agentic turn. Aborts the
+// pathological long tail (prod saw p95 ~111s, max ~10min) without hurting
+// normal turns (<25s). If it aborts before any text, the caller falls to the
+// next provider; once text has streamed, mid-stream abort just ends cleanly.
+const REQUEST_TIMEOUT_MS = Number(process.env.ASSISTANT_REQUEST_TIMEOUT_MS ?? 45_000)
+
 export interface StreamMetadata {
   provider: ProviderName
   model: string
@@ -108,6 +118,8 @@ export async function startStream(
         ...(systemText && { system: systemText }),
         messages: convo,
         temperature: 0.85,
+        maxOutputTokens: MAX_OUTPUT_TOKENS,
+        abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         ...(options.tools && {
           tools: options.tools,
           stopWhen: stepCountIs(MAX_TOOL_STEPS),

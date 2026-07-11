@@ -25,6 +25,8 @@ import { prisma } from '@/lib/db'
 import { generate } from '@/lib/llm/generate'
 
 import { buildForgieContext, renderContextBlock } from './context'
+import { tryRuleAnswer } from './rules'
+import type { GenerateResult } from '@/lib/llm/generate'
 import { buildSystemPrompt } from './prompts'
 import { getOrgId } from '@/lib/tenant-context'
 import { getOrgIdentity } from '@/lib/org-branding'
@@ -255,42 +257,54 @@ export async function handleIncomingWhatsapp(
       userRole: user.role,
     })
 
-    const brand = await getOrgIdentity(getOrgId())
-    const systemPrompt = [
-      buildSystemPrompt({ id: user.id, name: user.name, role: user.role as Role }, brand),
-      '',
-      renderContextBlock(context),
-      '',
-      WA_TOOL_GUIDANCE,
-      '',
-      WA_REPLY_GUIDANCE,
-    ].join('\n')
+    // Rule-first fast lane (Phase 1): deterministic answer to common safe reads,
+    // no LLM. Same engine as web chat. Null → fall through to the model.
+    const ruleAnswer = tryRuleAnswer(userBody, context)
 
-    const allTools = await buildAllToolsAsync({ userId: user.id, role: user.role })
-    const tools = readOnly(allTools)
+    let result: GenerateResult
+    if (ruleAnswer) {
+      result = {
+        text: ruleAnswer, provider: 'rule' as GenerateResult['provider'], model: 'rule',
+        inputTokens: null, outputTokens: null, latencyMs: 0, fallback: false, toolCalls: [],
+      }
+    } else {
+      const brand = await getOrgIdentity(getOrgId())
+      const systemPrompt = [
+        buildSystemPrompt({ id: user.id, name: user.name, role: user.role as Role }, brand),
+        '',
+        renderContextBlock(context),
+        '',
+        WA_TOOL_GUIDANCE,
+        '',
+        WA_REPLY_GUIDANCE,
+      ].join('\n')
 
-    // Step 7 — load the last few exchanges so Forgie has memory.
-    const history = await prisma.assistantMessage.findMany({
-      where: {
-        conversationId: conversation.id,
-        role: { in: ['USER', 'ASSISTANT'] },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: MAX_HISTORY_MESSAGES,
-      select: { role: true, content: true },
-    })
-    const ordered = history.reverse()
+      const allTools = await buildAllToolsAsync({ userId: user.id, role: user.role })
+      const tools = readOnly(allTools)
 
-    const messages: ModelMessage[] = [
-      { role: 'system', content: systemPrompt },
-      ...ordered.map((m) => ({
-        role: (m.role === 'USER' ? 'user' : 'assistant') as 'user' | 'assistant',
-        content: m.content,
-      })),
-    ]
+      // Step 7 — load the last few exchanges so Forgie has memory.
+      const history = await prisma.assistantMessage.findMany({
+        where: {
+          conversationId: conversation.id,
+          role: { in: ['USER', 'ASSISTANT'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: MAX_HISTORY_MESSAGES,
+        select: { role: true, content: true },
+      })
+      const ordered = history.reverse()
 
-    // Step 8 — call the LLM.
-    const result = await generate(messages, { tools })
+      const messages: ModelMessage[] = [
+        { role: 'system', content: systemPrompt },
+        ...ordered.map((m) => ({
+          role: (m.role === 'USER' ? 'user' : 'assistant') as 'user' | 'assistant',
+          content: m.content,
+        })),
+      ]
+
+      // Step 8 — call the LLM.
+      result = await generate(messages, { tools })
+    }
 
     // Step 9 — persist the assistant message + usage. Bookkeeping mistakes
     // shouldn't block the reply going out, so .catch() each one.

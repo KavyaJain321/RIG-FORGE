@@ -200,7 +200,7 @@ comes from the live database. Treat anything outside this block as
 unknown — don't invent details.
 
 \`\`\`json
-${JSON.stringify(ctx, null, 2)}
+${JSON.stringify(ctx)}
 \`\`\`
 
 A few notes on reading this:
