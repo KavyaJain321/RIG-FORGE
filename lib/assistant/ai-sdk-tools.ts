@@ -580,6 +580,40 @@ export async function buildAllToolsAsync(caller: ToolUser): Promise<ToolSet> {
   return base
 }
 
+// ─── Query-relevance tool subsetting ─────────────────────────────────────────
+// The full tool set is ~45 schemas (~8k tokens) re-sent every agentic step —
+// the dominant driver of Forgie's input-token bloat and latency. Core project/
+// task/ticket/member/chat tools are ALWAYS available; the heavier integration
+// groups (GitHub, Calendar, Gmail, Drive, WhatsApp) are included only when the
+// user's message actually mentions them. Degrades gracefully (a missing tool
+// makes Forgie ask/decline, never crash) and can be fully disabled at runtime
+// with ASSISTANT_DISABLE_TOOL_SUBSET=true.
+const TOOL_GROUPS: Array<{ prefixes: string[]; trigger: RegExp }> = [
+  { prefixes: ['gh_', 'propose_gh_'], trigger: /\b(git|github|repo|repos|repositor\w*|commit|commits|pull[ -]?request|\bprs?\b|branch\w*|issue|issues|codebase|source code|merge)\b/i },
+  { prefixes: ['gcal_', 'propose_gcal_'], trigger: /\b(calendar|meeting|meet|schedul\w*|event|invite|availabilit\w*|free[ -]?time|free\/busy|appointment|reschedul\w*)\b/i },
+  { prefixes: ['gmail_', 'propose_gmail_'], trigger: /\b(e-?mail|mail|inbox|gmail|reply|draft|compose)\b/i },
+  { prefixes: ['drive_', 'propose_drive_'], trigger: /\b(drive|file|files|folder|folders|document|\bdocs?\b|upload|attachment|spreadsheet|sheet)\b/i },
+  { prefixes: ['wa_', 'propose_wa_'], trigger: /\b(whatsapp|whats app|\bwa\b|broadcast)\b/i },
+]
+
+export function selectRelevantTools(all: ToolSet, query: string): ToolSet {
+  if (process.env.ASSISTANT_DISABLE_TOOL_SUBSET === 'true') return all
+  const q = query ?? ''
+  const optionalPrefixes = TOOL_GROUPS.flatMap((g) => g.prefixes)
+  const isOptional = (name: string) => optionalPrefixes.some((p) => name.startsWith(p))
+  const activePrefixes = new Set<string>()
+  for (const g of TOOL_GROUPS) {
+    if (g.trigger.test(q)) g.prefixes.forEach((p) => activePrefixes.add(p))
+  }
+  const out: ToolSet = {}
+  for (const [name, t] of Object.entries(all)) {
+    if (!isOptional(name) || [...activePrefixes].some((p) => name.startsWith(p))) {
+      out[name] = t
+    }
+  }
+  return out
+}
+
 // ─── Google Calendar tools (per-user) ────────────────────────────────────────
 
 function buildGcalTools(caller: ToolUser): ToolSet {

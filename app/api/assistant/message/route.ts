@@ -39,7 +39,7 @@ import { tryRuleAnswer, classifyFast, matchHelp, matchGreeting, normalize } from
 import { reserveRateLimit, recordUsage } from '@/lib/assistant/rate-limit'
 import { lookupCache, storeCache, maybeSweepCache } from '@/lib/assistant/cache'
 import { isCacheableResponse } from '@/lib/assistant/cache-guard'
-import { buildAllToolsAsync, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
+import { buildAllToolsAsync, selectRelevantTools, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
 import { signActionToken } from '@/lib/assistant/action-token'
 
 const MAX_HISTORY_MESSAGES = 10
@@ -307,6 +307,18 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
           userId: args.user.id,
           role: args.user.role,
         })
+        // Trim to the tool groups relevant to this message — core tools always
+        // stay; integration groups (GitHub/Calendar/Gmail/Drive/WhatsApp) only
+        // when mentioned. Cuts the re-sent input payload roughly in half for the
+        // common case, which is the main latency lever for tool-path queries.
+        const tools = selectRelevantTools(allTools, args.content)
+        // Action/tool-likely messages should avoid Groq (it hangs the agentic
+        // continuation after a tool call). Plain informational turns keep Groq
+        // first for speed. Heuristic: a write/action verb or an integration verb.
+        const deprioritizeGroq =
+          /\b(create|add|make|new|raise|open|schedule|book|invite|send|email|mail|dm|ping|message|notify|assign|reassign|update|change|edit|rename|set|move|mark|resolve|close|complete|archive|promote|demote|remove|delete|start a call|call|leave|remove)\b/i.test(
+            args.content,
+          )
 
         // streamText() never throws synchronously — the actual API call (and
         // any 429 / auth / network error) surfaces when the textStream is
@@ -326,7 +338,7 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
         const failureLog: Array<{ provider: string; reason: string }> = []
 
         for (let attempt = 0; attempt < STREAM_ATTEMPT_BUDGET; attempt++) {
-          const start = await startStream(messages, { tools: allTools })
+          const start = await startStream(messages, { tools, deprioritizeGroq })
 
           if (!start.success) {
             // All providers exhausted (synchronously). Fall through to the

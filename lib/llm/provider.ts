@@ -190,8 +190,16 @@ export interface SelectedModel {
   apiKey: string
 }
 
-export function selectNextModel(): SelectedModel | null {
-  const order = getProviderOrder()
+export function selectNextModel(opts?: { deprioritize?: ProviderName[] }): SelectedModel | null {
+  let order = getProviderOrder()
+  // Move certain providers to the back without dropping them (still a last
+  // resort). Used to keep Groq off the tool-calling path — Groq streams the
+  // first tool step fine but hangs the agentic CONTINUATION (feeding the tool
+  // result back) until the request timeout, so tool turns prefer local/Gemini.
+  if (opts?.deprioritize?.length) {
+    const demote = new Set(opts.deprioritize)
+    order = [...order.filter((p) => !demote.has(p)), ...order.filter((p) => demote.has(p))]
+  }
   const map = getPools()
 
   for (const providerName of order) {

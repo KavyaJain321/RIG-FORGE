@@ -82,6 +82,11 @@ export type StreamStart =
 
 export interface StreamOptions {
   tools?: ToolSet
+  // Push Groq to the back of the provider order for this turn. Set for
+  // action/tool-likely messages: Groq streams the first tool step but hangs
+  // the agentic continuation until the request timeout, so those turns prefer
+  // local/Gemini. Groq stays first for plain informational/text turns.
+  deprioritizeGroq?: boolean
 }
 
 /**
@@ -107,7 +112,7 @@ export async function startStream(
   const convo = messages.filter((m) => m.role !== 'system')
 
   for (let attempt = 0; attempt < MAX_FALLBACK_ATTEMPTS; attempt++) {
-    const selection = selectNextModel()
+    const selection = selectNextModel(options.deprioritizeGroq ? { deprioritize: ['groq'] } : undefined)
     if (!selection) {
       return { success: false, reason: 'all_keys_cooling_down' }
     }
@@ -228,5 +233,16 @@ function extractSystem(messages: ModelMessage[]): string | undefined {
 function errMsg(err: unknown): string {
   if (!err) return 'unknown'
   if (err instanceof Error) return err.message.split('\n')[0]?.slice(0, 200) ?? err.message
+  // AI SDK sometimes surfaces a plain object (e.g. { error: {...} }); String()
+  // on it yields a useless "[object Object]", so JSON-serialize instead.
+  if (typeof err === 'object') {
+    try {
+      const anyErr = err as Record<string, unknown>
+      const nested = anyErr.error ?? anyErr.data ?? anyErr
+      return JSON.stringify(nested).slice(0, 300)
+    } catch {
+      return String(err).slice(0, 200)
+    }
+  }
   return String(err).slice(0, 200)
 }
