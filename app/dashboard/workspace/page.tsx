@@ -20,6 +20,21 @@ type TabKey = (typeof TABS)[number]['key']
 
 export default function WorkspacePage() {
   const [tab, setTab] = useState<TabKey>('mail')
+  // GitHub is owned by a single org; others (e.g. Trijya) don't get it. Hide
+  // the Code tab entirely for them. Starts hidden until confirmed to avoid a
+  // show-then-remove flicker.
+  const [githubEnabled, setGithubEnabled] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    fetch('/api/github/status', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j) => { if (alive) setGithubEnabled(!!j?.data?.enabled) })
+      .catch(() => { if (alive) setGithubEnabled(false) })
+    return () => { alive = false }
+  }, [])
+
+  const tabs = TABS.filter((t) => t.key !== 'code' || githubEnabled)
 
   // An invite link (?call=<room>) drops the user straight onto the Meet tab.
   useEffect(() => {
@@ -30,7 +45,7 @@ export default function WorkspacePage() {
     <div className="p-4 sm:p-6 max-w-[1400px] mx-auto">
       <h1 className="font-mono text-xs uppercase tracking-widest text-text-secondary mb-3">Workspace</h1>
       <div className="flex gap-1 mb-4 border-b border-border-default">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.key}
             type="button"
