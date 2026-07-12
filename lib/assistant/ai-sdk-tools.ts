@@ -23,6 +23,8 @@ import * as gcal from './tools/gcal'
 import * as gmail from './tools/gmail'
 import * as gdrive from './tools/gdrive'
 import * as whatsapp from './tools/whatsapp'
+import { buildNasTools } from './tools/nas'
+import { isNasEnabled as isNasEnabledForOrg } from '@/lib/nas/client'
 import { isAdminRole } from '@/lib/auth'
 import { APP_NAME_UPPER } from '@/lib/branding'
 import type { ToolUser } from './tools/projects'
@@ -577,6 +579,11 @@ export async function buildAllToolsAsync(caller: ToolUser): Promise<ToolSet> {
     Object.assign(base, buildWhatsappTools())
   }
 
+  // NAS (office file server) tools — only for the NAS-owning org (Trijya).
+  if (isNasEnabledForOrg()) {
+    Object.assign(base, buildNasTools())
+  }
+
   return base
 }
 
@@ -594,7 +601,17 @@ const TOOL_GROUPS: Array<{ prefixes: string[]; trigger: RegExp }> = [
   { prefixes: ['gmail_', 'propose_gmail_'], trigger: /\b(e-?mail|mail|inbox|gmail|reply|draft|compose)\b/i },
   { prefixes: ['drive_', 'propose_drive_'], trigger: /\b(drive|file|files|folder|folders|document|\bdocs?\b|upload|attachment|spreadsheet|sheet)\b/i },
   { prefixes: ['wa_', 'propose_wa_'], trigger: /\b(whatsapp|whats app|\bwa\b|broadcast)\b/i },
+  { prefixes: ['nas_'], trigger: /\b(nas|file|files|folder|folders|document|\bdocs?\b|drawing|drawings|dwg|revit|\bcad\b|blueprint|floor ?plan|elevation|render|renders|spec|specs|drive|project files|on the server)\b/i },
 ]
+
+// Name prefixes of the optional (integration) tool groups. A query whose tool
+// set includes any of these is tool-invoking (GitHub/Calendar/Gmail/Drive/
+// WhatsApp/NAS) and should avoid Groq, which hangs the agentic continuation.
+export const OPTIONAL_TOOL_PREFIXES: string[] = TOOL_GROUPS.flatMap((g) => g.prefixes)
+
+export function usesIntegrationTools(tools: ToolSet): boolean {
+  return Object.keys(tools).some((name) => OPTIONAL_TOOL_PREFIXES.some((p) => name.startsWith(p)))
+}
 
 export function selectRelevantTools(all: ToolSet, query: string): ToolSet {
   if (process.env.ASSISTANT_DISABLE_TOOL_SUBSET === 'true') return all

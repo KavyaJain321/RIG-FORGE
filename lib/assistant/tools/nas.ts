@@ -1,0 +1,84 @@
+/**
+ * Forgie NAS tools — let the assistant browse, search, and READ files on the
+ * Trijya office NAS units (via the connector at TRIJYA_NAS_BASE_URL). Gated by
+ * isNasEnabled() so only the NAS-owning org (Trijya) ever gets them. Read
+ * supports text + spreadsheets today; other binaries return metadata.
+ */
+import { tool, type ToolSet } from 'ai'
+import { z } from 'zod'
+
+import { isNasEnabled, nasList, nasSearch, nasServers, nasFetchBytes } from '@/lib/nas/client'
+import { extractText } from '@/lib/nas/extract'
+
+export function buildNasTools(): ToolSet {
+  return {
+    nas_list: tool({
+      description:
+        'List folders and files in a directory on a Trijya NAS drive. Use to browse project files. `server` is a NAS label (omit to list the available NAS drives). `path` defaults to the root "/".',
+      inputSchema: z.object({
+        server: z.string().optional().describe('NAS label, e.g. "WD" or "Seagate". Omit to list drives.'),
+        path: z.string().optional().describe('Folder path, e.g. "/01 ARCHITECTURE". Defaults to "/".'),
+      }),
+      execute: async ({ server, path }) => {
+        if (!isNasEnabled()) return { error: 'NAS not available' }
+        try {
+          if (!server) {
+            const servers = await nasServers()
+            return { drives: servers.map((s) => s.label), hint: 'Call nas_list again with a server to browse it.' }
+          }
+          const r = await nasList(server, path || '/')
+          return {
+            server,
+            path: r.path,
+            items: r.items.slice(0, 100).map((i) => ({ name: i.name, type: i.isDir ? 'folder' : 'file', size: i.size })),
+          }
+        } catch (e) {
+          return { error: e instanceof Error ? e.message : 'list failed' }
+        }
+      },
+    }),
+
+    nas_search: tool({
+      description:
+        'Search the Trijya NAS for files/folders whose NAME contains the query. Searches all NAS drives if `server` is omitted. Returns matching paths — follow up with nas_read to read a file.',
+      inputSchema: z.object({
+        query: z.string().describe('Filename text to search for, e.g. "windlass" or "floor plan".'),
+        server: z.string().optional().describe('Restrict to one NAS label; omit to search all.'),
+      }),
+      execute: async ({ query, server }) => {
+        if (!isNasEnabled()) return { error: 'NAS not available' }
+        try {
+          const targets = server ? [server] : (await nasServers()).map((s) => s.label)
+          const all: Array<{ server: string; name: string; path: string; type: string; size: number }> = []
+          for (const t of targets) {
+            const r = await nasSearch(t, query, { limit: 30 })
+            for (const h of r.results) all.push({ server: t, name: h.name, path: h.path, type: h.isDir ? 'folder' : 'file', size: h.size })
+            if (all.length >= 50) break
+          }
+          return { query, matches: all.slice(0, 50) }
+        } catch (e) {
+          return { error: e instanceof Error ? e.message : 'search failed' }
+        }
+      },
+    }),
+
+    nas_read: tool({
+      description:
+        'Read the text content of a file on a Trijya NAS (text files and spreadsheets). Use the exact `server` + `path` from nas_search or nas_list. Returns extracted text so you can answer questions about the file.',
+      inputSchema: z.object({
+        server: z.string().describe('NAS label, e.g. "WD".'),
+        path: z.string().describe('Full file path, e.g. "/01 ARCHITECTURE/spec.txt".'),
+      }),
+      execute: async ({ server, path }) => {
+        if (!isNasEnabled()) return { error: 'NAS not available' }
+        try {
+          const buf = await nasFetchBytes(server, path)
+          const text = await extractText(path, buf)
+          return { server, path, bytes: buf.length, content: text }
+        } catch (e) {
+          return { error: e instanceof Error ? e.message : 'read failed' }
+        }
+      },
+    }),
+  }
+}

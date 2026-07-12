@@ -82,11 +82,13 @@ export type StreamStart =
 
 export interface StreamOptions {
   tools?: ToolSet
-  // Push Groq to the back of the provider order for this turn. Set for
-  // action/tool-likely messages: Groq streams the first tool step but hangs
-  // the agentic continuation until the request timeout, so those turns prefer
-  // local/Gemini. Groq stays first for plain informational/text turns.
-  deprioritizeGroq?: boolean
+  // Providers to push to the BACK of the order for this turn (still usable as a
+  // last resort). Used to keep providers that mishandle a given turn off the
+  // front: Groq hangs the agentic continuation after any tool call, and the
+  // small local models can't reliably do the search-then-summarize flow that
+  // read-integration tools (nas_search, gh_list, …) need. Chat + simple
+  // proposals leave this empty so the fast local model stays first.
+  deprioritize?: ProviderName[]
 }
 
 /**
@@ -112,7 +114,9 @@ export async function startStream(
   const convo = messages.filter((m) => m.role !== 'system')
 
   for (let attempt = 0; attempt < MAX_FALLBACK_ATTEMPTS; attempt++) {
-    const selection = selectNextModel(options.deprioritizeGroq ? { deprioritize: ['groq'] } : undefined)
+    const selection = selectNextModel(
+      options.deprioritize?.length ? { deprioritize: options.deprioritize } : undefined,
+    )
     if (!selection) {
       return { success: false, reason: 'all_keys_cooling_down' }
     }

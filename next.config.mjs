@@ -24,6 +24,12 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+
+  // pdf-parse (used to read NAS PDFs) is a CommonJS lib that must run at
+  // runtime, not be bundled/transpiled by webpack.
+  experimental: {
+    serverComponentsExternalPackages: ['pdf-parse'],
+  },
 }
 
 export default nextConfig

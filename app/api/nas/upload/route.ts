@@ -1,0 +1,39 @@
+import { type NextRequest } from 'next/server'
+
+import { getTokenFromCookies, verifyToken } from '@/lib/auth'
+import { successResponse, errorResponse } from '@/lib/api-helpers'
+import { isNasEnabled, nasUpload } from '@/lib/nas/client'
+
+export const runtime = 'nodejs'
+// Allow large-ish uploads (drawings/PDFs). Next caps body at 4MB by default for
+// route handlers only via config; App Router streams FormData so this is fine.
+export const maxDuration = 120
+
+// POST /api/nas/upload?server=WD&path=/folder  (multipart form, field "file")
+export async function POST(request: NextRequest) {
+  const token = getTokenFromCookies(request)
+  if (!token) return errorResponse('Authentication required', 401)
+  if (!verifyToken(token)) return errorResponse('Invalid or expired session', 401)
+  if (!isNasEnabled()) return errorResponse('NAS is not available', 403)
+
+  const { searchParams } = new URL(request.url)
+  const server = searchParams.get('server')
+  const path = searchParams.get('path') || '/'
+  if (!server) return errorResponse('server is required', 400)
+
+  let form: FormData
+  try {
+    form = await request.formData()
+  } catch {
+    return errorResponse('Expected multipart form data', 400)
+  }
+  const file = form.get('file')
+  if (!(file instanceof File)) return errorResponse('file field is required', 400)
+
+  try {
+    const res = await nasUpload(server, path, file, file.name)
+    return successResponse(res)
+  } catch (e) {
+    return errorResponse(e instanceof Error ? e.message : 'NAS upload failed', 502)
+  }
+}

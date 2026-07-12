@@ -29,7 +29,7 @@ import type { Role } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { errorResponse } from '@/lib/api-helpers'
-import { isAssistantEnabled, reportRateLimit, reportProviderExhausted } from '@/lib/llm/provider'
+import { isAssistantEnabled, reportRateLimit, reportProviderExhausted, type ProviderName } from '@/lib/llm/provider'
 import { startStream, consumeStream } from '@/lib/llm/stream'
 import { buildSystemPrompt } from '@/lib/assistant/prompts'
 import { getOrgId } from '@/lib/tenant-context'
@@ -39,8 +39,9 @@ import { tryRuleAnswer, classifyFast, matchHelp, matchGreeting, normalize } from
 import { reserveRateLimit, recordUsage } from '@/lib/assistant/rate-limit'
 import { lookupCache, storeCache, maybeSweepCache } from '@/lib/assistant/cache'
 import { isCacheableResponse } from '@/lib/assistant/cache-guard'
-import { buildAllToolsAsync, selectRelevantTools, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
+import { buildAllToolsAsync, selectRelevantTools, usesIntegrationTools, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
 import { signActionToken } from '@/lib/assistant/action-token'
+import { tryNasFastLane, tryNasReadIntent } from '@/lib/nas/fastlane'
 
 const MAX_HISTORY_MESSAGES = 10
 
@@ -168,10 +169,79 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
           return
         }
 
-        // ── Cache check (only on fresh conversations) ──────────────────────
         const priorCount = await prisma.assistantMessage.count({
           where: { conversationId: args.conversationId, role: { in: ['USER', 'ASSISTANT'] } },
         })
+
+        // ── NAS search fast-lane (pre-LLM, pre-cache) ──────────────────────
+        // "find <term> on the NAS" answers straight from the connector's
+        // filename index in ~ms, no LLM. Runs before the cache so file results
+        // are always fresh. Only fires for the NAS-owning org and clear
+        // file-search phrasing; anything else returns null.
+        const nasFast = await tryNasFastLane(args.content)
+        if (nasFast) {
+          write(controller, { type: 'text', delta: nasFast })
+          write(controller, {
+            type: 'done', provider: 'nas', model: 'nas-index',
+            fallback: false, latencyMs: 0, pendingActions: [], toolsUsed: ['nas_search'],
+          })
+          await persistAssistant(args.conversationId, nasFast, { provider: 'nas', model: 'nas-index' })
+          await maybeAutoTitle(args.conversationId, args.content, priorCount)
+          controller.close()
+          return
+        }
+
+        // ── NAS read fast-path (single no-tools LLM call over file text) ───
+        // "read/summarize <file>" → resolve + extract the file here, then answer
+        // in ONE generation with no tools. Avoids the slow/fragile agentic
+        // tool loop; local-first so it's fast and reliable.
+        const nasRead = await tryNasReadIntent(args.content)
+        if (nasRead) {
+          const sys =
+            `You are Forgie. Answer the user's question about the file "${nasRead.name}" ` +
+            `(on the ${nasRead.server} NAS) using ONLY the content below. Be concise and ` +
+            `specific; if the content doesn't contain the answer, say so plainly.\n\n` +
+            `--- CONTENT OF ${nasRead.name} ---\n${nasRead.text}`
+          const readMessages: ModelMessage[] = [
+            { role: 'system', content: sys },
+            { role: 'user', content: args.content },
+          ]
+          let readText = ''
+          let readMeta: Awaited<ReturnType<typeof consumeStream>> | null = null
+          for (let a = 0; a < 8; a++) {
+            const st = await startStream(readMessages, {}) // no tools → no hang
+            if (!st.success) break
+            try {
+              readMeta = await consumeStream(st, (d) => { readText += d; write(controller, { type: 'text', delta: d }) })
+              if (readText.trim()) break
+              reportRateLimit(st.provider, st.apiKey)
+              readMeta = null
+            } catch (e) {
+              const reason = e instanceof Error ? e.message : String(e)
+              if (/request too large|tokens per minute|context length|too many tokens|\b413\b/i.test(reason)) {
+                reportProviderExhausted(st.provider)
+              } else {
+                reportRateLimit(st.provider, st.apiKey)
+              }
+            }
+          }
+          if (!readText.trim()) {
+            readText = `I found ${nasRead.name} on the ${nasRead.server} NAS but couldn't read it just now.`
+          }
+          const link = `\n\n[⬇ ${nasRead.name}](/api/nas/download?server=${encodeURIComponent(nasRead.server)}&path=${encodeURIComponent(nasRead.path)})`
+          write(controller, { type: 'text', delta: link })
+          readText += link
+          write(controller, {
+            type: 'done', provider: readMeta?.provider ?? 'nas', model: readMeta?.model ?? 'nas-read',
+            fallback: false, latencyMs: 0, pendingActions: [], toolsUsed: ['nas_read'],
+          })
+          await persistAssistant(args.conversationId, readText, { provider: readMeta?.provider ?? 'nas', model: 'nas-read' })
+          await maybeAutoTitle(args.conversationId, args.content, priorCount)
+          controller.close()
+          return
+        }
+
+        // ── Cache check (only on fresh conversations) ──────────────────────
         if (priorCount <= 1) {
           const cached = await lookupCache({
             userId: args.user.id,
@@ -312,13 +382,25 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
         // when mentioned. Cuts the re-sent input payload roughly in half for the
         // common case, which is the main latency lever for tool-path queries.
         const tools = selectRelevantTools(allTools, args.content)
-        // Action/tool-likely messages should avoid Groq (it hangs the agentic
-        // continuation after a tool call). Plain informational turns keep Groq
-        // first for speed. Heuristic: a write/action verb or an integration verb.
-        const deprioritizeGroq =
-          /\b(create|add|make|new|raise|open|schedule|book|invite|send|email|mail|dm|ping|message|notify|assign|reassign|update|change|edit|rename|set|move|mark|resolve|close|complete|archive|promote|demote|remove|delete|start a call|call|leave|remove)\b/i.test(
+        // Provider routing for this turn:
+        //  • Integration-tool reads (nas_search, gh_list, gcal_list, …) need a
+        //    reliable search-then-summarize continuation — only the cloud models
+        //    do this well. Groq hangs the continuation; the small local models
+        //    leak/empty it. So push BOTH local and groq to the back → Gemini/
+        //    Cerebras serve these.
+        //  • Plain write/action verbs (create/assign/…) are terminal proposals
+        //    the local model handles fine; just keep Groq (continuation-hang)
+        //    off the front.
+        //  • Everything else (chat) keeps the fast local model first.
+        const isActionVerb =
+          /\b(create|add|make|new|raise|open|schedule|book|invite|send|email|mail|dm|ping|message|notify|assign|reassign|update|change|edit|rename|set|move|mark|resolve|close|complete|archive|promote|demote|remove|delete|start a call|call|leave)\b/i.test(
             args.content,
           )
+        const deprioritize: ProviderName[] = usesIntegrationTools(tools)
+          ? ['local', 'groq']
+          : isActionVerb
+            ? ['groq']
+            : []
 
         // streamText() never throws synchronously — the actual API call (and
         // any 429 / auth / network error) surfaces when the textStream is
@@ -338,7 +420,7 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
         const failureLog: Array<{ provider: string; reason: string }> = []
 
         for (let attempt = 0; attempt < STREAM_ATTEMPT_BUDGET; attempt++) {
-          const start = await startStream(messages, { tools, deprioritizeGroq })
+          const start = await startStream(messages, { tools, deprioritize })
 
           if (!start.success) {
             // All providers exhausted (synchronously). Fall through to the

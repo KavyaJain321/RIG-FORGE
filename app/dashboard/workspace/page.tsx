@@ -7,12 +7,14 @@ import CodePanel from '@/components/workspace/CodePanel'
 import MeetPanel from '@/components/workspace/MeetPanel'
 import DrivePanel from '@/components/workspace/DrivePanel'
 import ContactsPanel from '@/components/workspace/ContactsPanel'
+import FilesPanel from '@/components/workspace/FilesPanel'
 
 const TABS = [
   { key: 'mail', label: '📬 Mail' },
   { key: 'code', label: '⌥ Code' },
   { key: 'meet', label: '📹 Meet' },
   { key: 'drive', label: '📁 Drive' },
+  { key: 'files', label: '🗄️ Files' },
   { key: 'contacts', label: '👥 Contacts' },
 ] as const
 
@@ -24,6 +26,9 @@ export default function WorkspacePage() {
   // the Code tab entirely for them. Starts hidden until confirmed to avoid a
   // show-then-remove flicker.
   const [githubEnabled, setGithubEnabled] = useState(false)
+  // NAS (Files) is the inverse — only the org that owns the NAS (Trijya) gets
+  // it. Hidden until confirmed.
+  const [nasEnabled, setNasEnabled] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -31,10 +36,16 @@ export default function WorkspacePage() {
       .then((r) => r.json())
       .then((j) => { if (alive) setGithubEnabled(!!j?.data?.enabled) })
       .catch(() => { if (alive) setGithubEnabled(false) })
+    fetch('/api/nas/servers', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((j) => { if (alive) setNasEnabled(!!j?.data?.enabled) })
+      .catch(() => { if (alive) setNasEnabled(false) })
     return () => { alive = false }
   }, [])
 
-  const tabs = TABS.filter((t) => t.key !== 'code' || githubEnabled)
+  const tabs = TABS.filter(
+    (t) => (t.key !== 'code' || githubEnabled) && (t.key !== 'files' || nasEnabled),
+  )
 
   // An invite link (?call=<room>) drops the user straight onto the Meet tab.
   useEffect(() => {
@@ -63,6 +74,7 @@ export default function WorkspacePage() {
       {tab === 'code' && <CodePanel />}
       {tab === 'meet' && <MeetPanel />}
       {tab === 'drive' && <DrivePanel />}
+      {tab === 'files' && <FilesPanel />}
       {tab === 'contacts' && <ContactsPanel />}
     </div>
   )
