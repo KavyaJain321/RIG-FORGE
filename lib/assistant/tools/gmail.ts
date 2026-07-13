@@ -36,26 +36,69 @@ export interface SearchArgs {
   limit?: number
 }
 
+/**
+ * The `gmail.metadata` scope (what new connections get — gmail.readonly is a
+ * RESTRICTED scope we avoid) does NOT allow the `q` search parameter: any q,
+ * even "in:inbox", returns a 403 "Metadata scope does not support 'q'". So for
+ * metadata connections we list by labelIds and filter client-side instead.
+ */
+async function connectionSupportsQuery(userId: string): Promise<boolean> {
+  const integ = await prisma.googleIntegration.findUnique({
+    where: { userId },
+    select: { scopes: true },
+  })
+  return !!integ && integ.scopes.includes('gmail.readonly')
+}
+
+/** Translate a Gmail query into (labelIds, plain filter terms) for metadata mode. */
+function queryToLabelsAndTerms(q: string): { labelIds: string[]; terms: string[] } {
+  const labelIds: string[] = /\bin:sent\b/i.test(q) ? ['SENT'] : ['INBOX']
+  if (/\bis:unread\b/i.test(q)) labelIds.push('UNREAD')
+  const terms: string[] = []
+  // from:/to:/cc: values (addresses or domains) — the team filter uses these
+  const re = /\b(?:from|to|cc):([^\s{}]+)/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(q))) terms.push(m[1])
+  // leftover free text, operators stripped
+  const free = q
+    .replace(/\b(?:from|to|cc|in|is|subject|after|before|older|newer|label|has|category):[^\s{}]+/gi, '')
+    .replace(/[{}]/g, ' ')
+    .trim()
+  for (const w of free.split(/\s+/)) if (w.length > 1) terms.push(w)
+  return { labelIds, terms: [...new Set(terms.map((t) => t.toLowerCase()))] }
+}
+
 export async function searchMessages(userId: string, args: SearchArgs) {
   const auth = await getAuthorizedClient(userId)
   const gmail = google.gmail({ version: 'v1', auth })
 
   const limit = Math.min(Math.max(args.limit ?? 10, 1), 50)
+  const canQuery = await connectionSupportsQuery(userId)
 
-  const list = await gmail.users.messages.list({
-    userId: 'me',
-    q: args.query,
-    maxResults: limit,
-  })
+  let ids: Array<{ id?: string | null }>
+  let clientTerms: string[] = []
+  if (canQuery) {
+    const list = await gmail.users.messages.list({ userId: 'me', q: args.query, maxResults: limit })
+    ids = list.data.messages ?? []
+  } else {
+    // metadata scope: no `q` — list by label, over-fetch, filter client-side
+    const { labelIds, terms } = queryToLabelsAndTerms(args.query)
+    clientTerms = terms
+    const list = await gmail.users.messages.list({
+      userId: 'me',
+      labelIds,
+      maxResults: terms.length ? Math.min(limit * 5, 100) : limit,
+    })
+    ids = list.data.messages ?? []
+  }
 
-  const ids = list.data.messages ?? []
   if (ids.length === 0) {
     return { query: args.query, matches: 0, messages: [] }
   }
 
   // Fetch metadata for each. We only request specific headers to keep it fast.
-  const messages = await Promise.all(
-    ids.slice(0, limit).map(async (m) => {
+  const fetched = await Promise.all(
+    ids.map(async (m) => {
       if (!m.id) return null
       const r = await gmail.users.messages.get({
         userId: 'me',
@@ -80,10 +123,22 @@ export async function searchMessages(userId: string, args: SearchArgs) {
     }),
   )
 
+  let messages = fetched.filter((m): m is NonNullable<typeof m> => m !== null)
+
+  // metadata mode: apply the query terms client-side (server-side `q` was not
+  // available). Empty terms = a plain inbox listing, so keep everything.
+  if (!canQuery && clientTerms.length) {
+    messages = messages.filter((m) => {
+      const hay = `${m.from ?? ''} ${m.to ?? ''} ${m.subject ?? ''} ${m.snippet ?? ''}`.toLowerCase()
+      return clientTerms.some((t) => hay.includes(t))
+    })
+  }
+  messages = messages.slice(0, limit)
+
   return {
     query: args.query,
-    matches: list.data.resultSizeEstimate ?? messages.length,
-    messages: messages.filter((m): m is NonNullable<typeof m> => m !== null),
+    matches: messages.length,
+    messages,
   }
 }
 

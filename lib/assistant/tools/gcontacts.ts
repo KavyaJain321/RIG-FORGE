@@ -64,27 +64,64 @@ function mapPerson(p: RawPerson): ContactCard {
   }
 }
 
-/** The user's contacts, alphabetical. Default panel view. */
+// "Other contacts" (auto-collected from mail) only support this narrower mask.
+const OTHER_FIELDS = 'names,emailAddresses,phoneNumbers'
+
+function dedupe(cards: ContactCard[], limit: number): ContactCard[] {
+  const seen = new Set<string>()
+  const out: ContactCard[] = []
+  for (const c of cards) {
+    const key = (c.email || c.name).toLowerCase().trim()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(c)
+  }
+  return out.slice(0, limit)
+}
+
+/** The user's contacts, alphabetical. Merges saved ("My Contacts") with
+ * auto-collected "Other contacts" — many accounts have zero SAVED contacts, so
+ * connections.list alone comes back empty. otherContacts is best-effort (needs
+ * the contacts.other.readonly scope; silently skipped on older connections). */
 export async function listContacts(userId: string, limit = 50): Promise<{ contacts: ContactCard[] }> {
   const auth = await getAuthorizedClient(userId)
   const people = google.people({ version: 'v1', auth })
-  const res = await people.people.connections.list({
-    resourceName: 'people/me',
-    personFields: PERSON_FIELDS,
-    pageSize: Math.min(Math.max(limit, 1), 100),
-    sortOrder: 'FIRST_NAME_ASCENDING',
-  })
-  return { contacts: (res.data.connections ?? []).map(mapPerson) }
+
+  const saved = (
+    await people.people.connections.list({
+      resourceName: 'people/me',
+      personFields: PERSON_FIELDS,
+      pageSize: 100,
+      sortOrder: 'FIRST_NAME_ASCENDING',
+    })
+  ).data.connections?.map(mapPerson) ?? []
+
+  let other: ContactCard[] = []
+  try {
+    const res = await people.otherContacts.list({ readMask: OTHER_FIELDS, pageSize: 100 })
+    other = res.data.otherContacts?.map(mapPerson) ?? []
+  } catch {
+    // scope not granted (older connection) → saved-only
+  }
+
+  const merged = dedupe([...saved, ...other], limit).sort((a, b) => a.name.localeCompare(b.name))
+  return { contacts: merged }
 }
 
-/** Search the user's contacts by name / email / phone. */
+/** Search across saved + other contacts by name / email / phone. */
 export async function searchContacts(userId: string, query: string, limit = 30): Promise<{ contacts: ContactCard[] }> {
   const auth = await getAuthorizedClient(userId)
   const people = google.people({ version: 'v1', auth })
-  const res = await people.people.searchContacts({
-    query,
-    readMask: PERSON_FIELDS,
-    pageSize: Math.min(Math.max(limit, 1), 30),
-  })
-  return { contacts: (res.data.results ?? []).map((r) => mapPerson(r.person ?? {})) }
+
+  const [main, other] = await Promise.all([
+    people.people
+      .searchContacts({ query, readMask: PERSON_FIELDS, pageSize: 30 })
+      .then((r) => (r.data.results ?? []).map((x) => mapPerson(x.person ?? {})))
+      .catch(() => [] as ContactCard[]),
+    people.otherContacts
+      .search({ query, readMask: OTHER_FIELDS, pageSize: 30 })
+      .then((r) => (r.data.results ?? []).map((x) => mapPerson(x.person ?? {})))
+      .catch(() => [] as ContactCard[]),
+  ])
+  return { contacts: dedupe([...main, ...other], limit) }
 }

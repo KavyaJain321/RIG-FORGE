@@ -55,6 +55,9 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/drive.metadata.readonly',
   // Contacts (People API) — read-only. Sensitive scope (not restricted → no CASA).
   'https://www.googleapis.com/auth/contacts.readonly',
+  // "Other contacts" = auto-collected from mail. Most accounts keep everyone
+  // here (zero SAVED contacts), so without this Contacts shows empty. Sensitive.
+  'https://www.googleapis.com/auth/contacts.other.readonly',
 ] as const
 
 // Per-feature scope checks so we can gate tools per user when their stored
