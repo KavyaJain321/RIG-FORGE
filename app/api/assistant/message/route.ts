@@ -456,10 +456,17 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
               `errored ${fullText ? `after ${fullText.length} chars — committing partial response` : 'before any text — retrying'}: ${reason.slice(0, 200)}`,
             )
 
-            // Provider-wide failures (413 "request too large" / TPM cap) can't be
-            // fixed by another key — cool the WHOLE provider and jump to the next.
-            // Otherwise just cool this key.
+            // Provider-wide failures can't be fixed by another key — cool the
+            // WHOLE provider and jump to the next. Two cases:
+            //  • 413 "request too large" / TPM cap (shared across keys), and
+            //  • a stall to the request-timeout (abort): under load the provider
+            //    is unresponsive and its OTHER keys stall too, so retrying them
+            //    just burns another full timeout (seen: 2×45s). Skip straight to
+            //    the next provider instead.
+            // A plain 429 on one key is NOT provider-wide — cool just that key.
             if (/request too large|tokens per minute|context length|too many tokens|\b413\b/i.test(reason)) {
+              reportProviderExhausted(start.provider)
+            } else if (/abort|timed?\s?out|timeout|ETIMEDOUT/i.test(reason)) {
               reportProviderExhausted(start.provider)
             } else {
               reportRateLimit(start.provider, start.apiKey)
