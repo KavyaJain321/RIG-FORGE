@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const server = searchParams.get('server')
   const path = searchParams.get('path')
+  const inline = searchParams.get('inline') === '1'
   if (!server || !path) return errorResponse('server and path are required', 400)
 
   try {
@@ -27,7 +28,11 @@ export async function GET(request: NextRequest) {
     headers.set('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream')
     const len = upstream.headers.get('content-length')
     if (len) headers.set('Content-Length', len)
-    headers.set('Content-Disposition', `attachment; filename="${filename.replace(/"/g, '')}"`)
+    // inline = view in the browser (PDFs/images); default = download.
+    headers.set(
+      'Content-Disposition',
+      `${inline ? 'inline' : 'attachment'}; filename="${filename.replace(/"/g, '')}"`,
+    )
     headers.set('Cache-Control', 'private, no-store')
     return new Response(upstream.body, { status: 200, headers })
   } catch (e) {

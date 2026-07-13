@@ -199,6 +199,12 @@ export async function getMessage(userId: string, args: GetMessageArgs) {
 
 // ─── Write: send message (gated) ─────────────────────────────────────────────
 
+export interface SendAttachment {
+  filename: string
+  mimeType: string
+  content: Buffer
+}
+
 export interface SendArgs {
   to: string                // single recipient or comma-separated
   subject: string
@@ -206,6 +212,7 @@ export interface SendArgs {
   cc?: string
   bcc?: string
   isHtml?: boolean
+  attachments?: SendAttachment[]
 }
 
 export async function sendMessage(userId: string, args: SendArgs) {
@@ -291,24 +298,71 @@ function stripHtml(html: string): string {
 }
 
 function buildRawMessage(args: SendArgs): string {
-  const lines: string[] = []
-  lines.push(`To: ${args.to}`)
-  if (args.cc) lines.push(`Cc: ${args.cc}`)
-  if (args.bcc) lines.push(`Bcc: ${args.bcc}`)
-  lines.push(`Subject: ${encodeRFC2047(args.subject)}`)
-  lines.push('MIME-Version: 1.0')
-  lines.push(`Content-Type: ${args.isHtml ? 'text/html' : 'text/plain'}; charset="UTF-8"`)
-  lines.push('Content-Transfer-Encoding: base64')
-  lines.push('')
-  lines.push(Buffer.from(args.body, 'utf-8').toString('base64'))
+  const headers: string[] = []
+  headers.push(`To: ${args.to}`)
+  if (args.cc) headers.push(`Cc: ${args.cc}`)
+  if (args.bcc) headers.push(`Bcc: ${args.bcc}`)
+  headers.push(`Subject: ${encodeRFC2047(args.subject)}`)
+  headers.push('MIME-Version: 1.0')
 
-  const message = lines.join('\r\n')
+  let message: string
+  const atts = args.attachments ?? []
+  if (atts.length === 0) {
+    // Simple single-part message.
+    message = [
+      ...headers,
+      `Content-Type: ${args.isHtml ? 'text/html' : 'text/plain'}; charset="UTF-8"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from(args.body, 'utf-8').toString('base64'),
+    ].join('\r\n')
+  } else {
+    // multipart/mixed: body part + one part per attachment.
+    const boundary = `rfnas_${Date.now().toString(36)}_${Math.round(Math.random() * 1e9).toString(36)}`
+    const parts: string[] = [
+      `Content-Type: ${args.isHtml ? 'text/html' : 'text/plain'}; charset="UTF-8"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      Buffer.from(args.body, 'utf-8').toString('base64'),
+    ]
+    const attParts = atts.flatMap((a) => [
+      `--${boundary}`,
+      `Content-Type: ${a.mimeType}; name="${a.filename.replace(/"/g, '')}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${a.filename.replace(/"/g, '')}"`,
+      '',
+      a.content.toString('base64').replace(/(.{76})/g, '$1\r\n'),
+    ])
+    message = [
+      ...headers,
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      ...parts,
+      ...attParts,
+      `--${boundary}--`,
+    ].join('\r\n')
+  }
+
   // URL-safe base64 for Gmail API
   return Buffer.from(message, 'utf-8')
     .toString('base64')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '')
+}
+
+// Best-effort MIME type from a filename extension (for NAS attachments).
+export function guessMimeType(name: string): string {
+  const x = (name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1]) || ''
+  const map: Record<string, string> = {
+    pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', webp: 'image/webp', txt: 'text/plain', csv: 'text/csv',
+    doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    zip: 'application/zip', dwg: 'application/acad',
+  }
+  return map[x] || 'application/octet-stream'
 }
 
 function encodeRFC2047(text: string): string {

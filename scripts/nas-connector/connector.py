@@ -333,12 +333,12 @@ async def upload(server: str, path: str, file: UploadFile = File(...)):
             pass
 
 
-def _live_walk_search(server, ql, limit):
+def _live_walk_search(server, ql, limit, base="/"):
     """Fallback used only before the index for this server is built."""
     conn, share = _connect(server)
     results = []
     deadline = time.time() + 12
-    stack = [("/", 0)]
+    stack = [(base or "/", 0)]
     try:
         while stack and len(results) < limit and time.time() < deadline:
             p, depth = stack.pop()
@@ -369,17 +369,21 @@ def search(server: str, q: str, path: str = "/", limit: int = 60):
     if server not in SERVERS:
         raise HTTPException(404, f"unknown server '{server}'")
     ql = q.lower().strip()
+    # Optional folder scope: only match files under this path (like a Windows
+    # "search in current folder"). "/" = whole drive.
+    scope = _norm(path)
+    prefix = None if scope == "/" else (scope.rstrip("/") + "/")
     with INDEX_LOCK:
         idx = INDEX.get(server)
     if idx is not None:
         # Instant in-memory filter over the pre-built index.
         results = []
         for e in idx:
-            if ql in e["name"].lower():
+            if ql in e["name"].lower() and (prefix is None or e["path"].startswith(prefix)):
                 results.append(e)
                 if len(results) >= limit:
                     break
         return {"server": server, "query": q, "results": results, "truncated": len(results) >= limit, "source": "index"}
-    # Index not ready yet → one-time live fallback.
-    results = _live_walk_search(server, ql, limit)
+    # Index not ready yet → one-time live fallback (already path-scoped).
+    results = _live_walk_search(server, ql, limit, base=scope)
     return {"server": server, "query": q, "results": results, "truncated": len(results) >= limit, "source": "live"}

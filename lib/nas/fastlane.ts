@@ -16,7 +16,7 @@ const NAS_EXPLICIT = /\b(nas|on (the )?server|from (the )?server|on (the )?drive
 const WRITE = /\b(upload|delete|remove|move|rename|create|add|save|put|copy|share|send)\b/i
 // Words to strip so the remainder is the actual search term.
 const STOP =
-  /\b(find|search|locate|look|for|looking|show|me|do|we|have|has|is|are|there|where|the|a|an|any|all|some|please|on|in|from|of|about|our|my|whats|what|it|to|related|named|called|regarding|with|and|or|nas|file|files|folder|folders|drawing|drawings|dwg|revit|document|documents|pdf|pdfs|blueprint|render|renders|drive|server|latest|recent)\b/gi
+  /\b(can|could|would|will|you|u|please|pls|plz|kindly|able|find|search|locate|look|for|looking|show|me|do|we|have|has|is|are|there|where|the|a|an|any|all|some|on|in|from|of|about|our|my|whats|what|it|to|related|named|name|call|called|regarding|with|and|or|nas|file|files|folder|folders|drawing|drawings|dwg|revit|document|documents|pdf|pdfs|blueprint|render|renders|drive|server|latest|recent)\b/gi
 
 export async function tryNasFastLane(raw: string): Promise<string | null> {
   if (!isNasEnabled()) return null

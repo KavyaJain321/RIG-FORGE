@@ -121,6 +121,20 @@ export async function nasDownload(server: string, path: string): Promise<Respons
   )
 }
 
+/** Token-gated download: fetch a file WITHOUT the org-session check, for the
+ * public share-link route (a valid signed token is the authorization). Only
+ * call after verifyShareToken() has passed. */
+export async function nasDownloadByToken(server: string, path: string): Promise<Response> {
+  if (!BASE) throw new Error('NAS is not configured')
+  return fetch(
+    `${BASE}/download?server=${encodeURIComponent(server)}&path=${encodeURIComponent(path)}`,
+    {
+      headers: accessHeaders(),
+      signal: AbortSignal.timeout(Number(process.env.NAS_DOWNLOAD_TIMEOUT_MS ?? 120_000)),
+    },
+  )
+}
+
 /** Fetch a file's raw bytes (for text extraction by Forgie tools). Capped. */
 export async function nasFetchBytes(server: string, path: string, maxBytes = 8_000_000): Promise<Buffer> {
   const r = await nasDownload(server, path)
