@@ -24,8 +24,21 @@ function redirectWith(url: string, params: Record<string, string>): NextResponse
   return NextResponse.redirect(u.toString())
 }
 
+// The public origin of the app. On Render (and other proxies) `request.url` is
+// the INTERNAL bind (e.g. http://localhost:10000), so a redirect built from it
+// sends the browser to a dead localhost. Prefer explicit config: the origin of
+// GOOGLE_REDIRECT_URI (always set for OAuth to work) or NEXT_PUBLIC_APP_URL.
+function appOrigin(request: NextRequest): string {
+  for (const v of [process.env.GOOGLE_REDIRECT_URI, process.env.NEXT_PUBLIC_APP_URL]) {
+    if (v) {
+      try { return new URL(v).origin } catch { /* ignore malformed */ }
+    }
+  }
+  return new URL(request.url).origin
+}
+
 export async function GET(request: NextRequest) {
-  const profileUrl = new URL('/dashboard/profile', request.url).toString()
+  const profileUrl = new URL('/dashboard/profile', appOrigin(request)).toString()
 
   const { searchParams } = request.nextUrl
   const code = searchParams.get('code')
