@@ -91,6 +91,26 @@ export async function nasSearch(
   return { results: j.results ?? [], truncated: !!j.truncated }
 }
 
+export interface NasSemanticHit {
+  name: string
+  path: string
+  score: number
+}
+
+/** Meaning-based search over the connector's embedding index (nomic-embed-text).
+ * Returns [] gracefully if the semantic index isn't ready (503) so callers can
+ * fall back to keyword search. */
+export async function nasSemantic(server: string, q: string, k = 15): Promise<NasSemanticHit[]> {
+  try {
+    const r = await nasFetch(`/semantic?server=${encodeURIComponent(server)}&q=${encodeURIComponent(q)}&k=${k}`)
+    if (!r.ok) return []
+    const j = (await r.json()) as { results: NasSemanticHit[] }
+    return j.results ?? []
+  } catch {
+    return []
+  }
+}
+
 /** Proxy a file download from the NAS. Returns the upstream Response so the
  * route can stream it straight to the client without buffering in memory. */
 export async function nasDownload(server: string, path: string): Promise<Response> {

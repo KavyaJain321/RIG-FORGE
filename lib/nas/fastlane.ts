@@ -4,7 +4,7 @@
  * defers to the LLM (returns null) on anything ambiguous, long, or without a
  * concrete search term. Only runs when NAS is enabled for the org (Trijya).
  */
-import { isNasEnabled, nasServers, nasSearch, nasFetchBytes } from './client'
+import { isNasEnabled, nasServers, nasSearch, nasSemantic, nasFetchBytes } from './client'
 import { extractText, isExtractable } from './extract'
 
 const VERB = /\b(find|search|locate|look for|looking for|show me|do we have|is there|are there|where is|where are|pull up|get me)\b/i
@@ -37,7 +37,22 @@ export async function tryNasFastLane(raw: string): Promise<string | null> {
           .catch(() => []),
       ),
     )
-    const hits = perServer.flat().slice(0, 40)
+    let hits = perServer.flat().slice(0, 40)
+
+    // No exact filename match → try MEANING-based (embedding) search, still no
+    // LLM. Catches "hotel elevations" matching "GROUND FLOOR PLAN" etc.
+    let semantic = false
+    if (hits.length === 0) {
+      const perServerSem = await Promise.all(
+        servers.map((s) =>
+          nasSemantic(s.label, term, 12)
+            .then((rs) => rs.map((h) => ({ server: s.label, name: h.name, path: h.path, isDir: false, size: 0 })))
+            .catch(() => []),
+        ),
+      )
+      hits = perServerSem.flat().slice(0, 24)
+      semantic = hits.length > 0
+    }
 
     if (hits.length === 0) {
       return `I searched the NAS for “${term}” but didn't find any matching files. Try a different keyword, or browse them in Workspace → Files.`
@@ -45,7 +60,9 @@ export async function tryNasFastLane(raw: string): Promise<string | null> {
 
     const files = hits.filter((h) => !h.isDir).slice(0, 12)
     const dirs = hits.filter((h) => h.isDir).slice(0, 5)
-    const lines: string[] = [`🗄️ Found ${hits.length} match${hits.length === 1 ? '' : 'es'} for “${term}” on the NAS:`]
+    const lines: string[] = [
+      `🗄️ Found ${hits.length} match${hits.length === 1 ? '' : 'es'} for “${term}” on the NAS${semantic ? ' (by meaning)' : ''}:`,
+    ]
     for (const f of files) {
       const url = `/api/nas/download?server=${encodeURIComponent(f.server)}&path=${encodeURIComponent(f.path)}`
       lines.push(`• [${f.name}](${url}) — _${f.server}_ ${f.path}`)
