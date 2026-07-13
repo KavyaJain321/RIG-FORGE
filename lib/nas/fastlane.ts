@@ -9,6 +9,11 @@ import { extractText, isExtractable } from './extract'
 
 const VERB = /\b(find|search|locate|look for|looking for|show me|do we have|is there|are there|where is|where are|pull up|get me)\b/i
 const NOUN = /\b(nas|file|files|folder|folders|drawing|drawings|dwg|revit|document|documents|pdf|blueprint|floor ?plan|elevation|render|renders|drive|server)\b/i
+// An explicit NAS/server mention is strong enough intent to search even without
+// a verb ("elevation drawings on the nas", "BOQ files on the server").
+const NAS_EXPLICIT = /\b(nas|on (the )?server|from (the )?server|on (the )?drive)\b/i
+// Action intent belongs to the LLM/UI, not the read-only search lane.
+const WRITE = /\b(upload|delete|remove|move|rename|create|add|save|put|copy|share|send)\b/i
 // Words to strip so the remainder is the actual search term.
 const STOP =
   /\b(find|search|locate|look|for|looking|show|me|do|we|have|has|is|are|there|where|the|a|an|any|all|some|please|on|in|from|of|about|our|my|whats|what|it|to|related|named|called|regarding|with|and|or|nas|file|files|folder|folders|drawing|drawings|dwg|revit|document|documents|pdf|pdfs|blueprint|render|renders|drive|server|latest|recent)\b/gi
@@ -17,7 +22,10 @@ export async function tryNasFastLane(raw: string): Promise<string | null> {
   if (!isNasEnabled()) return null
   const c = (raw ?? '').trim()
   if (!c || c.length > 140) return null // long/complex → let the LLM handle it
-  if (!VERB.test(c) || !NOUN.test(c)) return null
+  if (WRITE.test(c)) return null // upload/delete/etc → not the read-only lane
+  if (READ_VERB.test(c)) return null // "read/summarize …" → the read fast-path handles it
+  if (!NOUN.test(c)) return null
+  if (!VERB.test(c) && !NAS_EXPLICIT.test(c)) return null // need a verb OR explicit NAS
 
   const term = c
     .toLowerCase()
