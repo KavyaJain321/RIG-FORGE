@@ -67,7 +67,12 @@ function initPools(): Map<ProviderName, ProviderPool> {
     // the machine still up → the port silently drops packets) fails FAST and the
     // router falls through to the cloud, instead of hanging ~20s. Local warm
     // generations finish in <2s, so this headroom never truncates a real reply.
-    const localTimeoutMs = Number(process.env.LOCAL_LLM_TIMEOUT_MS ?? 12_000)
+    // 12s was too tight: Ollama serves one GPU, so concurrent turns QUEUE and
+    // legitimately take >12s — the abort then produced empty replies under load
+    // (measured 3/5 empty at 5 concurrent). A down box still fails fast because
+    // the Cloudflare tunnel 502s immediately, so this longer budget only
+    // affects genuinely-queued work.
+    const localTimeoutMs = Number(process.env.LOCAL_LLM_TIMEOUT_MS ?? 25_000)
     // When the box is fronted by a Cloudflare Tunnel behind Access, Render must
     // present a service token so Cloudflare's edge lets the request through.
     // Absent (e.g. direct Tailscale in local dev) → no headers, unchanged.
