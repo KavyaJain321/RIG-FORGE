@@ -100,6 +100,8 @@ def _build_index(server: str):
                 entries.append({
                     "name": f.filename, "path": fp,
                     "isDir": bool(f.isDirectory), "size": int(f.file_size),
+                    # mtime powers "latest / newest" search + date sorting.
+                    "mtime": int(f.last_write_time or 0),
                 })
                 if f.isDirectory and depth < INDEX_MAX_DEPTH and not DENY_DIR.search(f.filename):
                     queue.append((fp, depth + 1))
@@ -351,7 +353,7 @@ def _live_walk_search(server, ql, limit, base="/"):
                     continue
                 fp = (p.rstrip("/") + "/" + f.filename)
                 if ql in f.filename.lower():
-                    results.append({"name": f.filename, "path": fp, "isDir": bool(f.isDirectory), "size": int(f.file_size)})
+                    results.append({"name": f.filename, "path": fp, "isDir": bool(f.isDirectory), "size": int(f.file_size), "mtime": int(f.last_write_time or 0)})
                     if len(results) >= limit:
                         break
                 if f.isDirectory and depth < 6:
@@ -365,7 +367,16 @@ def _live_walk_search(server, ql, limit, base="/"):
 
 
 @app.get("/search")
-def search(server: str, q: str, path: str = "/", limit: int = 60):
+def search(
+    server: str,
+    q: str,
+    path: str = "/",
+    limit: int = 60,
+    sort: str = "relevance",
+    since: int = 0,
+):
+    """sort: relevance | latest | oldest | largest | name.  since: unix secs
+    (only files modified after it) — powers "survey drawings, latest"."""
     if server not in SERVERS:
         raise HTTPException(404, f"unknown server '{server}'")
     ql = q.lower().strip()
@@ -373,17 +384,37 @@ def search(server: str, q: str, path: str = "/", limit: int = 60):
     # "search in current folder"). "/" = whole drive.
     scope = _norm(path)
     prefix = None if scope == "/" else (scope.rstrip("/") + "/")
+
+    def _finish(rows, source):
+        if since:
+            rows = [r for r in rows if r.get("mtime", 0) >= since]
+        if sort == "latest":
+            rows = sorted(rows, key=lambda r: r.get("mtime", 0), reverse=True)
+        elif sort == "oldest":
+            rows = sorted(rows, key=lambda r: r.get("mtime", 0))
+        elif sort == "largest":
+            rows = sorted(rows, key=lambda r: r.get("size", 0), reverse=True)
+        elif sort == "name":
+            rows = sorted(rows, key=lambda r: r.get("name", "").lower())
+        return {
+            "server": server, "query": q, "sort": sort,
+            "results": rows[:limit], "truncated": len(rows) > limit, "source": source,
+        }
+
     with INDEX_LOCK:
         idx = INDEX.get(server)
     if idx is not None:
-        # Instant in-memory filter over the pre-built index.
+        # Instant in-memory filter over the pre-built index. When sorting we must
+        # collect ALL matches first (not stop at `limit`), or "latest" would only
+        # sort an arbitrary first slice.
+        cap = limit if sort == "relevance" and not since else 5000
         results = []
         for e in idx:
             if ql in e["name"].lower() and (prefix is None or e["path"].startswith(prefix)):
                 results.append(e)
-                if len(results) >= limit:
+                if len(results) >= cap:
                     break
-        return {"server": server, "query": q, "results": results, "truncated": len(results) >= limit, "source": "index"}
+        return _finish(results, "index")
     # Index not ready yet → one-time live fallback (already path-scoped).
-    results = _live_walk_search(server, ql, limit, base=scope)
-    return {"server": server, "query": q, "results": results, "truncated": len(results) >= limit, "source": "live"}
+    results = _live_walk_search(server, ql, max(limit, 200) if (since or sort != "relevance") else limit, base=scope)
+    return _finish(results, "live")

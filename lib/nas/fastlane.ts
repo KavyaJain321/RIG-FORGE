@@ -14,6 +14,8 @@ const NOUN = /\b(nas|file|files|folder|folders|drawing|drawings|dwg|revit|docume
 const NAS_EXPLICIT = /\b(nas|on (the )?server|from (the )?server|on (the )?drive)\b/i
 // Action intent belongs to the LLM/UI, not the read-only search lane.
 const WRITE = /\b(upload|delete|remove|move|rename|create|add|save|put|copy|share|send)\b/i
+// "latest / newest / most recent <thing>" → sort newest-first by modified date.
+const LATEST = /\b(latest|newest|most recent|recent|last|current)\b/i
 // Words to strip so the remainder is the actual search term.
 const STOP =
   /\b(can|could|would|will|you|u|please|pls|plz|kindly|able|find|search|locate|look|for|looking|show|me|do|we|have|has|is|are|there|where|the|a|an|any|all|some|on|in|from|of|about|our|my|whats|what|it|to|related|named|name|call|called|regarding|with|and|or|nas|file|files|folder|folders|drawing|drawings|dwg|revit|document|documents|pdf|pdfs|blueprint|render|renders|drive|server|latest|recent)\b/gi
@@ -26,6 +28,10 @@ export async function tryNasFastLane(raw: string): Promise<string | null> {
   if (READ_VERB.test(c)) return null // "read/summarize …" → the read fast-path handles it
   if (!NOUN.test(c)) return null
   if (!VERB.test(c) && !NAS_EXPLICIT.test(c)) return null // need a verb OR explicit NAS
+
+  // "latest/newest survey drawings" → newest-first. Detect BEFORE stripping
+  // (STOP removes these words from the search term itself).
+  const wantsLatest = LATEST.test(c)
 
   const term = c
     .toLowerCase()
@@ -40,12 +46,14 @@ export async function tryNasFastLane(raw: string): Promise<string | null> {
     // Search every NAS concurrently (servers cached) — one round-trip, not N.
     const perServer = await Promise.all(
       servers.map((s) =>
-        nasSearch(s.label, term, { limit: 15 })
+        nasSearch(s.label, term, { limit: 15, sort: wantsLatest ? 'latest' : 'relevance' })
           .then((r) => r.results.map((h) => ({ server: s.label, ...h })))
           .catch(() => []),
       ),
     )
     let hits = perServer.flat().slice(0, 40)
+    // Merging drives breaks per-drive ordering — re-sort across both.
+    if (wantsLatest) hits.sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0))
 
     // No exact filename match → try MEANING-based (embedding) search, still no
     // LLM. Catches "hotel elevations" matching "GROUND FLOOR PLAN" etc.
@@ -68,12 +76,17 @@ export async function tryNasFastLane(raw: string): Promise<string | null> {
 
     const files = hits.filter((h) => !h.isDir).slice(0, 12)
     const dirs = hits.filter((h) => h.isDir).slice(0, 5)
+    const fmtDate = (m?: number) =>
+      m ? new Date(m * 1000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null
     const lines: string[] = [
-      `🗄️ Found ${hits.length} match${hits.length === 1 ? '' : 'es'} for “${term}” on the NAS${semantic ? ' (by meaning)' : ''}:`,
+      `🗄️ Found ${hits.length} match${hits.length === 1 ? '' : 'es'} for “${term}” on the NAS${
+        semantic ? ' (by meaning)' : ''
+      }${wantsLatest ? ' — newest first' : ''}:`,
     ]
     for (const f of files) {
       const url = `/api/nas/download?server=${encodeURIComponent(f.server)}&path=${encodeURIComponent(f.path)}`
-      lines.push(`• [${f.name}](${url}) — _${f.server}_ ${f.path}`)
+      const d = fmtDate(f.mtime)
+      lines.push(`• [${f.name}](${url}) — _${f.server}_${d ? ` · ${d}` : ''} ${f.path}`)
     }
     for (const d of dirs) {
       lines.push(`• 📁 ${d.name} — _${d.server}_ ${d.path}`)

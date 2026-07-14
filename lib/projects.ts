@@ -22,7 +22,7 @@ export async function fetchProjectDetail(
   const project = await prisma.project.findUnique({
     where: { id: projectId, isActive: true },
     include: {
-      lead: { select: { name: true } },
+      lead: { select: { id: true, name: true, email: true, avatarUrl: true, role: true, currentStatus: true } },
       members: {
         include: {
           user: {
@@ -56,6 +56,33 @@ export async function fetchProjectDetail(
     ? (rawLinks as unknown as ProjectLink[])
     : []
 
+  // The project LEAD isn't necessarily a ProjectMember row, which meant they
+  // never appeared in the assignee dropdown ("I want the task assigned to the
+  // project lead but it's not giving me the option"). Surface the lead as a
+  // member (listed first) so they're assignable everywhere members are used.
+  const memberRows = project.members.map((m) => ({
+    userId: m.user.id,
+    name: m.user.name,
+    email: m.user.email,
+    avatarUrl: m.user.avatarUrl,
+    role: m.user.role,
+    currentStatus: m.user.currentStatus,
+    joinedAt: m.joinedAt,
+    isLead: project.leadId === m.user.id,
+  }))
+  if (project.lead && project.leadId && !memberRows.some((m) => m.userId === project.leadId)) {
+    memberRows.unshift({
+      userId: project.lead.id,
+      name: project.lead.name,
+      email: project.lead.email,
+      avatarUrl: project.lead.avatarUrl,
+      role: project.lead.role,
+      currentStatus: project.lead.currentStatus,
+      joinedAt: project.createdAt,
+      isLead: true,
+    })
+  }
+
   return {
     id: project.id,
     name: project.name,
@@ -70,16 +97,7 @@ export async function fetchProjectDetail(
     doneTasks,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
-    members: project.members.map((m) => ({
-      userId: m.user.id,
-      name: m.user.name,
-      email: m.user.email,
-      avatarUrl: m.user.avatarUrl,
-      role: m.user.role,
-      currentStatus: m.user.currentStatus,
-      joinedAt: m.joinedAt,
-      isLead: project.leadId === m.user.id,
-    })),
+    members: memberRows,
     tasks: project.tasks.map((t) => ({
       id: t.id,
       title: t.title,

@@ -77,14 +77,20 @@ export interface NasSearchHit {
   path: string
   isDir: boolean
   size: number
+  /** unix seconds; powers "latest / newest" and date sorting */
+  mtime?: number
 }
+
+export type NasSort = 'relevance' | 'latest' | 'oldest' | 'largest' | 'name'
 
 export async function nasSearch(
   server: string,
   q: string,
-  opts: { path?: string; limit?: number } = {},
+  opts: { path?: string; limit?: number; sort?: NasSort; since?: number } = {},
 ): Promise<{ results: NasSearchHit[]; truncated: boolean }> {
   const params = new URLSearchParams({ server, q, path: opts.path ?? '/', limit: String(opts.limit ?? 40) })
+  if (opts.sort && opts.sort !== 'relevance') params.set('sort', opts.sort)
+  if (opts.since) params.set('since', String(opts.since))
   const r = await nasFetch(`/search?${params.toString()}`)
   if (!r.ok) throw new Error(`NAS search failed (${r.status})`)
   const j = (await r.json()) as { results: NasSearchHit[]; truncated: boolean }

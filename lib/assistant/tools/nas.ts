@@ -40,22 +40,39 @@ export function buildNasTools(): ToolSet {
 
     nas_search: tool({
       description:
-        'Search the Trijya NAS for files/folders whose NAME contains the query. Searches all NAS drives if `server` is omitted. Returns matching paths — follow up with nas_read to read a file.',
+        'Search the Trijya NAS for files/folders whose NAME contains the query. Searches all NAS drives if `server` is omitted. Use sort="latest" for "the newest/latest <thing>" questions, and `days` to limit to recently-changed files. Each match includes its modified date. Follow up with nas_read to read a file.',
       inputSchema: z.object({
-        query: z.string().describe('Filename text to search for, e.g. "windlass" or "floor plan".'),
+        query: z.string().describe('Filename text to search for, e.g. "windlass" or "survey drawing".'),
         server: z.string().optional().describe('Restrict to one NAS label; omit to search all.'),
+        folder: z.string().optional().describe('Only search inside this folder path, e.g. "/01 ARCHITECTURE".'),
+        sort: z
+          .enum(['relevance', 'latest', 'oldest', 'largest'])
+          .optional()
+          .describe('Order of results. Use "latest" for newest-first (e.g. "latest survey drawings").'),
+        days: z.number().optional().describe('Only files modified in the last N days.'),
       }),
-      execute: async ({ query, server }) => {
+      execute: async ({ query, server, folder, sort, days }) => {
         if (!isNasEnabled()) return { error: 'NAS not available' }
         try {
+          const since = days && days > 0 ? Math.floor(Date.now() / 1000) - days * 86400 : undefined
           const targets = server ? [server] : (await nasServers()).map((s) => s.label)
-          const all: Array<{ server: string; name: string; path: string; type: string; size: number }> = []
+          const all: Array<{ server: string; name: string; path: string; type: string; size: number; modified: string | null }> = []
           for (const t of targets) {
-            const r = await nasSearch(t, query, { limit: 30 })
-            for (const h of r.results) all.push({ server: t, name: h.name, path: h.path, type: h.isDir ? 'folder' : 'file', size: h.size })
+            const r = await nasSearch(t, query, { limit: 30, path: folder, sort: sort ?? 'relevance', since })
+            for (const h of r.results) {
+              all.push({
+                server: t, name: h.name, path: h.path,
+                type: h.isDir ? 'folder' : 'file', size: h.size,
+                modified: h.mtime ? new Date(h.mtime * 1000).toISOString().slice(0, 10) : null,
+              })
+            }
             if (all.length >= 50) break
           }
-          return { query, matches: all.slice(0, 50) }
+          // Merging two drives can break per-drive ordering — re-sort globally.
+          if (sort === 'latest' || sort === 'oldest') {
+            all.sort((a, b) => (sort === 'latest' ? 1 : -1) * ((b.modified ?? '').localeCompare(a.modified ?? '')))
+          }
+          return { query, sort: sort ?? 'relevance', matches: all.slice(0, 50) }
         } catch (e) {
           return { error: e instanceof Error ? e.message : 'search failed' }
         }

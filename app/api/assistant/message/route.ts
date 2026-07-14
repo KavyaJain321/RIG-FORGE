@@ -42,6 +42,7 @@ import { isCacheableResponse } from '@/lib/assistant/cache-guard'
 import { buildAllToolsAsync, selectRelevantTools, usesIntegrationTools, TOOL_USE_GUIDANCE } from '@/lib/assistant/ai-sdk-tools'
 import { signActionToken } from '@/lib/assistant/action-token'
 import { tryNasFastLane, tryNasReadIntent } from '@/lib/nas/fastlane'
+import { tryPeopleFastLane } from '@/lib/people/fastlane'
 
 const MAX_HISTORY_MESSAGES = 10
 
@@ -186,6 +187,26 @@ function buildResponseStream(args: BuildArgs): ReadableStream<Uint8Array> {
             fallback: false, latencyMs: 0, pendingActions: [], toolsUsed: ['nas_search'],
           })
           await persistAssistant(args.conversationId, nasFast, { provider: 'nas', model: 'nas-index' })
+          await maybeAutoTitle(args.conversationId, args.content, priorCount)
+          controller.close()
+          return
+        }
+
+        // ── People lookup fast-lane ────────────────────────────────────────
+        // "search X in contacts" / "X's number" → answer from the team
+        // directory instantly, INCLUDING the phone (the LLM path kept omitting
+        // it, or failing outright). Contact fields stay admin-only via RBAC.
+        const peopleFast = await tryPeopleFastLane(args.content, {
+          userId: args.user.id,
+          role: args.user.role as Role,
+        })
+        if (peopleFast) {
+          write(controller, { type: 'text', delta: peopleFast })
+          write(controller, {
+            type: 'done', provider: 'rule', model: 'directory',
+            fallback: false, latencyMs: 0, pendingActions: [], toolsUsed: ['list_members'],
+          })
+          await persistAssistant(args.conversationId, peopleFast, { provider: 'rule', model: 'directory' })
           await maybeAutoTitle(args.conversationId, args.content, priorCount)
           controller.close()
           return
