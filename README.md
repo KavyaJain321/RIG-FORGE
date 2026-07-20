@@ -1,249 +1,333 @@
-# Rig Forge
+# RIG Forge
 
-> Internal workforce intelligence and project operations platform for RIG 360 Media.
+Internal workforce, project, and communication platform for RIG 360 Media.
 
-Rig Forge is a full-stack team management system — track projects, manage tasks, raise support tickets, monitor live team presence, onboard members, and generate daily reports. Built for fast-moving teams that can't let anything slip through.
+RIG Forge combines project and task management, a native chat, an AI assistant (Forgie), and integrations with WhatsApp and Google Workspace into a single operational surface for the team.
 
----
+## Table of Contents
 
-## Tech Stack
+1. [Overview](#overview)
+2. [Features](#features)
+3. [Architecture](#architecture)
+4. [Tech Stack](#tech-stack)
+5. [Getting Started](#getting-started)
+6. [Environment Variables](#environment-variables)
+7. [Available Scripts](#available-scripts)
+8. [Project Structure](#project-structure)
+9. [Roles and Access](#roles-and-access)
+10. [Deployment](#deployment)
+11. [Security](#security)
+12. [License](#license)
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 14 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS |
-| Database | PostgreSQL |
-| ORM | Prisma 5 |
-| Auth | JWT (httpOnly cookies) |
-| State | Zustand |
-| Realtime | Socket.io |
-| Package Manager | pnpm |
+## Overview
 
----
+RIG Forge is a full-stack Next.js application backed by PostgreSQL (Supabase). It exposes a web dashboard, over one hundred API routes, and a set of scheduled jobs that keep the team informed. Two auxiliary services deploy separately: a WhatsApp bridge (Baileys) and a Cloudflare Worker fronting the media bucket on R2.
 
 ## Features
 
-- **Project Tracking** — Create and manage projects with leads, members, deadlines, priority, and status
-- **Task Management** — Assign tasks per project with status tracking (TODO → IN_PROGRESS → DONE)
-- **Support Tickets** — Raise, accept, and resolve issues; lifecycle enforced (OPEN → ACCEPTED → COMPLETED)
-- **Live Presence** — Real-time heartbeat showing who is actively working
-- **Team Onboarding** — Admin generates user credentials → user logs in → admin approves/rejects
-- **Daily Reports** — Auto-generated weekly reports per employee with daily work logs
-- **Notifications** — In-app notification system for all key events
-- **Thread Comments** — Per-project and per-task message threads
-- **Role-Based Access** — ADMIN and EMPLOYEE roles with strict middleware enforcement
+### Work Management
 
----
+* Project and task lifecycle with leads, members, deadlines, priority, and status.
+* Ticket workflow (`OPEN`, `ACCEPTED`, `COMPLETED`, `CANCELLED`) with role guards.
+* Per-project and per-task comment threads with visibility scopes.
 
-## Roles
+### Communication
 
-| Role | Capabilities |
-|---|---|
-| **ADMIN** | Full access — manage users, projects, onboarding, reports, all tickets |
-| **EMPLOYEE** | Own projects, tasks, tickets, daily logs, and profile |
+* Native chat: direct messages and groups.
+* Reactions, replies, pins, polls, mentions, read receipts, disappearing messages.
+* Media attachments (image, file, audio) with private signed URLs.
+* Group invites, block list, starred messages.
 
----
+### Forgie (AI Assistant)
 
-## Project Structure
+* Multi-provider LLM routing across Groq, Gemini, Cerebras, and an optional local vLLM instance.
+* Tool calling over Projects, Tasks, People, Tickets, GitHub, Google (Calendar, Meet, Drive, Contacts, Gmail), and internal NAS.
+* All AI-triggered write actions are HMAC-gated by the UI and logged to an audit table.
+* Streaming responses using the Vercel AI SDK.
+
+### Integrations
+
+* Google Workspace: per-user OAuth for Calendar, Meet, Drive, Contacts, and Gmail.
+* WhatsApp: inbound messages routed through the bridge into the same Forgie pipeline; outbound reply supported.
+* GitHub: repository listing and assistive queries.
+
+### Operations
+
+* AI-drafted daily logs at 18:00 IST, approved by the user.
+* Standup digest generated at 09:00 IST and delivered per user by Forgie.
+* Weekly reports aggregated per employee and per project.
+* Web Push notifications with per-tab suppression.
+* Presence tracking through periodic heartbeat.
+* Hidden developer dashboard gated by an email allow list.
+
+### Access Control
+
+* Role-based access: `SUPER_ADMIN`, `ADMIN`, `EMPLOYEE`.
+* Optional `CustomRole` with fine-grained capability keys.
+* Multi-tenant scoping enforced by a Prisma extension over AsyncLocalStorage.
+
+## Architecture
 
 ```
-forge/
-├── app/
-│   ├── (auth)/              # Login & pending pages
-│   ├── api/                 # All API routes
-│   │   ├── admin/           # Admin-only endpoints
-│   │   ├── auth/            # Login, logout, me
-│   │   ├── projects/        # Projects CRUD
-│   │   ├── tasks/           # Task management
-│   │   ├── tickets/         # Ticket lifecycle
-│   │   ├── notifications/   # Notification system
-│   │   ├── daily-log/       # Daily work logs
-│   │   ├── reports/         # Weekly report generation
-│   │   ├── threads/         # Project & task threads
-│   │   └── users/           # User profile management
-│   ├── dashboard/           # All dashboard pages
-│   └── page.tsx             # Landing page
-├── components/              # Reusable UI components
-├── hooks/                   # Custom React hooks
-├── lib/                     # Utilities, auth, DB client
-├── prisma/                  # Schema & migrations
-├── store/                   # Zustand state stores
-└── middleware.ts            # Route protection
+                        ┌───────────────────────┐
+                        │   Cron Schedulers     │
+                        │  (cron-job.org / GA)  │
+                        └──────────┬────────────┘
+                                   │  x-cron-secret
+                                   ▼
+┌──────────────────┐        ┌──────────────────┐        ┌──────────────────┐
+│  Cloudflare      │        │                  │        │  Supabase        │
+│  Worker + R2     │◀──────▶│   Next.js App    │◀──────▶│  Postgres        │
+│  (chat media)    │  HMAC  │   (Render)       │        │  Storage         │
+└──────────────────┘        │                  │        │  Realtime        │
+                            └────┬─────────┬───┘        └──────────────────┘
+                                 │         │
+                        Baileys  │         │  LLM APIs
+                                 ▼         ▼
+                        ┌──────────────┐  ┌────────────────────────┐
+                        │  WhatsApp    │  │  Groq / Gemini /       │
+                        │  Bridge      │  │  Cerebras / local vLLM │
+                        │  (Render)    │  │                        │
+                        └──────────────┘  └────────────────────────┘
 ```
 
----
+Key design notes:
+
+* **Multi-tenancy** is enforced in the application layer. Every tenant table carries `organizationId`. A Prisma extension in `lib/db.ts` reads the current organization from AsyncLocalStorage and scopes list, aggregate, and bulk operations. Single-record operations by cuid are intentionally unscoped.
+* **Chat realtime** uses Supabase Realtime with Postgres Row Level Security. The client obtains a per-user JWT from `/api/chat/realtime-token`, signed with `SUPABASE_JWT_SECRET`. Prisma bypasses RLS because it connects as the table owner; RLS is the boundary for non-Prisma clients.
+* **Media** is stored in a private R2 bucket, fronted by a Cloudflare Worker that verifies HMAC-signed URLs before proxying GET, PUT, and DELETE. This works around SNI blocking on some ISPs.
+* **AI writes** are never executed directly by the model. The assistant proposes an action, the UI renders a confirmation card, the user approves, and the server verifies an HMAC token before executing.
+
+## Tech Stack
+
+| Layer            | Technology                                              |
+| ---------------- | ------------------------------------------------------- |
+| Framework        | Next.js 14 (App Router)                                 |
+| Language         | TypeScript                                              |
+| Styling          | Tailwind CSS                                            |
+| Database         | PostgreSQL (Supabase)                                   |
+| ORM              | Prisma 5                                                |
+| Auth             | JWT in httpOnly cookies                                 |
+| Client State     | Zustand                                                 |
+| Chat Realtime    | Supabase Realtime with Postgres RLS                     |
+| Media            | Cloudflare Worker in front of Cloudflare R2             |
+| AI SDK           | Vercel AI SDK (Groq, Gemini, OpenAI-compatible drivers) |
+| WhatsApp         | Baileys (separate Node service)                         |
+| Push             | Web Push (VAPID)                                        |
+| Package Manager  | pnpm                                                    |
+| Deployment       | Render, Cloudflare, Supabase                            |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
-- pnpm (`npm install -g pnpm`)
-- PostgreSQL (local or hosted)
+* Node.js 20 or newer
+* pnpm (`npm install -g pnpm`)
+* PostgreSQL database (Supabase recommended)
 
-### 1. Clone the repository
+### Installation
 
 ```bash
 git clone https://github.com/RIG-360-MEDIA/RIG-FORGE.git
 cd RIG-FORGE
-```
-
-### 2. Install dependencies
-
-```bash
 pnpm install
 ```
 
-### 3. Configure environment
-
-Copy the example env file and fill in your values:
+### Database Setup
 
 ```bash
-cp .env.example .env
+pnpm db:push        # Sync the Prisma schema to the database
+pnpm db:generate    # Generate the Prisma client
 ```
 
-```env
-# Database
-DATABASE_URL="postgresql://user:password@localhost:5432/forge_db"
-DIRECT_URL="postgresql://user:password@localhost:5432/forge_db"
-
-# Auth
-JWT_SECRET="your-long-random-secret"
-JWT_EXPIRES_IN="7d"
-
-# Session
-COOKIE_NAME="forge-token"
-COOKIE_SECURE="false"
-
-# App
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-```
-
-### 4. Set up the database
+Optionally seed an initial admin (creates `admin@forge.dev` / `Admin1234!`; rotate immediately):
 
 ```bash
-pnpm db:push        # Push schema to database
-pnpm db:generate    # Generate Prisma client
+pnpm tsx prisma/seed.ts
 ```
 
-### 5. Run the development server
+### Running Locally
 
 ```bash
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3000](http://localhost:3000).
 
----
+## Environment Variables
 
-## Database Scripts
+Copy `.env.example` to `.env` and populate the required keys. Values below are illustrative.
 
-```bash
-pnpm db:push       # Sync schema to DB (no migration files)
-pnpm db:generate   # Regenerate Prisma client after schema changes
-pnpm db:studio     # Open Prisma Studio (visual DB browser)
+### Required
+
+```env
+DATABASE_URL="postgresql://user:pass@host:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://user:pass@host:5432/postgres"
+
+JWT_SECRET="use-a-32-plus-char-random-string"
+JWT_EXPIRES_IN="7d"
+
+SESSION_COOKIE_NAME="forge_session"
+SESSION_COOKIE_SECURE="false"
+
+PORT="3000"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NODE_ENV="development"
+
+CRON_SECRET="min-8-char-random"
 ```
 
----
+### Forgie (AI Assistant)
 
-## Team Accounts
-
-All team members have been seeded. Default password for all accounts: `Forge@2026`
-
-| Role | Name | Email |
-|---|---|---|
-| **ADMIN** | Pranav | pranavv@rigforge.com |
-| EMPLOYEE | Abhyam | abhyam@rigforge.com |
-| EMPLOYEE | Radhesh | rhadesh@rigforge.com |
-| EMPLOYEE | Sumit | sumit@rigforge.com |
-| **ADMIN** | Kavya Jain | kavya@rigforge.com |
-| EMPLOYEE | Yash | yash@rigforge.com |
-| EMPLOYEE | Daksh | daksh@rigforge.com |
-| EMPLOYEE | Ahmed | ahmed@rigforge.com |
-| EMPLOYEE | Kashvi | kashvi@rigforge.com |
-| EMPLOYEE | Sudipta | sudipta@rigforge.com |
-| EMPLOYEE | Shubham | shubham@rigforge.com |
-| EMPLOYEE | Krishn | krishn@rigforge.com |
-| EMPLOYEE | Pankaj | pankaj@rigforge.com |
-| EMPLOYEE | Utkarsh | utkarsh@rigforge.com |
-| EMPLOYEE | Rohan | rohun@rigforge.com |
-
-> Members should change their password after first login via **Profile → Change Password**.
-
----
-
-## Active Projects
-
-OSINT · CC · Corruptx · Childsafe · Drone Mapping · Kashmir · Vanishing Voices · TCH · Imagery · DNL · Repositories · Belavida · Windlass · Social Media Posting · Stance · Video Editing · Integration · News Prism
-
----
-
-## API Overview
-
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/api/auth/login` | Authenticate user |
-| POST | `/api/auth/logout` | Clear session |
-| GET | `/api/auth/me` | Get current user |
-| GET | `/api/projects` | List projects |
-| POST | `/api/projects` | Create project |
-| GET | `/api/projects/[id]` | Project detail |
-| POST | `/api/tasks` | Create task |
-| GET | `/api/tickets` | List tickets |
-| POST | `/api/tickets` | Raise ticket |
-| POST | `/api/tickets/[id]/accept` | Accept ticket |
-| POST | `/api/tickets/[id]/complete` | Complete ticket |
-| GET | `/api/notifications` | List notifications |
-| PATCH | `/api/notifications/read-all` | Mark all read |
-| POST | `/api/daily-log` | Submit daily log |
-| GET | `/api/reports` | List weekly reports |
-| POST | `/api/reports/generate` | Generate report |
-| PATCH | `/api/users/me/profile` | Update profile |
-| PATCH | `/api/users/me/password` | Change password |
-| POST | `/api/heartbeat` | Update presence |
-| GET | `/api/admin/onboarding/pending` | Pending users (admin) |
-| POST | `/api/admin/generate-user` | Create user (admin) |
-| POST | `/api/admin/onboarding/approve/[id]` | Approve user (admin) |
-| DELETE | `/api/admin/onboarding/reject/[id]` | Reject user (admin) |
-
----
-
-## Onboarding Flow
-
-```
-Admin generates user (name + email)
-        ↓
-System creates account with temp password
-        ↓
-User logs in → redirected to /pending
-        ↓
-Admin approves or rejects from /dashboard/onboarding
-        ↓
-Approved → user redirected to /dashboard
+```env
+ASSISTANT_ENABLED="true"
+GROQ_API_KEYS=""
+GEMINI_API_KEYS=""
+CEREBRAS_API_KEYS=""
+ASSISTANT_PROVIDER_ORDER="groq,gemini,cerebras"
+GROQ_MODEL="llama-3.3-70b-versatile"
+GEMINI_MODEL="gemini-flash-latest"
+CEREBRAS_MODEL="gpt-oss-120b"
+ASSISTANT_USER_MSG_PER_HOUR="30"
 ```
 
----
+### Optional Integrations
 
-## Ticket Lifecycle
+```env
+GITHUB_TOKEN=""
+GITHUB_ORG=""
+
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+GOOGLE_REDIRECT_URI="http://localhost:3000/api/auth/google/callback"
+
+WA_BRIDGE_URL=""
+WA_BRIDGE_SECRET=""
+RIGFORGE_WA_SECRET=""
+
+SUPABASE_JWT_SECRET=""
+
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=""
+VAPID_PRIVATE_KEY=""
+VAPID_SUBJECT="mailto:ops@example.com"
+
+DEV_DASHBOARD_EMAILS=""
+DEV_INSTANCES="[]"
+```
+
+## Available Scripts
+
+| Command            | Description                                     |
+| ------------------ | ----------------------------------------------- |
+| `pnpm dev`         | Start the Next.js development server            |
+| `pnpm build`       | Generate Prisma client and build for production |
+| `pnpm start`       | Run the production server on `$PORT`            |
+| `pnpm lint`        | Lint the codebase                               |
+| `pnpm db:push`     | Push the Prisma schema to the database          |
+| `pnpm db:generate` | Regenerate the Prisma client                    |
+| `pnpm db:studio`   | Open Prisma Studio (visual DB browser)          |
+
+## Project Structure
 
 ```
-OPEN → (accepted by different user) → ACCEPTED → COMPLETED
-OPEN → CANCELLED  (only raiser can cancel, only while OPEN)
+rig-forge/
+├── app/
+│   ├── (auth)/               Login and pending pages
+│   ├── api/                  Route handlers
+│   │   ├── admin/            User, role, and onboarding management
+│   │   ├── assistant/        Forgie messages, tools, action execution
+│   │   ├── auth/             Session and Google OAuth
+│   │   ├── chat/             Conversations, messages, media, invites
+│   │   ├── cron/             Scheduled endpoints (require x-cron-secret)
+│   │   ├── github/           GitHub integration
+│   │   ├── google/           Gmail, Drive, Contacts, Meet, diagnostics
+│   │   ├── projects/         Projects and members
+│   │   ├── tasks/            Task management
+│   │   ├── tickets/          Ticket lifecycle
+│   │   └── whatsapp/         Inbound webhook from the bridge
+│   └── dashboard/            Application UI
+├── components/               Feature-grouped React components
+├── lib/                      Auth, DB, assistant, chat, google, whatsapp, storage
+├── prisma/                   schema.prisma, seed.ts, and RLS SQL
+├── whatsapp-bridge/          Standalone Baileys service
+├── worker/                   Cloudflare Worker for R2 media
+├── scripts/                  Admin and maintenance scripts
+├── docs/                     Design specs and deployment notes
+├── tests/e2e/                Playwright tests
+├── store/                    Zustand stores
+├── hooks/                    Custom React hooks
+└── middleware.ts             Edge authentication and route protection
 ```
 
-> A user cannot accept their own ticket.
+## Roles and Access
 
----
+| Role          | Capabilities                                                      |
+| ------------- | ----------------------------------------------------------------- |
+| `SUPER_ADMIN` | Everything, including custom role management                      |
+| `ADMIN`       | All operational features except super-admin-only settings         |
+| `EMPLOYEE`    | Own work, assigned projects, tickets, daily logs, and chat        |
+| Custom Role   | Any subset of 13 fine-grained capability keys                     |
 
-## Environment Notes
+Capability keys include `members.view`, `projects.manage`, `assistant.admin`, `whatsapp.send`, and others defined in `lib/permissions.ts`. Access to the developer dashboard (`/dashboard/dev`) is gated separately by `DEV_DASHBOARD_EMAILS`.
 
-- `COOKIE_SECURE` should be `true` in production (requires HTTPS)
-- `JWT_SECRET` must be a strong random string in production
-- `DATABASE_URL` and `DIRECT_URL` should point to the same DB (required by Prisma with Supabase/PgBouncer setups)
+### Onboarding Flow
 
----
+```
+1. Admin creates a user (name + email) with a temporary password.
+2. User logs in and is redirected to /pending.
+3. Admin approves the user in /dashboard/onboarding.
+4. User is forced to change the password on next login.
+```
+
+### Ticket Lifecycle
+
+```
+OPEN -> ACCEPTED -> COMPLETED     (raiser cannot accept own ticket)
+OPEN -> CANCELLED                 (only the raiser, only while OPEN)
+```
+
+## Deployment
+
+Three services need to be deployed independently.
+
+### Web Application
+
+* Platform: Render (web service).
+* Build: `pnpm install && pnpm db:generate && pnpm build`.
+* Start: `pnpm start`.
+* Health check: `/api/health`.
+* Node version: 20.11.1 or newer.
+* Secrets managed in the Render dashboard.
+
+### WhatsApp Bridge
+
+* Platform: Render (separate web service).
+* Root: `whatsapp-bridge/`.
+* Health check: `/health`.
+* Shares the same Postgres database (persists Baileys authentication state).
+
+### Media Worker
+
+* Platform: Cloudflare Workers.
+* Root: `worker/`.
+* Configuration in `worker/wrangler.toml`.
+* Requires `R2_SIGNING_SECRET` and an R2 bucket binding.
+
+### Scheduled Jobs
+
+Endpoints under `/api/cron/*` are triggered externally by cron-job.org or GitHub Actions. All requests must include the header `x-cron-secret: $CRON_SECRET`.
+
+Additional deployment details are documented in `docs/FORGIE_DEPLOYMENT.md`.
+
+## Security
+
+* `JWT_SECRET` must be a strong random string in any non-development environment. Placeholder values leave every session forgeable.
+* Never commit real values in `.env`. The `.env.example` file contains only illustrative placeholders.
+* Prisma connects as the table owner and bypasses Postgres RLS. RLS is the security boundary for any non-Prisma client (Supabase JS with an anon key, Realtime, REST). Enable RLS with `scripts/enable-rls.mjs`.
+* `tempPassword` and Google OAuth tokens are currently stored in plaintext. An encrypted-column migration is planned.
+* Cron endpoints are publicly reachable and rely on `CRON_SECRET` for authentication.
+* The `chat-media` bucket must be private in production and served through the `/api/chat/media/[...path]` proxy.
 
 ## License
 
-Internal use only — RIG 360 Media. Unauthorized access is prohibited.
+Internal use only. Copyright RIG 360 Media. Unauthorized access is prohibited.
