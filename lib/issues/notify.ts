@@ -20,20 +20,23 @@ export interface IssueEmailInput {
   image?: SendAttachment | null
 }
 
+const GMAIL_SEND_RE = /gmail\.send|gmail\.modify|gmail\.compose|mail\.google\.com/
+
 /**
- * Pick a user whose connected Gmail we can send through. Uses a raw query so the
- * org-scope extension does NOT filter it — the sender may live in a different org
- * than the reporter (the Gmail token fetch is keyed by userId, org-agnostic).
- * Prefers the developer's own inbox, falls back to any connected account.
+ * Candidate accounts to send the notification through, best first. Uses a raw
+ * query so the org-scope extension does NOT filter it — the sender may live in a
+ * different org than the reporter (the Gmail token fetch is keyed by userId,
+ * org-agnostic). Only send-capable connections are returned; ordered by the
+ * developer's own account first, then most-recently-used (its refresh token is
+ * the most likely to still be valid).
  */
-async function resolveSenderUserId(): Promise<string | null> {
-  const rows = await prisma.$queryRaw<{ id: string }[]>`
-    SELECT u.id
+async function resolveSenderCandidates(): Promise<string[]> {
+  const rows = await prisma.$queryRaw<{ id: string; scopes: string; is_pref: boolean }[]>`
+    SELECT u.id, g.scopes, (u.email = ${PREFERRED_SENDER_EMAIL}) AS is_pref
     FROM "User" u
     JOIN "GoogleIntegration" g ON g."userId" = u.id
-    ORDER BY (u.email = ${PREFERRED_SENDER_EMAIL}) DESC
-    LIMIT 1`
-  return rows[0]?.id ?? null
+    ORDER BY (u.email = ${PREFERRED_SENDER_EMAIL}) DESC, g."lastUsedAt" DESC NULLS LAST`
+  return rows.filter((r) => GMAIL_SEND_RE.test(r.scopes ?? '')).map((r) => r.id)
 }
 
 /**
@@ -44,8 +47,8 @@ export async function notifyIssueByEmail(
   input: IssueEmailInput,
 ): Promise<{ sent: boolean; error?: string }> {
   try {
-    const senderId = await resolveSenderUserId()
-    if (!senderId) return { sent: false, error: 'no connected Google account to send from' }
+    const senders = await resolveSenderCandidates()
+    if (senders.length === 0) return { sent: false, error: 'no send-capable Google account connected' }
 
     const body = [
       `A new issue was reported in "${input.organizationId}".`,
@@ -66,13 +69,23 @@ export async function notifyIssueByEmail(
       .filter((l) => l !== '')
       .join('\n')
 
-    await sendMessage(senderId, {
-      to: NOTIFY_TO,
-      subject: `[Forge issue] ${input.title}`,
-      body,
-      attachments: input.image ? [input.image] : undefined,
-    })
-    return { sent: true }
+    // Try each candidate until one send succeeds — a single account's refresh
+    // token may have gone stale, so we fall back to the next healthiest one.
+    const errors: string[] = []
+    for (const senderId of senders) {
+      try {
+        await sendMessage(senderId, {
+          to: NOTIFY_TO,
+          subject: `[Forge issue] ${input.title}`,
+          body,
+          attachments: input.image ? [input.image] : undefined,
+        })
+        return { sent: true }
+      } catch (e) {
+        errors.push(e instanceof Error ? e.message : 'send failed')
+      }
+    }
+    return { sent: false, error: `all ${senders.length} sender(s) failed: ${errors.join(' | ')}` }
   } catch (e) {
     return { sent: false, error: e instanceof Error ? e.message : 'send failed' }
   }
