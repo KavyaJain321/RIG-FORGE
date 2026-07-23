@@ -21,6 +21,7 @@ const IconUsers = () => <svg className={ic} viewBox="0 0 24 24" {...sp}><circle 
 const IconReport = () => <svg className={ic} viewBox="0 0 24 24" {...sp}><path d="M6 3h9l5 5v13a0 0 0 0 1 0 0H6a0 0 0 0 1 0 0z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>
 const IconUserPlus = () => <svg className={ic} viewBox="0 0 24 24" {...sp}><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20a5.5 5.5 0 0 1 11 0M19 8v6M22 11h-6" /></svg>
 const IconUser = () => <svg className={ic} viewBox="0 0 24 24" {...sp}><circle cx="12" cy="8" r="3.4" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg>
+const IconFlag = () => <svg className={ic} viewBox="0 0 24 24" {...sp}><path d="M5 21V4M5 4h11l-2 3 2 3H5" /></svg>
 
 interface Item {
   href: string
@@ -41,6 +42,7 @@ export default function MobileNav() {
   // Hidden until the user is approved (mirrors the desktop nav gate).
   if (!user || user.mustChangePassword) return null
   const canOnboard = userCan(user, 'onboarding.approve')
+  const canViewIssues = userCan(user, 'members.view')
 
   // 4 thumb-priority tabs + a More sheet for the rest.
   const primary: Item[] = [
@@ -56,6 +58,8 @@ export default function MobileNav() {
     canOnboard
       ? { href: '/dashboard/onboarding', label: 'Onboarding', icon: <IconUserPlus /> }
       : { href: '/dashboard/profile', label: 'Profile', icon: <IconUser /> },
+    ...(canViewIssues ? [{ href: '/dashboard/issues', label: 'Issues', icon: <IconFlag /> }] : []),
+    { href: '/dashboard/report-issue', label: 'Report Issue', icon: <IconFlag /> },
   ]
   const moreActive = more.some((m) => isNavActive(m.href, pathname))
 

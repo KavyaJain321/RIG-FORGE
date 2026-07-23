@@ -114,6 +114,7 @@ model User {
   auditLogs         AssistantAuditLog[]
   dailyLogDrafts    DailyLogDraft[]
   googleIntegration GoogleIntegration?
+  issues            Issue[]
 
   // ── Custom roles (fine-grained permissions) ──
   customRoleId String?
@@ -772,4 +773,34 @@ model Organization {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Issue reports (user-submitted bug/feedback channel) ───────────────────────
+// Trijya (and any tenant) users file issues with an optional screenshot. A new
+// issue emails the developer (see lib/issues/notify). Fixing stays manual — this
+// is a capture + notify channel only, not an auto-fix pipeline.
+enum IssueStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+model Issue {
+  id             String      @id @default(cuid())
+  organizationId String      @default("rig360") // tenancy anchor (auto-scoped, see lib/db.ts)
+  reporterId     String
+  reporter       User        @relation(fields: [reporterId], references: [id])
+  title          String
+  description    String
+  pageUrl        String? // where the reporter was when they filed it
+  imageUrl       String? // R2 proxy path to the screenshot, if attached
+  userAgent      String? // browser/device string, for repro
+  status         IssueStatus @default(OPEN)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([organizationId])
+  @@index([reporterId])
+  @@index([status])
 }
