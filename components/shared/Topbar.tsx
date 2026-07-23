@@ -29,7 +29,9 @@ const ADMIN_NAV = [
   { href: '/dashboard/people', label: 'PEOPLE' },
   { href: '/dashboard/tickets', label: 'TICKETS' },
   { href: '/dashboard/reports', label: 'REPORTS' },
+  { href: '/dashboard/issues', label: 'ISSUES' },
   { href: '/dashboard/onboarding', label: 'ONBOARDING' },
+  { href: '/dashboard/report-issue', label: 'REPORT ISSUE' },
 ] as const
 
 // Super Admin sees everything Admin sees + no additional nav items needed
@@ -44,6 +46,7 @@ const EMPLOYEE_NAV = [
   { href: '/dashboard/people', label: 'PEOPLE' },
   { href: '/dashboard/tickets', label: 'TICKETS' },
   { href: '/dashboard/reports', label: 'REPORTS' },
+  { href: '/dashboard/report-issue', label: 'REPORT ISSUE' },
   { href: '/dashboard/profile', label: 'MY PROFILE' },
 ] as const
 
@@ -77,10 +80,12 @@ export default function Topbar() {
     : user?.role === 'ADMIN'
       ? ADMIN_NAV
       : EMPLOYEE_NAV
-  // Hide capability-gated tabs (e.g. Onboarding) a custom role lacks.
-  const navItems = baseNav.filter(
-    (i) => i.href !== '/dashboard/onboarding' || userCan(user, 'onboarding.approve'),
-  )
+  // Hide capability-gated tabs (e.g. Onboarding, Issues) a custom role lacks.
+  const NAV_CAP: Record<string, string> = {
+    '/dashboard/onboarding': 'onboarding.approve',
+    '/dashboard/issues': 'members.view',
+  }
+  const navItems = baseNav.filter((i) => !NAV_CAP[i.href] || userCan(user, NAV_CAP[i.href]))
 
   const [statusOpen, setStatusOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
