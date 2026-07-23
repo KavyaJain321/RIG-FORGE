@@ -213,7 +213,7 @@ export default function ProjectListRow({
       role="button"
       tabIndex={0}
       aria-label={`Open project: ${project.name}`}
-      className={`relative flex flex-col gap-3 lg:flex-row lg:items-center px-4 sm:px-6 lg:gap-6 py-3 lg:py-0 lg:min-h-[64px] bg-background-secondary border-b border-border-default hover:bg-background-tertiary cursor-pointer transition-all duration-300 ${isRemoving ? 'opacity-0' : 'opacity-100'}`}
+      className={`relative flex flex-col gap-3 lg:flex-row lg:items-center px-4 sm:px-6 lg:gap-4 py-3 lg:py-0 lg:min-h-[64px] bg-background-secondary border-b border-border-default hover:bg-background-tertiary cursor-pointer transition-all duration-300 ${isRemoving ? 'opacity-0' : 'opacity-100'}`}
       onClick={handleRowClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/dashboard/projects/${project.id}`) } }}
     >
@@ -221,7 +221,9 @@ export default function ProjectListRow({
       <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${barColor}`} />
 
       {/* ── COLUMN 1: Identity ──────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0">
+      {/* min-w floor so the name never collapses to an ellipsis when the meta
+          columns (or an open Forgie dock) squeeze the row. */}
+      <div className="flex-1 min-w-0 lg:min-w-[140px]">
         {editMode ? (
           <div data-no-nav className="space-y-2 py-2">
             <input
@@ -251,21 +253,24 @@ export default function ProjectListRow({
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-mono font-bold text-sm text-primary truncate">
-                {project.name}
-              </span>
+            {/* Name gets the FULL column width and may wrap to two lines — it
+                used to share the line with the priority badge and truncate to a
+                single character on narrower screens. */}
+            <span className="font-mono font-bold text-sm text-primary leading-snug break-words line-clamp-3">
+              {project.name}
+            </span>
+            <div className="flex items-center gap-2 min-w-0 mt-1">
               <span className="shrink-0">
                 <PriorityBadge priority={project.priority} />
               </span>
+              {project.description ? (
+                <p className="font-mono text-xs text-muted truncate">
+                  {project.description}
+                </p>
+              ) : (
+                <p className="font-mono text-xs text-muted italic truncate">No description</p>
+              )}
             </div>
-            {project.description ? (
-              <p className="font-mono text-xs text-muted truncate mt-1 max-w-md">
-                {project.description}
-              </p>
-            ) : (
-              <p className="font-mono text-xs text-muted italic mt-1">No description</p>
-            )}
           </>
         )}
       </div>
@@ -275,7 +280,7 @@ export default function ProjectListRow({
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 lg:contents">
 
       {/* ── COLUMN 2: Progress ──────────────────────────────────────────────── */}
-      <div className="w-full lg:w-48 shrink-0" data-no-nav>
+      <div className="w-full lg:w-32 lg:min-w-0 lg:shrink" data-no-nav>
         <p className="font-mono text-[10px] text-muted tracking-widest uppercase mb-1">
           Progress
         </p>
@@ -286,7 +291,7 @@ export default function ProjectListRow({
       </div>
 
       {/* ── COLUMN 3: Members ───────────────────────────────────────────────── */}
-      <div className="lg:w-32 shrink-0">
+      <div className="lg:w-24 shrink-0">
         {project.members.length === 0 ? (
           <span className="font-mono text-xs text-muted">—</span>
         ) : (
@@ -306,7 +311,7 @@ export default function ProjectListRow({
       </div>
 
       {/* ── COLUMN 4: Deadline ──────────────────────────────────────────────── */}
-      <div className="lg:w-32 shrink-0">
+      <div className="lg:w-28 shrink-0">
         {editMode ? (
           <input
             data-no-nav
@@ -328,7 +333,7 @@ export default function ProjectListRow({
       </div>
 
       {/* ── COLUMN 5: Status ────────────────────────────────────────────────── */}
-      <div className="lg:w-28 shrink-0">
+      <div className="lg:w-24 shrink-0">
         {editMode ? (
           <div data-no-nav className="relative">
             <select
@@ -353,7 +358,7 @@ export default function ProjectListRow({
       {/* ── COLUMN 6: Actions (ADMIN only) ──────────────────────────────────── */}
       {isAdmin && (
         <div
-          className="w-full lg:w-20 shrink-0 flex items-center justify-end gap-1 [&>button]:p-2 lg:[&>button]:p-0"
+          className="w-full lg:w-[124px] shrink-0 flex items-center justify-end gap-1.5"
           data-no-nav
           onClick={(e) => e.stopPropagation()}
         >
@@ -362,39 +367,41 @@ export default function ProjectListRow({
               <button
                 onClick={(e) => void handleSave(e)}
                 disabled={saving}
-                className="font-mono text-sm text-accent-ink hover:text-accent-ink disabled:opacity-50 transition-colors duration-150"
+                className="h-7 px-2.5 border border-accent/50 rounded font-mono text-[10px] tracking-widest text-accent-ink hover:bg-accent/10 disabled:opacity-50 transition-colors duration-150 whitespace-nowrap"
                 title="Save changes"
               >
-                {saving ? '…' : '✓'}
+                {saving ? '…' : 'SAVE'}
               </button>
               <button
                 onClick={cancelEdit}
-                className="font-mono text-sm text-muted hover:text-primary transition-colors duration-150"
+                className="h-7 px-2.5 border border-border-default rounded font-mono text-[10px] tracking-widest text-muted hover:text-primary transition-colors duration-150 whitespace-nowrap"
                 title="Cancel"
               >
-                ✕
+                CANCEL
               </button>
             </>
           ) : (
             <>
+              {/* Labelled, bordered buttons — these were bare "✎" / "▣" glyphs
+                  that users could not find (reported by Trijya). */}
               <button
                 onClick={openEdit}
-                className="font-mono text-base text-muted hover:text-accent-ink transition-colors duration-150"
+                className="h-7 px-2.5 border border-border-default rounded font-mono text-[10px] tracking-widest text-muted hover:text-accent-ink hover:border-accent/50 transition-colors duration-150 whitespace-nowrap"
                 title="Edit project"
               >
-                ✎
+                EDIT
               </button>
               <button
                 onClick={handleArchiveClick}
                 disabled={archiving}
-                className={`font-mono text-[10px] tracking-widest transition-colors duration-150 disabled:opacity-50 whitespace-nowrap ${
+                className={`h-7 px-2.5 border rounded font-mono text-[10px] tracking-widest transition-colors duration-150 disabled:opacity-50 whitespace-nowrap ${
                   archiveConfirm
-                    ? 'text-status-danger'
-                    : 'text-muted hover:text-status-danger'
+                    ? 'border-status-danger text-status-danger bg-status-danger/10'
+                    : 'border-border-default text-muted hover:text-status-danger hover:border-status-danger/50'
                 }`}
-                title="Archive project"
+                title="Delete project (can be restored)"
               >
-                {archiveConfirm ? 'CONFIRM?' : '▣'}
+                {archiveConfirm ? 'SURE?' : 'DELETE'}
               </button>
             </>
           )}
