@@ -21,7 +21,6 @@ const ADMIN_NAV = [
   { href: '/dashboard/reports',    label: 'Reports'     },
   { href: '/dashboard/issues',     label: 'Issues'      },
   { href: '/dashboard/onboarding', label: 'Onboarding'  },
-  { href: '/dashboard/report-issue', label: 'Report Issue' },
 ] as const
 
 const EMPLOYEE_NAV = [
@@ -29,8 +28,8 @@ const EMPLOYEE_NAV = [
   { href: '/dashboard/projects',   label: 'My Projects' },
   { href: '/dashboard/people',     label: 'Team'        },
   { href: '/dashboard/tickets',    label: 'Tickets'     },
+  { href: '/dashboard/issues',     label: 'Issues'      },
   { href: '/dashboard/profile',    label: 'My Profile'  },
-  { href: '/dashboard/report-issue', label: 'Report Issue' },
 ] as const
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,7 +43,6 @@ function isNavActive(itemHref: string, pathname: string): boolean {
 // with an admin base role). Untracked tabs are always shown.
 const NAV_CAP: Record<string, string> = {
   '/dashboard/onboarding': 'onboarding.approve',
-  '/dashboard/issues': 'members.view',
 }
 function visibleNav(
   items: ReadonlyArray<{ href: string; label: string }>,

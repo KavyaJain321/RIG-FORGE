@@ -2,7 +2,6 @@ import { type NextRequest } from 'next/server'
 
 import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
-import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import { putObject, r2Configured } from '@/lib/storage/r2'
 import { notifyIssueByEmail } from '@/lib/issues/notify'
@@ -93,15 +92,14 @@ export async function POST(request: NextRequest) {
 }
 
 // ─── GET /api/issues ──────────────────────────────────────────────────────────
-// Admin-only list of reported issues (org-scoped automatically).
+// Company-wide list of reported issues (org-scoped automatically). Any signed-in
+// user sees every issue in their org — issues are a shared, collaborative log.
 export async function GET(request: NextRequest) {
   try {
     const token = getTokenFromCookies(request)
     if (!token) return errorResponse('Authentication required', 401)
     const payload = verifyToken(token)
     if (!payload) return errorResponse('Invalid or expired session', 401)
-
-    if (!tokenCan(payload, 'members.view')) return errorResponse('Admin access required', 403)
 
     const { searchParams } = request.nextUrl
     const status = searchParams.get('status') ?? ''

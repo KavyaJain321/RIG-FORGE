@@ -42,7 +42,6 @@ export default function MobileNav() {
   // Hidden until the user is approved (mirrors the desktop nav gate).
   if (!user || user.mustChangePassword) return null
   const canOnboard = userCan(user, 'onboarding.approve')
-  const canViewIssues = userCan(user, 'members.view')
 
   // 4 thumb-priority tabs + a More sheet for the rest.
   const primary: Item[] = [
@@ -58,8 +57,7 @@ export default function MobileNav() {
     canOnboard
       ? { href: '/dashboard/onboarding', label: 'Onboarding', icon: <IconUserPlus /> }
       : { href: '/dashboard/profile', label: 'Profile', icon: <IconUser /> },
-    ...(canViewIssues ? [{ href: '/dashboard/issues', label: 'Issues', icon: <IconFlag /> }] : []),
-    { href: '/dashboard/report-issue', label: 'Report Issue', icon: <IconFlag /> },
+    { href: '/dashboard/issues', label: 'Issues', icon: <IconFlag /> },
   ]
   const moreActive = more.some((m) => isNavActive(m.href, pathname))
 
