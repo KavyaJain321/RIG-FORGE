@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { tokenCan } from '@/lib/permissions'
+import { excludeHiddenUsersWhere } from '@/lib/hidden-users'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
 import type { MemberSummary, PaginatedResponse } from '@/lib/types'
 
@@ -33,6 +34,8 @@ export async function GET(request: NextRequest) {
     if (tokenCan(payload, 'members.view')) {
       const where = {
         isActive: true,
+        // Hide QA/test accounts from the org member directory + search.
+        ...excludeHiddenUsersWhere(),
         ...(search && {
           OR: [
             { name: { contains: search, mode: 'insensitive' as const } },
@@ -59,13 +62,17 @@ export async function GET(request: NextRequest) {
           currentStatus: true,
           isOnboarding: true,
           createdAt: true,
-          _count: { select: { projects: true } },
+          // Relation counts/reads are nested → the org-scope extension does NOT
+          // apply. Filter explicitly by the caller's org so a user's card can
+          // never count or surface memberships from another tenant.
+          _count: { select: { projects: { where: { organizationId: payload.organizationId } } } },
           dailyActivities: {
             orderBy: { lastSeenAt: 'desc' },
             take: 1,
             select: { lastSeenAt: true },
           },
           projects: {
+            where: { organizationId: payload.organizationId },
             take: 1,
             select: { project: { select: { name: true } } },
           },
@@ -121,6 +128,8 @@ export async function GET(request: NextRequest) {
     const where = {
       isActive: true,
       id: { in: allowedIds },
+      // Hide QA/test accounts even if one somehow shares a project.
+      ...excludeHiddenUsersWhere(),
       ...(search && {
         name: { contains: search, mode: 'insensitive' as const },
       }),
@@ -147,13 +156,14 @@ export async function GET(request: NextRequest) {
         currentStatus: true,
         isOnboarding: true,
         createdAt: true,
-        _count: { select: { projects: true } },
+        _count: { select: { projects: { where: { organizationId: payload.organizationId } } } },
         dailyActivities: {
           orderBy: { lastSeenAt: 'desc' },
           take: 1,
           select: { lastSeenAt: true },
         },
         projects: {
+          where: { organizationId: payload.organizationId },
           take: 1,
           select: { project: { select: { name: true } } },
         },

@@ -3,6 +3,7 @@ import { type NextRequest } from 'next/server'
 import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/db'
+import { getOrgId } from '@/lib/tenant-context'
 import { getTokenFromCookies, verifyToken } from '@/lib/auth'
 import { tokenCan } from '@/lib/permissions'
 import { successResponse, errorResponse } from '@/lib/api-helpers'
@@ -230,11 +231,17 @@ export async function POST(
         deadline: resolvedDeadline,
         leadId: leadId.trim(),
         links: resolvedLinks as never,
+        // NOTE: nested creates are NOT touched by the org-scope extension
+        // (lib/db.ts only injects organizationId on top-level ops). Without an
+        // explicit value they fall back to the column default ("rig360"), which
+        // mis-stamps every non-rig360 tenant's lead membership + thread. Stamp
+        // them with the caller's org so scoped reads (counts, lists, assignee
+        // dropdowns) see them.
         members: {
-          create: { userId: leadId.trim() },
+          create: { userId: leadId.trim(), organizationId: getOrgId() },
         },
         thread: {
-          create: {},
+          create: { organizationId: getOrgId() },
         },
       },
     })

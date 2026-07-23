@@ -5,7 +5,8 @@ import ReactMarkdown from 'react-markdown'
 
 import MemberRow from '@/components/projects/detail/MemberRow'
 import MemberSlideOver from '@/components/people/MemberSlideOver'
-import type { ProjectDetail, ProjectLink } from '@/lib/types'
+import { useToast } from '@/components/ui/Toast'
+import type { ProjectDetail, ProjectLink, ApiResponse } from '@/lib/types'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -730,6 +731,7 @@ function DetailsPanel({ project, isAdmin, onProjectChange }: DetailsPanelProps) 
 
 export default function OverviewTab({ project, isAdmin, isLead, currentUserId, onProjectChange }: OverviewTabProps) {
   const canEdit = isAdmin || isLead
+  const { addToast } = useToast()
   const [slideOverMemberId, setSlideOverMemberId] = useState<string | null>(null)
 
   function handleMemberClick(userId: string) {
@@ -738,11 +740,32 @@ export default function OverviewTab({ project, isAdmin, isLead, currentUserId, o
     setSlideOverMemberId(userId)
   }
 
-  function handleRemoveMember(userId: string) {
+  async function handleRemoveMember(userId: string) {
+    // Optimistic update; revert if the server rejects. Previously this only
+    // mutated local state and never called the API, so removals silently
+    // reappeared on refresh.
+    const previousMembers = project.members
     onProjectChange({
       ...project,
       members: project.members.filter((m) => m.userId !== userId),
     })
+    try {
+      const res = await fetch(`/api/projects/${project.id}/members/${userId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const json = (await res.json()) as ApiResponse<ProjectDetail>
+      if (!res.ok || json.error) {
+        onProjectChange({ ...project, members: previousMembers })
+        addToast('error', json.error ?? 'Failed to remove member')
+        return
+      }
+      if (json.data) onProjectChange(json.data)
+      addToast('success', 'Member removed')
+    } catch {
+      onProjectChange({ ...project, members: previousMembers })
+      addToast('error', 'Network error while removing member')
+    }
   }
 
   function handleDescriptionSaved(description: string | null) {
